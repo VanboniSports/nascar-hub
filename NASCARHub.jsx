@@ -72,6 +72,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ADMIN PASSWORD
 // ─────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "CassidyH7/15";
+const CSV_URL = "https://raw.githubusercontent.com/VanboniSports/nascar-hub/refs/heads/main/nascar_scraped_data.csv";
 
 // ─────────────────────────────────────────────────────────────
 // INITIAL DRIVERS — 36 full-time 2026
@@ -310,6 +311,7 @@ const Ic = {
   Chevron: ({open})=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{transform:open?"rotate(180deg)":"rotate(0)",transition:"transform 0.2s",flexShrink:0}}><polyline points="6 9 12 15 18 9"/></svg>,
   Alert:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
   Users:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  Refresh: ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -917,7 +919,7 @@ const PRED_MODELS = [
 // ─────────────────────────────────────────────────────────────
 // PREDICTOR TAB — with model selector
 // ─────────────────────────────────────────────────────────────
-function PredictorTab({ drivers, csvData, onCsvUpload }) {
+function PredictorTab({ drivers, csvData }) {
   const [selectedWeek, setSelectedWeek] = useState("");
   const [selectedModel, setSelectedModel] = useState("power");
   const [results, setResults] = useState([]);
@@ -998,23 +1000,9 @@ function PredictorTab({ drivers, csvData, onCsvUpload }) {
           <div style={{ flex:1 }}>
             <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:2 }}>CSV Data Source</div>
             <div style={{ fontSize:12, color:hasCsv ? T.green : T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
-              {hasCsv ? `✓ ${csvData.length.toLocaleString()} records loaded` : "No data — upload CSV to use this model"}
+              {hasCsv ? `✓ ${csvData.length.toLocaleString()} records loaded` : "No data — CSV loads automatically from GitHub. Use Admin Panel to upload manually."}
             </div>
           </div>
-          {!hasCsv && (
-            <label style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"6px 14px", background:T.accent, color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:`0 4px 14px ${T.accentGlow}` }}>
-              <Ic.Import /> Upload CSV
-              <input type="file" accept=".csv" style={{ display:"none" }}
-                onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = ev => { onCsvUpload(parseCSVData(ev.target.result)); };
-                  reader.readAsText(file);
-                  e.target.value = "";
-                }} />
-            </label>
-          )}
         </div>
       )}
 
@@ -1314,7 +1302,7 @@ const SSChartTooltip = ({ active, payload, label }) => {
   );
 };
 
-function StatsTab({ drivers, seasonStats, raceHistory, csvData, onCsvUpload }) {
+function StatsTab({ drivers, seasonStats, raceHistory, csvData }) {
   const [subTab, setSubTab] = useState("standings");
 
   return (
@@ -1330,28 +1318,6 @@ function StatsTab({ drivers, seasonStats, raceHistory, csvData, onCsvUpload }) {
             </button>
           );
         })}
-      </div>
-
-      {/* CSV upload bar */}
-      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, marginBottom:16 }}>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:2 }}>CSV Data Source</div>
-          <div style={{ fontSize:12, color:csvData.length > 0 ? T.green : T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
-            {csvData.length > 0 ? `✓ ${csvData.length.toLocaleString()} records loaded` : "No data — upload CSV below"}
-          </div>
-        </div>
-        <label style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"6px 14px", background:T.accent, color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:`0 4px 14px ${T.accentGlow}` }}>
-          <Ic.Import /> Upload CSV
-          <input type="file" accept=".csv" style={{ display:"none" }}
-            onChange={e => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = ev => { onCsvUpload(parseCSVData(ev.target.result)); };
-              reader.readAsText(file);
-              e.target.value = "";
-            }} />
-        </label>
       </div>
 
       {/* Sub-tab content */}
@@ -1432,7 +1398,7 @@ function SSStandingsTab({ csvData, drivers }) {
     else { setSortKey(k); setSortAsc(defaultAsc); }
   };
 
-  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>Upload the NASCAR CSV to view season standings.</div>;
+  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>CSV data loads automatically from GitHub. Check Admin Panel if data is missing.</div>;
 
   const cols = [
     { k:"name",        l:"#",          asc:true  },
@@ -1532,7 +1498,7 @@ function SSCompareTab({ csvData, drivers }) {
     setSelected(prev => prev.includes(name) ? prev.filter(n=>n!==name) : prev.length < 6 ? [...prev, name] : prev);
   };
 
-  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>Upload the NASCAR CSV to compare drivers.</div>;
+  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>CSV data loads automatically from GitHub. Check Admin Panel if data is missing.</div>;
 
   const metrics = [
     { key:"wins",        label:"Wins",        lower:false },
@@ -1726,7 +1692,7 @@ function SSMfgTrendsTab({ csvData }) {
     return { overall, byType, trendData };
   }, [csvData, yearFilter]);
 
-  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>Upload the NASCAR CSV to view manufacturer trends.</div>;
+  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>CSV data loads automatically from GitHub. Check Admin Panel if data is missing.</div>;
 
   // Build track type breakdown chart data
   const trackTypes = ["Intermediate","Short Track","Road Course","Superspeedway"];
@@ -1913,7 +1879,7 @@ function SSSleeperTab({ csvData, drivers }) {
     else { setSortKey(k); setSortAsc(defaultAsc); }
   };
 
-  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>Upload the NASCAR CSV to detect sleepers.</div>;
+  if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>CSV data loads automatically from GitHub. Check Admin Panel if data is missing.</div>;
 
   // Sleeper candidates: underperforming career avg by >= 3 positions
   const sleeperCandidates = sorted.filter(d => d.diff >= 3);
@@ -2405,12 +2371,12 @@ function BattleTrackerTab({ battleRaces }) {
 // ─────────────────────────────────────────────────────────────
 // GLOBAL ADMIN PANEL — lives at the bottom of the app
 // ─────────────────────────────────────────────────────────────
-function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave }) {
+function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
   const [pwErr, setPwErr] = useState(false);
-  const [adminSection, setAdminSection] = useState("power"); // "power" | "battle"
+  const [adminSection, setAdminSection] = useState("power"); // "power" | "battle" | "csv"
 
   // Power Rankings admin state
   const [raceName, setRaceName] = useState("");
@@ -2599,7 +2565,7 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
               {/* Admin sub-nav */}
               <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, paddingBottom:0 }}>
-                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"}].map(tab => {
+                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"}].map(tab => {
                   const active = adminSection === tab.id;
                   return (
                     <button key={tab.id} onClick={()=>setAdminSection(tab.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
@@ -2874,6 +2840,46 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
                   )}
                 </div>
               )}
+
+              {/* ─── CSV DATA ADMIN ─── */}
+              {adminSection === "csv" && (
+                <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                  {/* Status */}
+                  <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 20px", display:"flex", flexDirection:"column", gap:10 }}>
+                    <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>CSV Data Status</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <span style={{ fontSize:14, color:csvLoading ? T.gold : csvData.length > 0 ? T.green : T.red }}>●</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, color:T.text, fontFamily:"'IBM Plex Mono',monospace" }}>
+                          {csvLoading ? "Loading…" : csvData.length > 0 ? `✓ ${csvData.length.toLocaleString()} records loaded` : "No data loaded"}
+                        </div>
+                        {csvError && <div style={{ fontSize:11, color:T.red, fontFamily:"'IBM Plex Mono',monospace", marginTop:4 }}>⚠ {csvError}</div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+                    <label style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"8px 18px", background:T.accent, color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:`0 4px 14px ${T.accentGlow}` }}>
+                      <Ic.Import /> Upload CSV
+                      <input type="file" accept=".csv" style={{ display:"none" }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = ev => { onCsvUpload(parseCSVData(ev.target.result)); };
+                          reader.readAsText(file);
+                          e.target.value = "";
+                        }} />
+                    </label>
+                    <button onClick={onCsvRefresh} disabled={csvLoading}
+                      style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"8px 18px", background:"#334155", color:"#fff", border:"none", borderRadius:8, cursor:csvLoading?"not-allowed":"pointer", fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", opacity:csvLoading?0.5:1 }}>
+                      {csvLoading ? <Ic.Spinner /> : <Ic.Refresh />} Refresh from GitHub
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
         </div>
@@ -2979,7 +2985,7 @@ function TrackLeaderboardTab({ csvData }) {
         <div style={{ fontSize:28 }}>📊</div>
         <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.text }}>No CSV Data Loaded</div>
         <div style={{ fontSize:12, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", maxWidth:400 }}>
-          Upload your <span style={{ color:T.accent }}>nascar_scraped_data.csv</span> file using the CSV upload section below to populate track leaderboards.
+          Upload your <span style={{ color:T.accent }}>nascar_scraped_data.csv</span> file using the Admin Panel CSV section to populate track leaderboards.
         </div>
       </div>
     );
@@ -3310,8 +3316,8 @@ function DriverTrackLookup({ csvData }) {
     return (
       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 20px", gap:14, textAlign:"center" }}>
         <div style={{ fontSize:28 }}>🔍</div>
-        <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.text }}>Upload CSV to Enable Lookup</div>
-        <div style={{ fontSize:12, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Use the Upload CSV button above to load <span style={{ color:T.accent }}>nascar_scraped_data.csv</span></div>
+        <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.text }}>Waiting for CSV Data</div>
+        <div style={{ fontSize:12, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>CSV data loads automatically from GitHub. Use the <span style={{ color:T.accent }}>Admin Panel</span> to upload or refresh manually.</div>
       </div>
     );
   }
@@ -3605,7 +3611,7 @@ const DA_SUBTABS = [
   { id:"dnfrisk",     label:"Bad / Good Day",            icon:"Alert"   },
 ];
 
-function TrackStatsTab({ csvData, onCsvUpload }) {
+function TrackStatsTab({ csvData }) {
   const [subTab, setSubTab] = useState("lookup");
 
   return (
@@ -3621,31 +3627,6 @@ function TrackStatsTab({ csvData, onCsvUpload }) {
             </button>
           );
         })}
-      </div>
-
-      {/* CSV upload bar — always visible */}
-      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, marginBottom:16 }}>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:2 }}>CSV Data Source</div>
-          <div style={{ fontSize:12, color:csvData.length > 0 ? T.green : T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
-            {csvData.length > 0 ? `✓ ${csvData.length.toLocaleString()} records loaded` : "No data — upload CSV below"}
-          </div>
-        </div>
-        <label style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"6px 14px", background:T.accent, color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:`0 4px 14px ${T.accentGlow}` }}>
-          <Ic.Import /> Upload CSV
-          <input type="file" accept=".csv" style={{ display:"none" }}
-            onChange={e => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = ev => {
-                const parsed = parseCSVData(ev.target.result);
-                onCsvUpload(parsed);
-              };
-              reader.readAsText(file);
-              e.target.value = "";
-            }} />
-        </label>
       </div>
 
       {/* Sub-tab content */}
@@ -3694,7 +3675,7 @@ function DaGrade({ val, allVals, lowerBetter }) {
   return <span style={{ background:g.bg, color:g.color, padding:"2px 7px", borderRadius:4, fontWeight:800, fontSize:10, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:0.5 }}>{g.grade}</span>;
 }
 
-function DaTrackBreakdown({ csvData, onCsvUpload }) {
+function DaTrackBreakdown({ csvData }) {
   const [selDriver, setSelDriver] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [sortCol, setSortCol] = useState("avgFinish");
@@ -4671,32 +4652,8 @@ function DaBadDayRisk({ csvData }) {
 // ─────────────────────────────────────────────────────────────
 // DRIVER ANALYTICS TAB — wrapper with sub-navigation
 // ─────────────────────────────────────────────────────────────
-function DriverAnalyticsTab({ csvData, onCsvUpload }) {
+function DriverAnalyticsTab({ csvData }) {
   const [subTab, setSubTab] = useState("breakdown");
-
-  // CSV upload bar
-  const csvBar = (
-    <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, marginBottom:16 }}>
-      <div style={{ flex:1 }}>
-        <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:2 }}>CSV Data Source</div>
-        <div style={{ fontSize:12, color:csvData.length > 0 ? T.green : T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
-          {csvData.length > 0 ? `✓ ${csvData.length.toLocaleString()} records loaded` : "No data — upload CSV below"}
-        </div>
-      </div>
-      <label style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"6px 14px", background:T.accent, color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:`0 4px 14px ${T.accentGlow}` }}>
-        <Ic.Import /> Upload CSV
-        <input type="file" accept=".csv" style={{ display:"none" }}
-          onChange={e => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = ev => { onCsvUpload(parseCSVData(ev.target.result)); };
-            reader.readAsText(file);
-            e.target.value = "";
-          }} />
-      </label>
-    </div>
-  );
 
   if (csvData.length === 0) {
     return (
@@ -4713,11 +4670,10 @@ function DriverAnalyticsTab({ csvData, onCsvUpload }) {
             );
           })}
         </div>
-        {csvBar}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 20px", gap:14, textAlign:"center" }}>
           <div style={{ fontSize:28 }}>📊</div>
-          <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.text }}>Upload CSV to Enable Driver Analytics</div>
-          <div style={{ fontSize:12, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Use the Upload CSV button above to load <span style={{ color:T.accent }}>nascar_scraped_data.csv</span></div>
+          <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.text }}>Waiting for CSV Data</div>
+          <div style={{ fontSize:12, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>CSV data loads automatically from GitHub on startup. If it failed, use the Admin Panel to upload or refresh.</div>
         </div>
       </div>
     );
@@ -4738,12 +4694,9 @@ function DriverAnalyticsTab({ csvData, onCsvUpload }) {
         })}
       </div>
 
-      {/* CSV bar */}
-      {csvBar}
-
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "breakdown"   && <DaTrackBreakdown csvData={csvData} onCsvUpload={onCsvUpload} />}
+        {subTab === "breakdown"   && <DaTrackBreakdown csvData={csvData} />}
         {subTab === "h2h"         && <DaHeadToHead csvData={csvData} />}
         {subTab === "consistency" && <DaConsistencyScore csvData={csvData} />}
         {subTab === "dnfrisk"     && <DaBadDayRisk csvData={csvData} />}
@@ -4868,7 +4821,6 @@ export default function NASCARHub() {
     } catch {}
 
     // Auto-fetch CSV from GitHub, fall back to localStorage cache
-    const CSV_URL = "https://raw.githubusercontent.com/VanboniSports/nascar-hub/refs/heads/main/nascar_scraped_data.csv";
     setCsvLoading(true);
     setCsvError(null);
     fetch(CSV_URL)
@@ -4888,7 +4840,7 @@ export default function NASCARHub() {
       })
       .catch(err => {
         console.warn("CSV auto-fetch failed, trying localStorage cache:", err);
-        setCsvError(`Auto-load failed: ${err.message}. Upload CSV manually or refresh to retry.`);
+        setCsvError(`Auto-load failed: ${err.message}. Use Admin Panel to upload CSV manually or refresh to retry.`);
         // Fall back to localStorage cache
         try {
           const csvRaw = localStorage.getItem("nascar_csv_data");
@@ -4911,6 +4863,30 @@ export default function NASCARHub() {
   const saveCsvData = useCallback(async (parsed) => {
     setCsvData(parsed);
     try { localStorage.setItem("nascar_csv_data", JSON.stringify(parsed)); } catch {}
+  }, []);
+
+  const refreshCsv = useCallback(() => {
+    setCsvLoading(true);
+    setCsvError(null);
+    fetch(CSV_URL)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
+      })
+      .then(text => {
+        const parsed = parseCSVData(text);
+        if (parsed.length > 0) {
+          setCsvData(parsed);
+          try { localStorage.setItem("nascar_csv_data", JSON.stringify(parsed)); } catch {}
+        } else {
+          throw new Error("CSV parsed but produced 0 records");
+        }
+        setCsvLoading(false);
+      })
+      .catch(err => {
+        setCsvError(`Refresh failed: ${err.message}`);
+        setCsvLoading(false);
+      });
   }, []);
 
   const saveBattleRaces = useCallback(async (updated) => {
@@ -5079,11 +5055,11 @@ export default function NASCARHub() {
         <main style={{ flex:1, overflow:"auto", padding:"24px 28px", maxWidth:1000, width:"100%" }}>
           <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
             {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} />}
-            {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} onCsvUpload={saveCsvData} />}
+            {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} />}
             {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} />}
-            {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} onCsvUpload={saveCsvData} />}
-            {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} onCsvUpload={saveCsvData} />}
-            {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} onCsvUpload={saveCsvData} />}
+            {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} />}
+            {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} />}
+            {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} />}
           </div>
         </main>
 
@@ -5099,6 +5075,11 @@ export default function NASCARHub() {
           canUndo={undoStack.length>0}
           battleRaces={battleRaces}
           onBattleSave={saveBattleRaces}
+          csvData={csvData}
+          csvLoading={csvLoading}
+          csvError={csvError}
+          onCsvUpload={saveCsvData}
+          onCsvRefresh={refreshCsv}
         />
 
         {/* FOOTER */}
