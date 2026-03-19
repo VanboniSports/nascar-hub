@@ -577,6 +577,40 @@ function RatingMiniBar({ value, type }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// INFO LEGEND — Collapsible info box for tab explanations
+// ─────────────────────────────────────────────────────────────
+function InfoLegend({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginBottom: open ? 16 : 8 }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        display:"flex", alignItems:"center", gap:7, padding:"6px 12px",
+        background: open ? `${T.accent}10` : "transparent",
+        border:`1px solid ${open ? `${T.accent}40` : T.border}`,
+        borderRadius:8, cursor:"pointer", transition:"all 0.18s",
+      }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={open ? T.accent : T.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <span style={{ fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.2, textTransform:"uppercase", color: open ? T.accent : T.textDim }}>
+          {title || "Legend"}
+        </span>
+        <Ic.Chevron open={open} />
+      </button>
+      {open && (
+        <div style={{
+          marginTop:8, padding:"14px 16px", background:T.surface, border:`1px solid ${T.border}`,
+          borderRadius:10, fontSize:12, color:T.textMid, lineHeight:1.65,
+          fontFamily:"'IBM Plex Mono',monospace", animation:"fadeIn 0.2s ease",
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // POWER RANKINGS TAB — Rankings sub-tab
 // ─────────────────────────────────────────────────────────────
 function RankingsTab({ drivers, prevRanks }) {
@@ -995,6 +1029,41 @@ function PredictorTab({ drivers, csvData }) {
       </div>
 
       {/* CSV status for Pure Stats / Enhanced models */}
+      <InfoLegend title="Prediction Colors & Models">
+        <div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>DRIVER COLORS IN RESULTS</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:3, marginBottom:10 }}>
+            {[
+              { label:"Gold border / rank circle", color:T.gold, desc:"Top 3 predicted finish (podium contenders)" },
+              { label:"Track-type color border", color:T.accent, desc:"Colored by the track type of the selected race (blue = intermediate, red = short, green = superspeedway, purple = road)" },
+              { label:"Tier-based border", color:T.textMid, desc:"Remaining drivers colored by their overall Power Rankings tier" },
+            ].map(t => (
+              <div key={t.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:3, background:t.color, flexShrink:0 }} />
+                <span><span style={{ fontWeight:700, color:t.color }}>{t.label}</span> — {t.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>ENHANCED PURE STATS BONUS TAGS</div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
+            {[
+              { tag:"Mfr", desc:"Manufacturer track affinity" },
+              { tag:"Qual", desc:"Strong qualifying history" },
+              { tag:"Mom", desc:"Momentum (trending up or down)" },
+              { tag:"Dom", desc:"Laps-led dominance at track" },
+              { tag:"Win", desc:"Win multiplier active" },
+              { tag:"PO", desc:"Playoff pressure bonus" },
+            ].map(b => (
+              <span key={b.tag} style={{ fontSize:10, padding:"2px 7px", borderRadius:4, background:`${T.accent}15`, border:`1px solid ${T.accent}30`, color:T.accentText }}>
+                <span style={{ fontWeight:700 }}>{b.tag}</span> = {b.desc}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize:11, color:T.textDim, borderTop:`1px solid ${T.border}`, paddingTop:8 }}>
+            Pure Stats and Enhanced Pure Stats models read from CSV race history. Power Rankings model uses live Supabase ratings. Lower composite scores = better predicted finish.
+          </div>
+        </div>
+      </InfoLegend>
       {needsCsv && (
         <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10 }}>
           <div style={{ flex:1 }}>
@@ -1302,7 +1371,7 @@ const SSChartTooltip = ({ active, payload, label }) => {
   );
 };
 
-function StatsTab({ drivers, seasonStats, raceHistory, csvData }) {
+function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoints }) {
   const [subTab, setSubTab] = useState("standings");
 
   return (
@@ -1322,7 +1391,7 @@ function StatsTab({ drivers, seasonStats, raceHistory, csvData }) {
 
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "standings"  && <SSStandingsTab csvData={csvData} drivers={drivers} />}
+        {subTab === "standings"  && <SSStandingsTab csvData={csvData} drivers={drivers} seasonPoints={seasonPoints} />}
         {subTab === "compare"    && <SSCompareTab csvData={csvData} drivers={drivers} />}
         {subTab === "mfgTrends"  && <SSMfgTrendsTab csvData={csvData} />}
         {subTab === "sleeper"    && <SSSleeperTab csvData={csvData} drivers={drivers} />}
@@ -1362,9 +1431,9 @@ function ssBuildSeasonData(csvData, year) {
 }
 
 // ── Sub-tab 1: Season Standings ──
-function SSStandingsTab({ csvData, drivers }) {
-  const [sortKey, setSortKey] = useState("avgFinish");
-  const [sortAsc, setSortAsc] = useState(true);
+function SSStandingsTab({ csvData, drivers, seasonPoints }) {
+  const [sortKey, setSortKey] = useState("seasonPts");
+  const [sortAsc, setSortAsc] = useState(false);
   const [yearFilter, setYearFilter] = useState(2026);
   const [fullTimerOnly, setFullTimerOnly] = useState(true);
 
@@ -1378,8 +1447,11 @@ function SSStandingsTab({ csvData, drivers }) {
     const data = ssBuildSeasonData(csvData, yearFilter);
     let filtered = data;
     if (fullTimerOnly) filtered = data.filter(d => FULL_TIMER_NAMES.includes(d.name));
-    return filtered;
-  }, [csvData, yearFilter, fullTimerOnly]);
+    return filtered.map(d => ({
+      ...d,
+      seasonPts: seasonPoints?.[`${d.name}__${yearFilter}`] ?? null,
+    }));
+  }, [csvData, yearFilter, fullTimerOnly, seasonPoints]);
 
   const sorted = useMemo(() => {
     const arr = [...rows];
@@ -1403,13 +1475,14 @@ function SSStandingsTab({ csvData, drivers }) {
   const cols = [
     { k:"name",        l:"#",          asc:true  },
     { k:null,           l:"Driver",     asc:true  },
-    { k:"races",       l:"Races",      asc:false },
+    { k:"seasonPts",   l:"Pts",        asc:false },
     { k:"avgFinish",   l:"Avg Fin",    asc:true  },
     { k:"wins",        l:"Wins",       asc:false },
     { k:"top5",        l:"Top 5",      asc:false },
     { k:"top10",       l:"Top 10",     asc:false },
     { k:"lapsLed",     l:"Laps Led",   asc:false },
     { k:"bestFinish",  l:"Best",       asc:true  },
+    { k:"races",       l:"Races",      asc:false },
   ];
 
   // Find driver info for team/mfg display
@@ -1460,13 +1533,14 @@ function SSStandingsTab({ csvData, drivers }) {
                       <span style={{ color:mfgColor, fontWeight:600 }}>{r.mfg}</span>
                     </div>
                   </td>
-                  <td style={{ textAlign:"center", color:T.textMid, fontFamily:"monospace" }}>{r.races}</td>
+                  <td style={{ textAlign:"center", fontWeight:800, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, color:r.seasonPts!=null?T.accent:T.textDim }}>{r.seasonPts != null ? r.seasonPts : "—"}</td>
                   <td style={{ textAlign:"center", fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, color:r.avgFinish<=10?T.green:r.avgFinish<=20?T.gold:T.red }}>{r.avgFinish.toFixed(1)}</td>
                   <td style={{ textAlign:"center", fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", color:r.wins>0?T.gold:T.textDim }}>{r.wins||"—"}</td>
                   <td style={{ textAlign:"center", color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.top5||"—"}</td>
                   <td style={{ textAlign:"center", color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.top10||"—"}</td>
                   <td style={{ textAlign:"center", color:r.lapsLed>0?"#a855f7":T.textDim, fontFamily:"monospace" }}>{r.lapsLed||"—"}</td>
                   <td style={{ textAlign:"center", fontWeight:700, color:r.bestFinish===1?T.gold:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.bestFinish||"—"}</td>
+                  <td style={{ textAlign:"center", color:T.textMid, fontFamily:"monospace" }}>{r.races}</td>
                 </tr>
               );
             })}
@@ -1901,6 +1975,34 @@ function SSSleeperTab({ csvData, drivers }) {
         </span>
       </div>
 
+      <InfoLegend title="How the Sleeper Detector Works">
+        <div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>WHAT IS A SLEEPER?</div>
+          <div style={{ marginBottom:10 }}>
+            A <span style={{ fontWeight:700, color:T.gold }}>"sleeper"</span> is a driver whose current-year average finish is <span style={{ fontWeight:700, color:T.red }}>≥ 3 positions worse</span> than their career average — they're underperforming their historical baseline and statistically likely to bounce back. Conversely, <span style={{ fontWeight:700, color:T.green }}>"hot"</span> drivers are outperforming their career baseline by ≥ 2 positions.
+          </div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>METRICS USED</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:3, marginBottom:8 }}>
+            {[
+              { label:"Career Avg", desc:"Average finish across all seasons except the current year" },
+              { label:"Current Avg", desc:"Average finish in the selected year only" },
+              { label:"Diff", desc:"Current − Career (positive = underperforming, negative = overperforming)" },
+              { label:"Last 3", desc:"Average finish of the 3 most recent races this season" },
+            ].map(m => (
+              <div key={m.label}>
+                <span style={{ fontWeight:700, color:T.accentText }}>{m.label}:</span> {m.desc}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:4, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>TREND ARROWS</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+            <span><span style={{ color:T.green, fontWeight:700 }}>▲ Trending up</span> — Last 3 races are better than their season average (bounce-back underway)</span>
+            <span><span style={{ color:T.red, fontWeight:700 }}>▼ Still declining</span> — Last 3 races are worse than their season average</span>
+            <span><span style={{ color:T.textDim, fontWeight:700 }}>— Holding steady</span> — Last 3 races roughly match their season average</span>
+          </div>
+        </div>
+      </InfoLegend>
+
       {/* Sleeper alert cards */}
       {sleeperCandidates.length > 0 && (
         <div>
@@ -2274,7 +2376,43 @@ function BattleTrackerTab({ battleRaces }) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16, alignItems: "start" }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <InfoLegend title="How the Battle Tracker Works">
+        <div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>THE 5 PREDICTORS</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
+            {PREDICTORS.map(p => (
+              <div key={p} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:"50%", background:PREDICTOR_COLORS[p], flexShrink:0 }} />
+                <span><span style={{ fontWeight:700, color:PREDICTOR_COLORS[p] }}>{p}</span> — {PREDICTOR_DESCRIPTIONS[p]}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>SCORING SYSTEM</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:2, marginBottom:10 }}>
+            {[
+              { pts:"+20", desc:"Predicted the exact race winner" },
+              { pts:"+10", desc:"Predicted winner finished in actual top 3" },
+              { pts:"+5",  desc:"Predicted winner finished in actual top 5" },
+              { pts:"+6",  desc:"Per correct driver in your top-3 picks" },
+              { pts:"+3",  desc:"Per correct driver in your top-5 picks" },
+              { pts:"+1",  desc:"Per correct driver in your top-10 picks" },
+            ].map(s => (
+              <div key={s.pts+s.desc} style={{ display:"flex", gap:8 }}>
+                <span style={{ fontWeight:700, color:T.gold, minWidth:28, textAlign:"right" }}>{s.pts}</span>
+                <span>{s.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:4, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>READING RESULTS</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+            <span><span style={{ color:T.green }}>●</span> Green dot = actual race results entered &nbsp;|&nbsp; <span style={{ color:T.textDim }}>●</span> Gray dot = results pending</span>
+            <span>Leaderboard ranks predictors by cumulative points across all scored races.</span>
+            <span>Click any race in the sidebar to see per-predictor breakdowns and which picks hit.</span>
+          </div>
+        </div>
+      </InfoLegend>
+      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16, alignItems: "start" }}>
       {/* Races sidebar */}
       <div>
         <div style={{ fontSize: 10, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8, paddingLeft: 4, fontFamily: "'Barlow Condensed',sans-serif" }}>
@@ -2365,18 +2503,186 @@ function BattleTrackerTab({ battleRaces }) {
         )}
       </div>
     </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SEASON POINTS ADMIN — Manual entry of NASCAR official points
+// ─────────────────────────────────────────────────────────────
+function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
+  const [year, setYear] = useState(2026);
+  const [localPts, setLocalPts] = useState({});
+  const [pasteText, setPasteText] = useState("");
+  const [pasteMsg, setPasteMsg] = useState("");
+  const [saveMsg, setSaveMsg] = useState("");
+
+  // Initialize local state from seasonPoints whenever year changes
+  useEffect(() => {
+    const pts = {};
+    INITIAL_DRIVERS.forEach(d => {
+      const key = `${d.name}__${year}`;
+      pts[d.name] = seasonPoints?.[key] != null ? String(seasonPoints[key]) : "";
+    });
+    setLocalPts(pts);
+    setSaveMsg("");
+  }, [year, seasonPoints]);
+
+  const handlePtsChange = (name, val) => {
+    setLocalPts(prev => ({ ...prev, [name]: val }));
+  };
+
+  const handleSave = () => {
+    const updated = { ...seasonPoints };
+    Object.entries(localPts).forEach(([name, val]) => {
+      const key = `${name}__${year}`;
+      const num = parseInt(val);
+      if (!isNaN(num)) {
+        updated[key] = num;
+      } else {
+        delete updated[key];
+      }
+    });
+    onSave(updated);
+    setSaveMsg(`✓ ${year} points saved for ${Object.values(localPts).filter(v => v !== "").length} drivers.`);
+  };
+
+  // Parse pasted standings text
+  // Handles formats like:
+  //   1. Kyle Larson 350   OR   1 Kyle Larson 350   OR   Kyle Larson\t350
+  const handleParse = () => {
+    if (!pasteText.trim()) { setPasteMsg("Paste standings text first."); return; }
+    const lines = pasteText.split("\n").map(l => l.trim()).filter(Boolean);
+    let matched = 0;
+    const newPts = { ...localPts };
+
+    for (const line of lines) {
+      // Try to extract driver name and points from each line
+      // Strip leading rank number and period/dot
+      const cleaned = line.replace(/^\d+[\.\)\s]+/, "").trim();
+      // Try tab-separated: "Kyle Larson\t350"
+      let name = null, pts = null;
+      const tabParts = cleaned.split(/\t+/);
+      if (tabParts.length >= 2) {
+        const lastPart = tabParts[tabParts.length - 1].trim();
+        const num = parseInt(lastPart.replace(/[,\s]/g, ""));
+        if (!isNaN(num) && num > 0) {
+          name = tabParts.slice(0, -1).join(" ").trim();
+          pts = num;
+        }
+      }
+      // Try space-separated with number at end: "Kyle Larson 350"
+      if (!name) {
+        const match = cleaned.match(/^(.+?)\s+(\d[\d,]*)\s*$/);
+        if (match) {
+          name = match[1].trim();
+          pts = parseInt(match[2].replace(/,/g, ""));
+        }
+      }
+      if (!name || !pts) continue;
+
+      // Fuzzy match to INITIAL_DRIVERS
+      const driver = findDriver(drivers, name);
+      if (driver) {
+        newPts[driver.name] = String(pts);
+        matched++;
+      }
+    }
+
+    setLocalPts(newPts);
+    setPasteMsg(matched > 0 ? `✓ Matched ${matched} driver${matched !== 1 ? "s" : ""} from paste.` : "No drivers matched. Check the format.");
+  };
+
+  const inputStyle = { width:"100%", background:"#142030", border:`1px solid ${T.border}`, color:T.text, borderRadius:6, padding:"6px 10px", fontSize:13, outline:"none", fontFamily:"'IBM Plex Mono',monospace", textAlign:"center" };
+  const btnStyle2 = (col) => ({ padding:"8px 18px", background:col, border:"none", color:"#fff", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" });
+
+  const filled = Object.values(localPts).filter(v => v !== "" && !isNaN(parseInt(v))).length;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* Year selector + status */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Year</span>
+          <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ background:"#142030", color:T.text, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 10px", fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }}>
+            {[2026,2025,2024,2023,2022].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <span style={{ fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{filled} of {INITIAL_DRIVERS.length} drivers have points</span>
+        <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+          <button onClick={handleSave} style={{ ...btnStyle2(T.accent), boxShadow:`0 4px 14px ${T.accentGlow}` }}>Save Points</button>
+        </div>
+      </div>
+
+      {saveMsg && <div style={{ fontSize:12, color:T.green, fontFamily:"'IBM Plex Mono',monospace" }}>{saveMsg}</div>}
+
+      {/* Paste parser */}
+      <div style={{ background:"#0f1923", border:`1px solid ${T.border}`, borderRadius:12, padding:16 }}>
+        <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 }}>Paste Standings</div>
+        <div style={{ fontSize:11, color:T.textDim, marginBottom:8, fontFamily:"'IBM Plex Mono',monospace" }}>
+          Paste from NASCAR.com or any source. Accepts: "1. Kyle Larson 350" or "Kyle Larson → 350" or tab-separated.
+        </div>
+        <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={5} placeholder={"1. Kyle Larson 350\n2. William Byron 320\n3. Denny Hamlin 310\n..."} style={{ width:"100%", background:"#0c1520", border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"10px 12px", fontSize:12, fontFamily:"monospace", resize:"vertical", outline:"none", lineHeight:1.7 }} />
+        <div style={{ display:"flex", gap:8, marginTop:8, alignItems:"center" }}>
+          <button onClick={handleParse} style={btnStyle2("#334155")}>Parse & Fill</button>
+          <button onClick={() => { setPasteText(""); setPasteMsg(""); }} style={{ ...btnStyle2("transparent"), color:T.textDim, border:`1px solid ${T.border}` }}>Clear</button>
+          {pasteMsg && <span style={{ fontSize:11, color:pasteMsg.startsWith("✓") ? T.green : T.gold, fontFamily:"'IBM Plex Mono',monospace" }}>{pasteMsg}</span>}
+        </div>
+      </div>
+
+      {/* Driver points grid */}
+      <div style={{ background:"#0f1923", border:`1px solid ${T.border}`, borderRadius:12, overflow:"auto" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+          <thead>
+            <tr style={{ borderBottom:`1px solid ${T.border}` }}>
+              <th style={{ padding:"10px 12px", textAlign:"left", fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", color:T.textDim }}>#</th>
+              <th style={{ padding:"10px 12px", textAlign:"left", fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", color:T.textDim }}>Driver</th>
+              <th style={{ padding:"10px 12px", textAlign:"center", fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", color:T.accent, width:100 }}>Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {INITIAL_DRIVERS.map((d, idx) => {
+              const tier = getTier(d.overall);
+              return (
+                <tr key={d.num} style={{ borderBottom:`1px solid ${T.border}`, background:idx % 2 === 0 ? "transparent" : `${T.surface2}44` }}>
+                  <td style={{ padding:"6px 12px", fontWeight:700, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", fontSize:11, width:30 }}>{d.num}</td>
+                  <td style={{ padding:"6px 12px" }}>
+                    <span style={{ fontWeight:700, color:tier.border, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14 }}>{d.name}</span>
+                    <span style={{ fontSize:10, color:T.textDim, marginLeft:8 }}>{d.team}</span>
+                  </td>
+                  <td style={{ padding:"4px 8px", width:100 }}>
+                    <input
+                      type="number"
+                      value={localPts[d.name] || ""}
+                      onChange={e => handlePtsChange(d.name, e.target.value)}
+                      placeholder="—"
+                      style={inputStyle}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Bottom save button */}
+      <div style={{ display:"flex", justifyContent:"flex-end" }}>
+        <button onClick={handleSave} style={{ ...btnStyle2(T.accent), boxShadow:`0 4px 14px ${T.accentGlow}` }}>Save Points</button>
+      </div>
+    </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
 // GLOBAL ADMIN PANEL — lives at the bottom of the app
 // ─────────────────────────────────────────────────────────────
-function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh }) {
+function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
   const [pwErr, setPwErr] = useState(false);
-  const [adminSection, setAdminSection] = useState("power"); // "power" | "battle" | "csv"
+  const [adminSection, setAdminSection] = useState("power"); // "power" | "battle" | "csv" | "points"
 
   // Power Rankings admin state
   const [raceName, setRaceName] = useState("");
@@ -2565,7 +2871,7 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
               {/* Admin sub-nav */}
               <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, paddingBottom:0 }}>
-                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"}].map(tab => {
+                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"}].map(tab => {
                   const active = adminSection === tab.id;
                   return (
                     <button key={tab.id} onClick={()=>setAdminSection(tab.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
@@ -2878,6 +3184,15 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
                     </button>
                   </div>
                 </div>
+              )}
+
+              {/* ─── SEASON POINTS ADMIN ─── */}
+              {adminSection === "points" && (
+                <SeasonPointsAdmin
+                  drivers={drivers}
+                  seasonPoints={seasonPoints}
+                  onSave={onSeasonPointsSave}
+                />
               )}
 
             </div>
@@ -4746,6 +5061,28 @@ function PowerRankingsTab({ drivers, prevRanks, ratingHistory }) {
           );
         })}
       </div>
+      <InfoLegend title="How Rankings Work">
+        <div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>DRIVER COLOR TIERS</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
+            {[
+              { label:"Elite (85+)", color:T.gold, desc:"Championship contenders — consistently dominant across track types" },
+              { label:"Strong (75–84)", color:T.accent, desc:"Playoff-caliber drivers with multiple strengths" },
+              { label:"Solid (68–74)", color:T.textMid, desc:"Competitive mid-pack; capable of top-10 finishes regularly" },
+              { label:"Developing (63–67)", color:T.border2, desc:"Showing flashes but inconsistent; upside potential" },
+              { label:"Baseline (< 63)", color:T.border, desc:"Backmarkers or rookies still building a track record" },
+            ].map(t => (
+              <div key={t.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:3, background:t.color, flexShrink:0, border:`1px solid ${t.color}` }} />
+                <span><span style={{ fontWeight:700, color:t.color }}>{t.label}</span> — {t.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:11, color:T.textDim, borderTop:`1px solid ${T.border}`, paddingTop:8, marginTop:4 }}>
+            Ratings update after each race using an asymmetric decay algorithm with recency bias, win bonuses, and momentum multipliers. Overall rating blends all track-type ratings with recent form.
+          </div>
+        </div>
+      </InfoLegend>
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
         {subTab === "rankings" && <RankingsTab drivers={drivers} prevRanks={prevRanks} />}
         {subTab === "compare"  && <CompareTab drivers={drivers} />}
@@ -4812,12 +5149,20 @@ export default function NASCARHub() {
   const [csvLoading, setCsvLoading] = useState(true);
   const [csvError, setCsvError] = useState(null);
 
-  // Load Battle Tracker data + auto-fetch CSV from GitHub
+  // Season Points — manually entered NASCAR official points, keyed by "driverName__year"
+  const [seasonPoints, setSeasonPoints] = useState({});
+
+  // Load Battle Tracker data + season points + auto-fetch CSV from GitHub
   useEffect(() => {
     // Load battle races from localStorage
     try {
       const raw = localStorage.getItem("nascar_races");
       if (raw) setBattleRaces(JSON.parse(raw));
+    } catch {}
+    // Load season points from localStorage
+    try {
+      const raw = localStorage.getItem("nascar_season_points");
+      if (raw) setSeasonPoints(JSON.parse(raw));
     } catch {}
 
     // Auto-fetch CSV from GitHub, fall back to localStorage cache
@@ -4892,6 +5237,11 @@ export default function NASCARHub() {
   const saveBattleRaces = useCallback(async (updated) => {
     setBattleRaces(updated);
     try { localStorage.setItem("nascar_races", JSON.stringify(updated)); } catch {}
+  }, []);
+
+  const saveSeasonPoints = useCallback((updated) => {
+    setSeasonPoints(updated);
+    try { localStorage.setItem("nascar_season_points", JSON.stringify(updated)); } catch {}
   }, []);
 
   // Load from Supabase on mount
@@ -5059,7 +5409,7 @@ export default function NASCARHub() {
             {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} />}
             {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} />}
             {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} />}
-            {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} />}
+            {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} />}
           </div>
         </main>
 
@@ -5080,6 +5430,8 @@ export default function NASCARHub() {
           csvError={csvError}
           onCsvUpload={saveCsvData}
           onCsvRefresh={refreshCsv}
+          seasonPoints={seasonPoints}
+          onSeasonPointsSave={saveSeasonPoints}
         />
 
         {/* FOOTER */}
