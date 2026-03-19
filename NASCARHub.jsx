@@ -39,7 +39,7 @@ const PREDICTORS = ["Pure Stats", "Enhanced Pure Stats", "NASCAR 2026 ML", "Powe
 
 const PREDICTOR_DESCRIPTIONS = {
   "Pure Stats": "Track-type weighted statistics, no ML",
-  "Enhanced Pure Stats": "Pure Stats + manufacturer affinity, momentum & playoff adjustments",
+  "Enhanced Pure Stats": "Pure Stats + manufacturer affinity, momentum & Chase adjustments",
   "NASCAR 2026 ML": "Random Forest ML with 2026 schedule classifications",
   "Power Rankings": "Live power rankings from the NASCAR Hub",
   "My Gut": "Personal picks based on intuition & race knowledge",
@@ -798,7 +798,7 @@ const ENH_MFR_STRONG_TRACKS = {
   'Ford': ['Daytona International Speedway','Talladega Superspeedway','Michigan International Speedway'],
   'Toyota': ['Bristol Motor Speedway','Darlington Raceway','Richmond Raceway'],
 };
-const ENH_PLAYOFF_TRACKS = [
+const ENH_CHASE_TRACKS = [
   'Darlington Raceway','Kansas Speedway','Bristol Motor Speedway','Texas Motor Speedway',
   'Talladega Superspeedway','Charlotte Motor Speedway Roval','Las Vegas Motor Speedway',
   'Homestead-Miami Speedway','Martinsville Speedway','Phoenix Raceway',
@@ -903,15 +903,15 @@ function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
     else if (trackWins >= 1) { winMult = 0.92; bonusTags.push("Win"); }
     else if (typeWins >= 5) { winMult = 0.94; bonusTags.push("Win"); }
 
-    // E6: Playoff Pressure
-    let playoffBonus = 0;
-    const isPlayoff = ENH_PLAYOFF_TRACKS.some(pt => predMatchTrack(scheduleTrack, pt));
-    if (isPlayoff) {
-      if (recentWins >= 1) { playoffBonus = -0.4; bonusTags.push("PO"); }
+    // E6: Chase Pressure
+    let chaseBonus = 0;
+    const isChase = ENH_CHASE_TRACKS.some(pt => predMatchTrack(scheduleTrack, pt));
+    if (isChase) {
+      if (recentWins >= 1) { chaseBonus = -0.4; bonusTags.push("PO"); }
     }
 
     // Final enhanced score
-    const enhancedScore = (baseScore + mfrBonus + startBonus + momBonus + domBonus + playoffBonus) * winMult;
+    const enhancedScore = (baseScore + mfrBonus + startBonus + momBonus + domBonus + chaseBonus) * winMult;
 
     // Convert to probabilities (use same formula as Pure Stats for consistency)
     const winProb  = Math.max(5, Math.min(95, 100 - enhancedScore*2.5)) / 100;
@@ -1052,7 +1052,7 @@ function PredictorTab({ drivers, csvData }) {
               { tag:"Mom", desc:"Momentum (trending up or down)" },
               { tag:"Dom", desc:"Laps-led dominance at track" },
               { tag:"Win", desc:"Win multiplier active" },
-              { tag:"PO", desc:"Playoff pressure bonus" },
+              { tag:"PO", desc:"Chase pressure bonus" },
             ].map(b => (
               <span key={b.tag} style={{ fontSize:10, padding:"2px 7px", borderRadius:4, background:`${T.accent}15`, border:`1px solid ${T.accent}30`, color:T.accentText }}>
                 <span style={{ fontWeight:700 }}>{b.tag}</span> = {b.desc}
@@ -1504,6 +1504,54 @@ function SSStandingsTab({ csvData, drivers, seasonPoints }) {
         </button>
         <span style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", marginLeft:"auto" }}>{sorted.length} driver{sorted.length!==1?"s":""}</span>
       </div>
+
+      <InfoLegend title="Color Guide">
+        <div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>DRIVER NAME COLORS</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
+            {[
+              { label:"Gold", color:T.gold, desc:"Elite tier (85+ overall rating)" },
+              { label:"Blue", color:T.accent, desc:"Strong tier (75–84)" },
+              { label:"Steel", color:T.textMid, desc:"Solid tier (68–74)" },
+              { label:"Muted", color:T.border2, desc:"Developing tier (63–67)" },
+              { label:"Dim", color:T.border, desc:"Baseline tier (< 63)" },
+            ].map(t => (
+              <div key={t.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:3, background:t.color, flexShrink:0, border:`1px solid ${t.color}` }} />
+                <span><span style={{ fontWeight:700, color:t.color }}>{t.label}</span> — {t.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>STAT COLORS</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+            {[
+              { label:"Avg Finish", items:[
+                { color:T.green, desc:"≤ 10.0 (elite)" },
+                { color:T.gold, desc:"10.1–20.0 (solid)" },
+                { color:T.red, desc:"> 20.0 (struggling)" },
+              ]},
+              { label:"Wins", items:[{ color:T.gold, desc:"1+ wins highlighted" }] },
+              { label:"Laps Led", items:[{ color:"#a855f7", desc:"Any laps led highlighted in purple" }] },
+              { label:"Best Finish", items:[{ color:T.gold, desc:"P1 highlighted in gold" }] },
+              { label:"Manufacturer", items:[
+                { color:MFG_COLORS.Chevrolet, desc:"Chevrolet" },
+                { color:MFG_COLORS.Ford, desc:"Ford" },
+                { color:MFG_COLORS.Toyota, desc:"Toyota" },
+              ]},
+            ].map(group => (
+              <div key={group.label} style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                <span style={{ fontWeight:700, color:T.accentText, minWidth:80 }}>{group.label}:</span>
+                {group.items.map(item => (
+                  <span key={item.desc} style={{ display:"inline-flex", alignItems:"center", gap:4 }}>
+                    <span style={{ width:8, height:8, borderRadius:2, background:item.color, flexShrink:0 }} />
+                    <span>{item.desc}</span>
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </InfoLegend>
 
       {/* Table */}
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"auto" }}>
@@ -5067,7 +5115,7 @@ function PowerRankingsTab({ drivers, prevRanks, ratingHistory }) {
           <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
             {[
               { label:"Elite (85+)", color:T.gold, desc:"Championship contenders — consistently dominant across track types" },
-              { label:"Strong (75–84)", color:T.accent, desc:"Playoff-caliber drivers with multiple strengths" },
+              { label:"Strong (75–84)", color:T.accent, desc:"Chase-caliber drivers with multiple strengths" },
               { label:"Solid (68–74)", color:T.textMid, desc:"Competitive mid-pack; capable of top-10 finishes regularly" },
               { label:"Developing (63–67)", color:T.border2, desc:"Showing flashes but inconsistent; upside potential" },
               { label:"Baseline (< 63)", color:T.border, desc:"Backmarkers or rookies still building a track record" },
