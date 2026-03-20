@@ -10,7 +10,7 @@ const T = {
   border:"#1a2d40", border2:"#1e3a52",
   accent:"#1e90ff", accentSoft:"rgba(30,144,255,0.10)",
   accentGlow:"rgba(30,144,255,0.22)", accentText:"#60b8ff",
-  text:"#e8f4ff", textMid:"#6a9bbf", textDim:"#2a4a65",
+  text:"#e8f4ff", textMid:"#8cb8d8", textDim:"#5a8aab",
   green:"#4caf50", greenBg:"rgba(76,175,80,0.10)",
   red:"#f44336", redBg:"rgba(244,67,54,0.10)",
   gold:"#ffc107", goldBg:"rgba(255,193,7,0.12)",
@@ -39,7 +39,7 @@ const PREDICTORS = ["Pure Stats", "Enhanced Pure Stats", "NASCAR 2026 ML", "Powe
 
 const PREDICTOR_DESCRIPTIONS = {
   "Pure Stats": "Track-type weighted statistics, no ML",
-  "Enhanced Pure Stats": "Pure Stats + manufacturer affinity, momentum & Chase adjustments",
+  "Enhanced Pure Stats": "Pure Stats + manufacturer affinity, momentum & playoff adjustments",
   "NASCAR 2026 ML": "Random Forest ML with 2026 schedule classifications",
   "Power Rankings": "Live power rankings from the NASCAR Hub",
   "My Gut": "Personal picks based on intuition & race knowledge",
@@ -120,42 +120,43 @@ const INITIAL_DRIVERS = [
 // SCHEDULE
 // ─────────────────────────────────────────────────────────────
 const SCHEDULE = [
-  { week:1,  date:"Feb 15", name:"Daytona 500",         track:"Daytona International Speedway",      type:"superspeedway", length:2.5,   laps:200 },
-  { week:2,  date:"Feb 22", name:"Atlanta",              track:"Atlanta Motor Speedway",              type:"superspeedway", length:1.54,  laps:260 },
-  { week:3,  date:"Mar 1",  name:"COTA",                 track:"Circuit of the Americas",            type:"road",          length:3.426, laps:68  },
-  { week:4,  date:"Mar 8",  name:"Phoenix",              track:"Phoenix Raceway",                    type:"intermediate",  length:1.0,   laps:312 },
-  { week:5,  date:"Mar 15", name:"Las Vegas",            track:"Las Vegas Motor Speedway",           type:"intermediate",  length:1.5,   laps:267 },
-  { week:6,  date:"Mar 22", name:"Darlington",           track:"Darlington Raceway",                 type:"short",         length:1.366, laps:293 },
-  { week:7,  date:"Mar 29", name:"Martinsville",         track:"Martinsville Speedway",              type:"short",         length:0.526, laps:500 },
-  { week:8,  date:"Apr 12", name:"Bristol",              track:"Bristol Motor Speedway",             type:"short",         length:0.533, laps:500 },
-  { week:9,  date:"Apr 19", name:"Kansas",               track:"Kansas Speedway",                    type:"intermediate",  length:1.5,   laps:267 },
-  { week:10, date:"Apr 26", name:"Talladega",            track:"Talladega Superspeedway",            type:"superspeedway", length:2.66,  laps:188 },
-  { week:11, date:"May 3",  name:"Dover",                track:"Dover Motor Speedway",               type:"short",         length:1.0,   laps:400 },
-  { week:12, date:"May 10", name:"Watkins Glen",         track:"Watkins Glen International",         type:"road",          length:2.45,  laps:90  },
-  { week:13, date:"May 24", name:"Coca-Cola 600",        track:"Charlotte Motor Speedway",           type:"intermediate",  length:1.5,   laps:400 },
-  { week:14, date:"May 31", name:"Nashville",            track:"Nashville Superspeedway",            type:"short",         length:1.33,  laps:300 },
-  { week:15, date:"Jun 7",  name:"Michigan",             track:"Michigan International Speedway",    type:"intermediate",  length:2.0,   laps:200 },
-  { week:16, date:"Jun 14", name:"Pocono",               track:"Pocono Raceway",                     type:"intermediate",  length:2.5,   laps:160 },
-  { week:17, date:"Jun 21", name:"San Diego",            track:"Naval Base Coronado Street Course",  type:"road",          length:2.0,   laps:75  },
-  { week:18, date:"Jun 28", name:"Sonoma",               track:"Sonoma Raceway",                     type:"road",          length:1.99,  laps:110 },
-  { week:19, date:"Jul 5",  name:"Chicagoland",          track:"Chicagoland Speedway",               type:"intermediate",  length:1.5,   laps:267 },
-  { week:20, date:"Jul 12", name:"Atlanta II",           track:"Atlanta Motor Speedway",             type:"superspeedway", length:1.54,  laps:260 },
-  { week:21, date:"Jul 19", name:"North Wilkesboro",     track:"North Wilkesboro Speedway",          type:"short",         length:0.625, laps:400 },
-  { week:22, date:"Jul 26", name:"Brickyard 400",        track:"Indianapolis Motor Speedway",        type:"intermediate",  length:2.5,   laps:160 },
-  { week:23, date:"Aug 9",  name:"Iowa",                 track:"Iowa Speedway",                      type:"intermediate",  length:0.875, laps:350 },
-  { week:24, date:"Aug 15", name:"Richmond",             track:"Richmond Raceway",                   type:"short",         length:0.75,  laps:400 },
-  { week:25, date:"Aug 23", name:"New Hampshire",        track:"New Hampshire Motor Speedway",       type:"short",         length:1.058, laps:301 },
-  { week:26, date:"Aug 29", name:"Daytona II",           track:"Daytona International Speedway",     type:"superspeedway", length:2.5,   laps:160 },
-  { week:27, date:"Sep 6",  name:"Southern 500",         track:"Darlington Raceway",                 type:"short",         length:1.366, laps:367 },
-  { week:28, date:"Sep 13", name:"Gateway",              track:"World Wide Technology Raceway",      type:"short",         length:1.25,  laps:240 },
-  { week:29, date:"Sep 19", name:"Bristol Night Race",   track:"Bristol Motor Speedway",             type:"short",         length:0.533, laps:500 },
-  { week:30, date:"Sep 27", name:"Kansas II",            track:"Kansas Speedway",                    type:"intermediate",  length:1.5,   laps:267 },
-  { week:31, date:"Oct 4",  name:"Las Vegas II",         track:"Las Vegas Motor Speedway",           type:"intermediate",  length:1.5,   laps:267 },
-  { week:32, date:"Oct 11", name:"Charlotte Oval",       track:"Charlotte Motor Speedway",           type:"intermediate",  length:1.5,   laps:334 },
-  { week:33, date:"Oct 18", name:"Phoenix II",           track:"Phoenix Raceway",                    type:"intermediate",  length:1.0,   laps:312 },
-  { week:34, date:"Oct 25", name:"Talladega II",         track:"Talladega Superspeedway",            type:"superspeedway", length:2.66,  laps:188 },
-  { week:35, date:"Nov 1",  name:"Martinsville II",      track:"Martinsville Speedway",              type:"short",         length:0.526, laps:500 },
-  { week:36, date:"Nov 8",  name:"Championship",         track:"Homestead-Miami Speedway",           type:"intermediate",  length:1.5,   laps:267 },
+  { week:1,  date:"Feb 15", name:"Daytona 500",            track:"Daytona International Speedway",      type:"superspeedway", length:2.5,   laps:200 },
+  { week:2,  date:"Feb 22", name:"Atlanta",                 track:"Atlanta Motor Speedway",              type:"superspeedway", length:1.54,  laps:260 },
+  { week:3,  date:"Mar 1",  name:"COTA",                    track:"Circuit Of The Americas",             type:"road",          length:3.426, laps:68  },
+  { week:4,  date:"Mar 8",  name:"Phoenix",                 track:"Phoenix Raceway",                     type:"intermediate",  length:1.0,   laps:312 },
+  { week:5,  date:"Mar 15", name:"Las Vegas",               track:"Las Vegas Motor Speedway",            type:"intermediate",  length:1.5,   laps:267 },
+  { week:6,  date:"Mar 22", name:"Darlington",              track:"Darlington Raceway",                  type:"intermediate",  length:1.366, laps:293 },
+  { week:7,  date:"Mar 29", name:"Martinsville",            track:"Martinsville Speedway",               type:"short",         length:0.526, laps:500 },
+  { week:8,  date:"Apr 12", name:"Bristol",                  track:"Bristol Motor Speedway",              type:"short",         length:0.533, laps:500 },
+  { week:9,  date:"Apr 19", name:"Kansas",                   track:"Kansas Speedway",                     type:"intermediate",  length:1.5,   laps:267 },
+  { week:10, date:"Apr 26", name:"Talladega",                track:"Talladega Superspeedway",             type:"superspeedway", length:2.66,  laps:188 },
+  { week:11, date:"May 3",  name:"Texas",                    track:"Texas Motor Speedway",                type:"intermediate",  length:1.5,   laps:334 },
+  { week:12, date:"May 10", name:"Watkins Glen",             track:"Watkins Glen International Raceway",  type:"road",          length:2.45,  laps:90  },
+  { week:0,  date:"May 17", name:"All-Star Race (Dover)",    track:"Dover International Speedway",        type:"intermediate",  length:1.0,   laps:200, allStar:true },
+  { week:13, date:"May 24", name:"Coca-Cola 600",            track:"Charlotte Motor Speedway",            type:"intermediate",  length:1.5,   laps:400 },
+  { week:14, date:"May 31", name:"Nashville",                track:"Nashville Superspeedway",             type:"intermediate",  length:1.33,  laps:300 },
+  { week:15, date:"Jun 7",  name:"Michigan",                 track:"Michigan International Speedway",     type:"intermediate",  length:2.0,   laps:200 },
+  { week:16, date:"Jun 14", name:"Pocono",                   track:"Pocono Raceway",                      type:"intermediate",  length:2.5,   laps:160 },
+  { week:17, date:"Jun 21", name:"San Diego",                track:"Naval Base Coronado Street Course",   type:"road",          length:2.0,   laps:75  },
+  { week:18, date:"Jun 28", name:"Sonoma",                   track:"Sonoma Raceway",                      type:"road",          length:1.99,  laps:110 },
+  { week:19, date:"Jul 5",  name:"Chicagoland",              track:"Chicagoland Speedway",                type:"intermediate",  length:1.5,   laps:267 },
+  { week:20, date:"Jul 12", name:"Atlanta II",               track:"Atlanta Motor Speedway",              type:"superspeedway", length:1.54,  laps:260 },
+  { week:21, date:"Jul 19", name:"North Wilkesboro",         track:"North Wilkesboro Speedway",           type:"short",         length:0.625, laps:400 },
+  { week:22, date:"Jul 26", name:"Brickyard 400",            track:"Indianapolis Motor Speedway",         type:"intermediate",  length:2.5,   laps:160 },
+  { week:23, date:"Aug 9",  name:"Iowa",                     track:"Iowa Speedway",                       type:"short",         length:0.875, laps:350 },
+  { week:24, date:"Aug 15", name:"Richmond",                 track:"Richmond Raceway",                    type:"short",         length:0.75,  laps:400 },
+  { week:25, date:"Aug 23", name:"New Hampshire",            track:"New Hampshire Motor Speedway",        type:"short",         length:1.058, laps:301 },
+  { week:26, date:"Aug 29", name:"Daytona II",               track:"Daytona International Speedway",      type:"superspeedway", length:2.5,   laps:160 },
+  { week:27, date:"Sep 6",  name:"Southern 500",             track:"Darlington Raceway",                  type:"intermediate",  length:1.366, laps:367 },
+  { week:28, date:"Sep 13", name:"Gateway",                  track:"World Wide Technology Raceway",       type:"intermediate",  length:1.25,  laps:240 },
+  { week:29, date:"Sep 19", name:"Bristol Night Race",       track:"Bristol Motor Speedway",              type:"short",         length:0.533, laps:500 },
+  { week:30, date:"Sep 27", name:"Kansas II",                track:"Kansas Speedway",                     type:"intermediate",  length:1.5,   laps:267 },
+  { week:31, date:"Oct 4",  name:"Las Vegas II",             track:"Las Vegas Motor Speedway",            type:"intermediate",  length:1.5,   laps:267 },
+  { week:32, date:"Oct 11", name:"Charlotte Oval",           track:"Charlotte Motor Speedway",            type:"intermediate",  length:1.5,   laps:334 },
+  { week:33, date:"Oct 18", name:"Phoenix II",               track:"Phoenix Raceway",                     type:"intermediate",  length:1.0,   laps:312 },
+  { week:34, date:"Oct 25", name:"Talladega II",             track:"Talladega Superspeedway",             type:"superspeedway", length:2.66,  laps:188 },
+  { week:35, date:"Nov 1",  name:"Martinsville II",          track:"Martinsville Speedway",               type:"short",         length:0.526, laps:500 },
+  { week:36, date:"Nov 8",  name:"Championship",             track:"Homestead-Miami Speedway",            type:"intermediate",  length:1.5,   laps:267 },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -676,7 +677,7 @@ const PRED_ROAD_COURSES = [
   'San Diego Road Course','Charlotte Motor Speedway Roval',
   'Naval Base Coronado Street Course',
 ];
-const PRED_SHORT_TRACKS = ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway'];
+const PRED_SHORT_TRACKS = ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway','Iowa Speedway','New Hampshire Motor Speedway'];
 const PRED_SUPERSPEEDWAYS = ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway'];
 
 function predGetTrackType(trackName) {
@@ -798,10 +799,10 @@ const ENH_MFR_STRONG_TRACKS = {
   'Ford': ['Daytona International Speedway','Talladega Superspeedway','Michigan International Speedway'],
   'Toyota': ['Bristol Motor Speedway','Darlington Raceway','Richmond Raceway'],
 };
-const ENH_CHASE_TRACKS = [
-  'Darlington Raceway','Kansas Speedway','Bristol Motor Speedway','Texas Motor Speedway',
-  'Talladega Superspeedway','Charlotte Motor Speedway Roval','Las Vegas Motor Speedway',
-  'Homestead-Miami Speedway','Martinsville Speedway','Phoenix Raceway',
+const ENH_PLAYOFF_TRACKS = [
+  'Darlington Raceway','World Wide Technology Raceway','Bristol Motor Speedway','Kansas Speedway',
+  'Las Vegas Motor Speedway','Charlotte Motor Speedway','Phoenix Raceway',
+  'Talladega Superspeedway','Martinsville Speedway','Homestead-Miami Speedway',
 ];
 
 function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
@@ -903,15 +904,15 @@ function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
     else if (trackWins >= 1) { winMult = 0.92; bonusTags.push("Win"); }
     else if (typeWins >= 5) { winMult = 0.94; bonusTags.push("Win"); }
 
-    // E6: Chase Pressure
-    let chaseBonus = 0;
-    const isChase = ENH_CHASE_TRACKS.some(pt => predMatchTrack(scheduleTrack, pt));
-    if (isChase) {
-      if (recentWins >= 1) { chaseBonus = -0.4; bonusTags.push("PO"); }
+    // E6: Playoff Pressure
+    let playoffBonus = 0;
+    const isPlayoff = ENH_PLAYOFF_TRACKS.some(pt => predMatchTrack(scheduleTrack, pt));
+    if (isPlayoff) {
+      if (recentWins >= 1) { playoffBonus = -0.4; bonusTags.push("PO"); }
     }
 
     // Final enhanced score
-    const enhancedScore = (baseScore + mfrBonus + startBonus + momBonus + domBonus + chaseBonus) * winMult;
+    const enhancedScore = (baseScore + mfrBonus + startBonus + momBonus + domBonus + playoffBonus) * winMult;
 
     // Convert to probabilities (use same formula as Pure Stats for consistency)
     const winProb  = Math.max(5, Math.min(95, 100 - enhancedScore*2.5)) / 100;
@@ -958,7 +959,7 @@ function PredictorTab({ drivers, csvData }) {
   const [selectedModel, setSelectedModel] = useState("power");
   const [results, setResults] = useState([]);
 
-  const race = SCHEDULE.find(r => r.week === parseInt(selectedWeek));
+  const race = selectedWeek === "allstar" ? SCHEDULE.find(r => r.allStar) : SCHEDULE.find(r => !r.allStar && r.week === parseInt(selectedWeek));
   const model = PRED_MODELS.find(m => m.id === selectedModel);
   const needsCsv = selectedModel === "pure" || selectedModel === "enhanced";
   const hasCsv = csvData.length > 0;
@@ -1052,7 +1053,7 @@ function PredictorTab({ drivers, csvData }) {
               { tag:"Mom", desc:"Momentum (trending up or down)" },
               { tag:"Dom", desc:"Laps-led dominance at track" },
               { tag:"Win", desc:"Win multiplier active" },
-              { tag:"PO", desc:"Chase pressure bonus" },
+              { tag:"PO", desc:"Playoff pressure bonus" },
             ].map(b => (
               <span key={b.tag} style={{ fontSize:10, padding:"2px 7px", borderRadius:4, background:`${T.accent}15`, border:`1px solid ${T.accent}30`, color:T.accentText }}>
                 <span style={{ fontWeight:700 }}>{b.tag}</span> = {b.desc}
@@ -1082,7 +1083,7 @@ function PredictorTab({ drivers, csvData }) {
           <select value={selectedWeek} onChange={e=>{ setSelectedWeek(e.target.value); setResults([]); }}
             style={{ width:"100%", background:T.surface2, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"9px 12px", fontSize:13, outline:"none" }}>
             <option value="">Choose a race...</option>
-            {SCHEDULE.map(r => <option key={r.week} value={r.week}>Week {r.week} · {r.date} · {r.name}</option>)}
+            {SCHEDULE.map(r => <option key={r.allStar ? "allstar" : r.week} value={r.allStar ? "allstar" : r.week}>{r.allStar ? "★" : `Week ${r.week}`} · {r.date} · {r.name}{r.allStar ? " (Non-Points)" : ""}</option>)}
           </select>
         </div>
         <button onClick={runPrediction} disabled={!race || (needsCsv && !hasCsv)} style={{ padding:"9px 24px", background:(race && (!needsCsv||hasCsv))?model.color:"#1a2d40", color:(race && (!needsCsv||hasCsv))?"#fff":T.textDim, border:"none", borderRadius:8, cursor:(race && (!needsCsv||hasCsv))?"pointer":"default", fontSize:13, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:(race && (!needsCsv||hasCsv))?`0 4px 18px ${model.color}44`:"none" }}>
@@ -1279,8 +1280,8 @@ function TrendsTab({ drivers, ratingHistory }) {
     const grids=[];
     for(let v=Math.ceil(mn/st)*st;v<=mx;v+=st) grids.push(v);
     let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;">`;
-    grids.forEach(v=>{svg+=`<line x1="${P.l}" x2="${W-P.r}" y1="${yp(v)}" y2="${yp(v)}" stroke="rgba(255,255,255,0.05)"/><text x="${P.l-6}" y="${yp(v)+3}" fill="#2a4a65" font-size="9" text-anchor="end">${v}</text>`;});
-    ratingHistory.forEach((_,i)=>{svg+=`<text x="${xp(i)}" y="${H-6}" fill="#2a4a65" font-size="8" text-anchor="middle">R${i+1}</text>`;});
+    grids.forEach(v=>{svg+=`<line x1="${P.l}" x2="${W-P.r}" y1="${yp(v)}" y2="${yp(v)}" stroke="rgba(255,255,255,0.05)"/><text x="${P.l-6}" y="${yp(v)+3}" fill="#5a8aab" font-size="9" text-anchor="end">${v}</text>`;});
+    ratingHistory.forEach((_,i)=>{svg+=`<text x="${xp(i)}" y="${H-6}" fill="#5a8aab" font-size="8" text-anchor="middle">R${i+1}</text>`;});
     selected.forEach((num,di)=>{
       const col=CC[di%CC.length];
       const pts=ratingHistory.map((s,i)=>s[num]?{x:xp(i),y:yp(s[num][trendKey]||0)}:null).filter(Boolean);
@@ -1504,54 +1505,6 @@ function SSStandingsTab({ csvData, drivers, seasonPoints }) {
         </button>
         <span style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", marginLeft:"auto" }}>{sorted.length} driver{sorted.length!==1?"s":""}</span>
       </div>
-
-      <InfoLegend title="Color Guide">
-        <div>
-          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>DRIVER NAME COLORS</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
-            {[
-              { label:"Gold", color:T.gold, desc:"Elite tier (85+ overall rating)" },
-              { label:"Blue", color:T.accent, desc:"Strong tier (75–84)" },
-              { label:"Steel", color:T.textMid, desc:"Solid tier (68–74)" },
-              { label:"Muted", color:T.border2, desc:"Developing tier (63–67)" },
-              { label:"Dim", color:T.border, desc:"Baseline tier (< 63)" },
-            ].map(t => (
-              <div key={t.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ width:10, height:10, borderRadius:3, background:t.color, flexShrink:0, border:`1px solid ${t.color}` }} />
-                <span><span style={{ fontWeight:700, color:t.color }}>{t.label}</span> — {t.desc}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>STAT COLORS</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
-            {[
-              { label:"Avg Finish", items:[
-                { color:T.green, desc:"≤ 10.0 (elite)" },
-                { color:T.gold, desc:"10.1–20.0 (solid)" },
-                { color:T.red, desc:"> 20.0 (struggling)" },
-              ]},
-              { label:"Wins", items:[{ color:T.gold, desc:"1+ wins highlighted" }] },
-              { label:"Laps Led", items:[{ color:"#a855f7", desc:"Any laps led highlighted in purple" }] },
-              { label:"Best Finish", items:[{ color:T.gold, desc:"P1 highlighted in gold" }] },
-              { label:"Manufacturer", items:[
-                { color:MFG_COLORS.Chevrolet, desc:"Chevrolet" },
-                { color:MFG_COLORS.Ford, desc:"Ford" },
-                { color:MFG_COLORS.Toyota, desc:"Toyota" },
-              ]},
-            ].map(group => (
-              <div key={group.label} style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
-                <span style={{ fontWeight:700, color:T.accentText, minWidth:80 }}>{group.label}:</span>
-                {group.items.map(item => (
-                  <span key={item.desc} style={{ display:"inline-flex", alignItems:"center", gap:4 }}>
-                    <span style={{ width:8, height:8, borderRadius:2, background:item.color, flexShrink:0 }} />
-                    <span>{item.desc}</span>
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </InfoLegend>
 
       {/* Table */}
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"auto" }}>
@@ -4005,15 +3958,17 @@ function TrackStatsTab({ csvData }) {
 // DRIVER ANALYTICS TAB
 // ─────────────────────────────────────────────────────────────
 const DA_TRACKS_2026 = [
-  "Bristol Motor Speedway","Charlotte Motor Speedway","Circuit Of The Americas","Darlington Raceway",
-  "Daytona International Speedway","Dover International Speedway","Echopark Speedway","Homestead-Miami Speedway",
-  "Indianapolis Motor Speedway","Iowa Speedway","Kansas Speedway","Las Vegas Motor Speedway",
-  "Martinsville Speedway","Michigan International Speedway","Nashville Superspeedway","New Hampshire Motor Speedway",
-  "Phoenix Raceway","Pocono Raceway","Richmond Raceway","Sonoma Raceway","Talladega Superspeedway",
-  "Texas Motor Speedway","Watkins Glen International","World Wide Technology Raceway",
+  "Bristol Motor Speedway","Charlotte Motor Speedway","Chicagoland Speedway","Circuit Of The Americas",
+  "Darlington Raceway","Daytona International Speedway","Dover International Speedway","Echopark Speedway",
+  "Homestead-Miami Speedway","Indianapolis Motor Speedway","Iowa Speedway","Kansas Speedway",
+  "Las Vegas Motor Speedway","Martinsville Speedway","Michigan International Speedway",
+  "Nashville Superspeedway","Naval Base Coronado Street Course","New Hampshire Motor Speedway",
+  "North Wilkesboro Speedway","Phoenix Raceway","Pocono Raceway","Richmond Raceway","Sonoma Raceway",
+  "Talladega Superspeedway","Texas Motor Speedway","Watkins Glen International Raceway",
+  "World Wide Technology Raceway",
 ];
 const DA_TRACK_ALIASES = {
-  "Watkins Glen International Raceway":"Watkins Glen International",
+  "Watkins Glen International":"Watkins Glen International Raceway",
 };
 
 function daGradeChip(val, allVals, lowerBetter) {
@@ -5115,10 +5070,10 @@ function PowerRankingsTab({ drivers, prevRanks, ratingHistory }) {
           <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
             {[
               { label:"Elite (85+)", color:T.gold, desc:"Championship contenders — consistently dominant across track types" },
-              { label:"Strong (75–84)", color:T.accent, desc:"Chase-caliber drivers with multiple strengths" },
+              { label:"Strong (75–84)", color:T.accent, desc:"Playoff-caliber drivers with multiple strengths" },
               { label:"Solid (68–74)", color:T.textMid, desc:"Competitive mid-pack; capable of top-10 finishes regularly" },
-              { label:"Developing (63–67)", color:T.border2, desc:"Showing flashes but inconsistent; upside potential" },
-              { label:"Baseline (< 63)", color:T.border, desc:"Backmarkers or rookies still building a track record" },
+              { label:"Developing (63–67)", color:"#4a7a9b", desc:"Showing flashes but inconsistent; upside potential" },
+              { label:"Baseline (< 63)", color:"#3d6a85", desc:"Backmarkers or rookies still building a track record" },
             ].map(t => (
               <div key={t.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
                 <span style={{ width:10, height:10, borderRadius:3, background:t.color, flexShrink:0, border:`1px solid ${t.color}` }} />
@@ -5153,8 +5108,7 @@ async function loadFromSupabase() {
     const { data:prRows }   = await sb.from("app_state").select("*").eq("key","prevRanks");
     const { data:rfRows }   = await sb.from("app_state").select("*").eq("key","recentFinishes");
     const { data:raRows }   = await sb.from("app_state").select("*").eq("key","raceArchive");
-    const { data:spRows }   = await sb.from("app_state").select("*").eq("key","seasonPoints");
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows };
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 
@@ -5207,6 +5161,11 @@ export default function NASCARHub() {
     try {
       const raw = localStorage.getItem("nascar_races");
       if (raw) setBattleRaces(JSON.parse(raw));
+    } catch {}
+    // Load season points from localStorage
+    try {
+      const raw = localStorage.getItem("nascar_season_points");
+      if (raw) setSeasonPoints(JSON.parse(raw));
     } catch {}
 
     // Auto-fetch CSV from GitHub, fall back to localStorage cache
@@ -5283,12 +5242,9 @@ export default function NASCARHub() {
     try { localStorage.setItem("nascar_races", JSON.stringify(updated)); } catch {}
   }, []);
 
-  const saveSeasonPoints = useCallback(async (updated) => {
+  const saveSeasonPoints = useCallback((updated) => {
     setSeasonPoints(updated);
-    // Save to Supabase app_state table
-    try {
-      await sb.from("app_state").upsert({ key:"seasonPoints", value:updated }, { onConflict:"key" });
-    } catch (e) { console.error("Season points save error:", e); }
+    try { localStorage.setItem("nascar_season_points", JSON.stringify(updated)); } catch {}
   }, []);
 
   // Load from Supabase on mount
@@ -5297,7 +5253,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     loadFromSupabase().then(data => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -5305,7 +5261,6 @@ export default function NASCARHub() {
       if (prRows?.[0]) setPrevRanks(prRows[0].value||{});
       if (rfRows?.[0]) setRecentFinishes(rfRows[0].value||{});
       if (raRows?.[0]) setRaceArchive(raRows[0].value||[]);
-      if (spRows?.[0]) setSeasonPoints(spRows[0].value||{});
       setSbStatus("live");
     });
   }, []);
