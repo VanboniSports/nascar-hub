@@ -5108,7 +5108,8 @@ async function loadFromSupabase() {
     const { data:prRows }   = await sb.from("app_state").select("*").eq("key","prevRanks");
     const { data:rfRows }   = await sb.from("app_state").select("*").eq("key","recentFinishes");
     const { data:raRows }   = await sb.from("app_state").select("*").eq("key","raceArchive");
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows };
+    const { data:spRows }   = await sb.from("app_state").select("*").eq("key","seasonPoints");
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 
@@ -5161,11 +5162,6 @@ export default function NASCARHub() {
     try {
       const raw = localStorage.getItem("nascar_races");
       if (raw) setBattleRaces(JSON.parse(raw));
-    } catch {}
-    // Load season points from localStorage
-    try {
-      const raw = localStorage.getItem("nascar_season_points");
-      if (raw) setSeasonPoints(JSON.parse(raw));
     } catch {}
 
     // Auto-fetch CSV from GitHub, fall back to localStorage cache
@@ -5242,9 +5238,11 @@ export default function NASCARHub() {
     try { localStorage.setItem("nascar_races", JSON.stringify(updated)); } catch {}
   }, []);
 
-  const saveSeasonPoints = useCallback((updated) => {
+  const saveSeasonPoints = useCallback(async (updated) => {
     setSeasonPoints(updated);
-    try { localStorage.setItem("nascar_season_points", JSON.stringify(updated)); } catch {}
+    try {
+      await sb.from("app_state").upsert({ key:"seasonPoints", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("Season points save error:", e); }
   }, []);
 
   // Load from Supabase on mount
@@ -5253,7 +5251,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     loadFromSupabase().then(data => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -5261,6 +5259,7 @@ export default function NASCARHub() {
       if (prRows?.[0]) setPrevRanks(prRows[0].value||{});
       if (rfRows?.[0]) setRecentFinishes(rfRows[0].value||{});
       if (raRows?.[0]) setRaceArchive(raRows[0].value||[]);
+      if (spRows?.[0]) setSeasonPoints(spRows[0].value||{});
       setSbStatus("live");
     });
   }, []);
