@@ -5440,7 +5440,28 @@ export default function NASCARHub() {
         <footer style={{ borderTop:`1px solid ${T.border}`, padding:"7px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", background:T.footerBg }}>
           <span>NASCAR HUB v2.5</span>
           <span>{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {drivers.length} drivers</span>
-          <span>2026 Cup Series</span>
+          <span style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <span>2026 Cup Series</span>
+            <a
+              href="https://docs.google.com/forms/d/e/1FAIpQLSclS_CfKMfb8MuCkeW1uLH6RSImBJTXSlF4FqfFjvjqPHn9uQ/viewform?usp=publish-editor"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display:"inline-flex", alignItems:"center", gap:4,
+                padding:"3px 9px", borderRadius:4,
+                border:`1px solid ${T.border2}`,
+                background:"rgba(30,144,255,0.07)",
+                color:T.accentText, fontFamily:"'Barlow Condensed',sans-serif",
+                fontSize:11, fontWeight:600, letterSpacing:"0.04em",
+                textDecoration:"none", cursor:"pointer",
+                transition:"background 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={e=>{ e.currentTarget.style.background="rgba(30,144,255,0.16)"; e.currentTarget.style.borderColor=T.accent; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background="rgba(30,144,255,0.07)"; e.currentTarget.style.borderColor=T.border2; }}
+            >
+              📝 Submit Feedback
+            </a>
+          </span>
         </footer>
       </div>
     </>
