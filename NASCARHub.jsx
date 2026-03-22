@@ -5875,6 +5875,127 @@ async function saveToSupabase(drivers, raceHistory, seasonStats, ratingHistory, 
 }
 
 // ─────────────────────────────────────────────────────────────
+// WELCOME MODAL
+// ─────────────────────────────────────────────────────────────
+function WelcomeModal({ onDismiss }) {
+  const [dontShow, setDontShow] = useState(false);
+  const handleDismiss = () => {
+    if (dontShow) {
+      try { localStorage.setItem("nascar_hub_welcome_dismissed", "1"); } catch {}
+    }
+    onDismiss();
+  };
+  return (
+    <div style={{
+      position:"fixed", inset:0, zIndex:9999,
+      background:"rgba(0,0,0,0.75)", backdropFilter:"blur(6px)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      padding:20, animation:"fadeIn 0.3s ease",
+    }} onClick={handleDismiss}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background:`linear-gradient(180deg, ${T.surface2} 0%, ${T.surface} 100%)`,
+        border:`1px solid ${T.border2}`, borderRadius:16,
+        maxWidth:460, width:"100%", padding:"32px 28px 24px",
+        boxShadow:`0 24px 80px rgba(0,0,0,0.6), 0 0 40px ${T.accentGlow}`,
+        position:"relative", overflow:"hidden",
+      }}>
+        {/* Accent glow line at top */}
+        <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:`linear-gradient(90deg, transparent, ${T.accent}, transparent)` }} />
+
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:20 }}>
+          <img src={VBS_LOGO} alt="Vanboni Sports" style={{ height:36, opacity:0.85 }} />
+        </div>
+
+        {/* Headline */}
+        <h2 style={{
+          fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900,
+          fontSize:26, letterSpacing:3, textTransform:"uppercase",
+          textAlign:"center", margin:"0 0 6px", lineHeight:1.2,
+          color:T.text,
+        }}>
+          WELCOME TO NASCAR <span style={{ color:T.accent }}>HUB</span>
+        </h2>
+        <p style={{
+          fontFamily:"'IBM Plex Mono',monospace", fontSize:10,
+          letterSpacing:2.5, textTransform:"uppercase", textAlign:"center",
+          color:T.textDim, margin:"0 0 18px",
+        }}>
+          2026 CUP SERIES ANALYTICS PLATFORM
+        </p>
+
+        {/* Divider */}
+        <div style={{ height:1, background:T.border, margin:"0 0 16px" }} />
+
+        {/* Description */}
+        <p style={{
+          fontSize:13, lineHeight:1.7, color:T.textMid,
+          margin:"0 0 16px", textAlign:"center",
+          fontFamily:"'Barlow',sans-serif",
+        }}>
+          Your all-in-one destination for NASCAR Cup Series analytics — explore driver performance, predict race outcomes, and track the season.
+        </p>
+
+        {/* Tool list */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px 16px", margin:"0 0 22px" }}>
+          {[
+            { icon:"🏆", label:"Power Rankings" },
+            { icon:"🏁", label:"Race Predictor" },
+            { icon:"📊", label:"Battle Tracker" },
+            { icon:"🛤️", label:"Track Stats" },
+            { icon:"👤", label:"Driver Analytics" },
+            { icon:"📈", label:"Season Stats" },
+          ].map(t => (
+            <div key={t.label} style={{
+              display:"flex", alignItems:"center", gap:8,
+              padding:"6px 10px", borderRadius:8,
+              background:T.accentSoft, border:`1px solid ${T.accent}15`,
+            }}>
+              <span style={{ fontSize:14 }}>{t.icon}</span>
+              <span style={{
+                fontSize:12, fontWeight:600, color:T.accentText,
+                fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5,
+              }}>{t.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Don't show again checkbox */}
+        <label style={{
+          display:"flex", alignItems:"center", justifyContent:"center",
+          gap:8, cursor:"pointer", margin:"0 0 18px",
+        }}>
+          <input
+            type="checkbox" checked={dontShow}
+            onChange={e => setDontShow(e.target.checked)}
+            style={{ accentColor:T.accent, width:14, height:14, cursor:"pointer" }}
+          />
+          <span style={{
+            fontSize:11, color:T.textDim,
+            fontFamily:"'IBM Plex Mono',monospace", letterSpacing:0.5,
+          }}>Don't show this again</span>
+        </label>
+
+        {/* CTA Button */}
+        <button onClick={handleDismiss} style={{
+          display:"block", width:"100%", padding:"12px 0",
+          background:`linear-gradient(135deg, ${T.accent}, #0066cc)`,
+          color:"#fff", border:"none", borderRadius:10,
+          fontSize:15, fontWeight:800, letterSpacing:2, textTransform:"uppercase",
+          fontFamily:"'Barlow Condensed',sans-serif",
+          cursor:"pointer", transition:"opacity 0.15s",
+        }}
+          onMouseEnter={e => e.currentTarget.style.opacity="0.88"}
+          onMouseLeave={e => e.currentTarget.style.opacity="1"}
+        >
+          LET'S GO
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────
 export default function NASCARHub() {
@@ -5906,6 +6027,11 @@ export default function NASCARHub() {
   const toolUsageRef = useRef({});
   const toolUsageLoaded = useRef(false);
   const toolUsageQueue = useRef([]);
+
+  // Welcome Modal — show on first visit unless dismissed
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try { return !localStorage.getItem("nascar_hub_welcome_dismissed"); } catch { return true; }
+  });
 
   // Load CSV from GitHub + Battle Tracker data (battle races now loaded via Supabase below)
   useEffect(() => {
@@ -6183,6 +6309,9 @@ export default function NASCARHub() {
           .nascar-mobile-banner{display:block}
         }
       `}</style>
+
+      {/* WELCOME MODAL */}
+      {showWelcome && <WelcomeModal onDismiss={() => setShowWelcome(false)} />}
 
       <div style={{ minHeight:"100vh", background:T.bg, fontFamily:"'Barlow',sans-serif", color:T.text, display:"flex", flexDirection:"column" }}>
 
