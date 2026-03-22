@@ -1118,11 +1118,12 @@ function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
   // ── Desktop sidebar mode ──
   return (
     <aside style={{
-      width: 280, minWidth: 280, flexShrink: 0,
+      flex: 1, minWidth: 260,
       background: T.surface, borderLeft: `1px solid ${T.border}`,
-      display: "flex", flexDirection: "column", overflow: "auto",
+      display: "flex", flexDirection: "column", alignItems: "center", overflow: "auto",
       fontFamily: "'Barlow',sans-serif",
     }}>
+      <div style={{ width: "100%", maxWidth: 300 }}>
       {/* Header stripe */}
       <div style={{
         padding: "14px 16px 12px", borderBottom: `1px solid ${T.border}`,
@@ -1297,6 +1298,7 @@ function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
             CSV data loading…
           </div>
         )}
+      </div>
       </div>
     </aside>
   );
