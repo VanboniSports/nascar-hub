@@ -4330,9 +4330,34 @@ const TS_SUBTABS = [
   { id:"leaderboard", label:"Track Leaderboard",   icon:"Chart" },
 ];
 
+// 4-driver H2H comparison colors
+const H2H_COLORS = ["#1e90ff","#ef4444","#22c55e","#a855f7"];
+
+// 2026 Team Roster
+const TEAM_ROSTER_2026 = {
+  "Hendrick Motorsports":["Kyle Larson","Chase Elliott","William Byron","Alex Bowman"],
+  "Joe Gibbs Racing":["Denny Hamlin","Christopher Bell","Ty Gibbs","Chase Briscoe"],
+  "Team Penske":["Joey Logano","Ryan Blaney","Austin Cindric"],
+  "Trackhouse Racing":["Ross Chastain","Shane van Gisbergen","Connor Zilisch"],
+  "23XI Racing":["Bubba Wallace","Tyler Reddick","Riley Herbst"],
+  "RFK Racing":["Chris Buescher","Brad Keselowski","Ryan Preece"],
+  "Haas Factory Team":["Cole Custer"],
+  "Front Row Motorsports":["Michael McDowell","Todd Gilliland","Noah Gragson"],
+  "Spire Motorsports":["Carson Hocevar","Zane Smith","Daniel Suarez"],
+  "Legacy Motor Club":["Erik Jones","John Hunter Nemechek"],
+  "Hyak Motorsports":["Ricky Stenhouse Jr"],
+  "Richard Childress Racing":["Kyle Busch","Austin Dillon"],
+  "Wood Brothers Racing":["Harrison Burton"],
+  "Rick Ware Racing":["Cody Ware"],
+  "Kaulig Racing":["AJ Allmendinger","Ty Dillon"],
+};
+
+const TEAM_NAMES_2026 = Object.keys(TEAM_ROSTER_2026).sort();
+
 const DA_SUBTABS = [
   { id:"breakdown",   label:"Driver Track Breakdown", icon:"Flag"    },
   { id:"h2h",         label:"Head to Head",            icon:"Compare" },
+  { id:"teamh2h",     label:"Team H2H",                icon:"Compare" },
   { id:"consistency", label:"Consistency Score",       icon:"Chart"   },
   { id:"dnfrisk",     label:"Bad / Good Day",            icon:"Alert"   },
 ];
@@ -4712,8 +4737,7 @@ function DaExpandedRow({ row }) {
 // HEAD TO HEAD — Sub-tab 2
 // ─────────────────────────────────────────────────────────────
 function DaHeadToHead({ csvData }) {
-  const [driver1, setDriver1] = useState("");
-  const [driver2, setDriver2] = useState("");
+  const [selectedDrivers, setSelectedDrivers] = useState(["","","",""]);
 
   const byDriver = useMemo(() => {
     const bd = {};
@@ -4727,11 +4751,18 @@ function DaHeadToHead({ csvData }) {
 
   const driverList = useMemo(() => FULL_TIMER_NAMES.filter(n => byDriver[n]).sort(), [byDriver]);
 
-  // Compute head-to-head stats
-  const h2h = useMemo(() => {
-    if (!driver1 || !driver2 || driver1 === driver2) return null;
-    const r1 = byDriver[driver1] || [];
-    const r2 = byDriver[driver2] || [];
+  const setDriver = (idx, val) => {
+    setSelectedDrivers(prev => { const next = [...prev]; next[idx] = val; return next; });
+  };
+
+  const activeDrivers = selectedDrivers.filter(d => d !== "");
+  const uniqueActive = [...new Set(activeDrivers)];
+  const ready = uniqueActive.length >= 2 && uniqueActive.length === activeDrivers.length;
+
+  // Compute stats for each selected driver
+  const h2hData = useMemo(() => {
+    if (!ready) return null;
+    const drivers = uniqueActive;
 
     function driverStats(races) {
       const finishes = races.map(r => r[3]).filter(v => v > 0);
@@ -4747,114 +4778,161 @@ function DaHeadToHead({ csvData }) {
       };
     }
 
-    const s1 = driverStats(r1);
-    const s2 = driverStats(r2);
+    const stats = {};
+    for (const d of drivers) stats[d] = driverStats(byDriver[d] || []);
 
-    // Find shared races (same track + same date)
-    const idx1 = {};
-    for (const r of r1) { const key = `${r[1]}|${r[9]}`; idx1[key] = r; }
-    let d1ahead = 0, d2ahead = 0, ties = 0;
-    const byType = { Intermediate:{d1:0,d2:0}, "Short Track":{d1:0,d2:0}, "Road Course":{d1:0,d2:0}, Superspeedway:{d1:0,d2:0} };
-    for (const r of r2) {
-      const key = `${r[1]}|${r[9]}`;
-      const match = idx1[key];
-      if (!match) continue;
-      const f1 = match[3], f2 = r[3];
-      if (f1 > 0 && f2 > 0) {
-        const trackType = CSV_TRACK_TYPES[r[1]] || "Unknown";
-        if (f1 < f2) { d1ahead++; if (byType[trackType]) byType[trackType].d1++; }
-        else if (f2 < f1) { d2ahead++; if (byType[trackType]) byType[trackType].d2++; }
-        else ties++;
+    // Head-to-head pairwise wins in shared races
+    const raceIdx = {};
+    for (const d of drivers) {
+      for (const r of (byDriver[d] || [])) {
+        const key = `${r[1]}|${r[9]}`;
+        if (!raceIdx[key]) raceIdx[key] = {};
+        raceIdx[key][d] = r[3];
       }
     }
 
-    return { s1, s2, d1ahead, d2ahead, ties, totalShared: d1ahead+d2ahead+ties, byType };
-  }, [driver1, driver2, byDriver]);
+    // Count pairwise finishes + by track type
+    const pairwise = {};
+    const pairByType = {};
+    for (let i = 0; i < drivers.length; i++) {
+      for (let j = i+1; j < drivers.length; j++) {
+        const pk = `${drivers[i]}|${drivers[j]}`;
+        pairwise[pk] = { d1:0, d2:0, ties:0 };
+        pairByType[pk] = { Intermediate:{d1:0,d2:0}, "Short Track":{d1:0,d2:0}, "Road Course":{d1:0,d2:0}, Superspeedway:{d1:0,d2:0} };
+      }
+    }
+    for (const [key, finishMap] of Object.entries(raceIdx)) {
+      const track = key.split("|")[0];
+      const trackType = CSV_TRACK_TYPES[track] || "Unknown";
+      for (let i = 0; i < drivers.length; i++) {
+        for (let j = i+1; j < drivers.length; j++) {
+          const f1 = finishMap[drivers[i]], f2 = finishMap[drivers[j]];
+          if (f1 > 0 && f2 > 0) {
+            const pk = `${drivers[i]}|${drivers[j]}`;
+            if (f1 < f2) { pairwise[pk].d1++; if (pairByType[pk][trackType]) pairByType[pk][trackType].d1++; }
+            else if (f2 < f1) { pairwise[pk].d2++; if (pairByType[pk][trackType]) pairByType[pk][trackType].d2++; }
+            else pairwise[pk].ties++;
+          }
+        }
+      }
+    }
 
-  function WinBar({ v1, v2, label }) {
-    const total = v1 + v2 || 1;
-    const pct1 = (v1 / total) * 100;
-    return (
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase", marginBottom:3 }}>
-          <span style={{ color: v1 > v2 ? T.accent : v1 === v2 ? T.textDim : T.textMid }}>{v1}</span>
-          <span>{label}</span>
-          <span style={{ color: v2 > v1 ? T.accent : v2 === v1 ? T.textDim : T.textMid }}>{v2}</span>
-        </div>
-        <div style={{ display:"flex", height:6, borderRadius:3, overflow:"hidden", background:T.surface2 }}>
-          <div style={{ width:`${pct1}%`, background: v1 > v2 ? T.accent : v1 === v2 ? T.textDim : `${T.accent}55`, transition:"width 0.3s" }} />
-          <div style={{ flex:1, background: v2 > v1 ? T.accent : v2 === v1 ? T.textDim : `${T.accent}55`, transition:"width 0.3s" }} />
-        </div>
-      </div>
-    );
-  }
+    // Yearly avg finish trend
+    const yearlyTrend = {};
+    const years = [...new Set(csvData.map(r => r[2]))].sort();
+    for (const yr of years) {
+      yearlyTrend[yr] = { year: yr };
+      for (const d of drivers) {
+        const races = (byDriver[d] || []).filter(r => r[2] === yr);
+        const finishes = races.map(r => r[3]).filter(v => v > 0);
+        yearlyTrend[yr][d] = finishes.length ? +(finishes.reduce((a,b)=>a+b,0)/finishes.length).toFixed(1) : null;
+      }
+    }
 
-  const cats = h2h ? [
-    { label:"Wins", v1:h2h.s1.wins, v2:h2h.s2.wins },
-    { label:"Top 5s", v1:h2h.s1.top5, v2:h2h.s2.top5 },
-    { label:"Top 10s", v1:h2h.s1.top10, v2:h2h.s2.top10 },
-    { label:"Avg Finish", v1:h2h.s1.avgFinish, v2:h2h.s2.avgFinish, lowerBetter:true },
-    { label:"Best Finish", v1:h2h.s1.bestFinish, v2:h2h.s2.bestFinish, lowerBetter:true },
-    { label:"Worst Finish", v1:h2h.s1.worstFinish, v2:h2h.s2.worstFinish, lowerBetter:true },
-    { label:"Laps Led", v1:h2h.s1.lapsLed, v2:h2h.s2.lapsLed },
-  ] : [];
+    return { drivers, stats, pairwise, pairByType, yearlyTrend: Object.values(yearlyTrend) };
+  }, [ready, uniqueActive.join(","), byDriver, csvData]);
+
+  const selStyle = { width:"100%", padding:"10px 14px", background:T.surface2, color:T.text, border:`1px solid ${T.border2}`, borderRadius:8, fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" };
+  const labelStyle = { fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      {/* Driver selectors */}
-      <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
-        <div style={{ flex:1, minWidth:200, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:16 }}>
-          <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 }}>Driver 1</div>
-          <select value={driver1} onChange={e=>setDriver1(e.target.value)}
-            style={{ width:"100%", padding:"10px 14px", background:T.surface2, color:T.text, border:`1px solid ${T.border2}`, borderRadius:8, fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" }}>
-            <option value="">— Select —</option>
-            {driverList.filter(d=>d!==driver2).map(d=><option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
-        <div style={{ display:"flex", alignItems:"center", fontSize:20, fontWeight:900, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>VS</div>
-        <div style={{ flex:1, minWidth:200, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:16 }}>
-          <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 }}>Driver 2</div>
-          <select value={driver2} onChange={e=>setDriver2(e.target.value)}
-            style={{ width:"100%", padding:"10px 14px", background:T.surface2, color:T.text, border:`1px solid ${T.border2}`, borderRadius:8, fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" }}>
-            <option value="">— Select —</option>
-            {driverList.filter(d=>d!==driver1).map(d=><option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
+      {/* Driver selectors — 2 to 4 */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:12 }}>
+        {[0,1,2,3].map(idx => {
+          const others = selectedDrivers.filter((d,i) => i !== idx && d !== "");
+          const color = H2H_COLORS[idx];
+          return (
+            <div key={idx} style={{ background:T.surface, border:`1px solid ${selectedDrivers[idx]?color:T.border}`, borderRadius:12, padding:16, transition:"border-color 0.2s" }}>
+              <div style={{ ...labelStyle, color: selectedDrivers[idx] ? color : T.textDim }}>Driver {idx+1}{idx >= 2 ? " (optional)" : ""}</div>
+              <select value={selectedDrivers[idx]} onChange={e=>setDriver(idx, e.target.value)} style={selStyle}>
+                <option value="">— {idx >= 2 ? "Optional" : "Select"} —</option>
+                {driverList.filter(d=>!others.includes(d)).map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          );
+        })}
       </div>
 
-      {h2h && (
+      {h2hData && (
         <>
-          {/* Head-to-head record */}
-          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Head-to-Head Record ({h2h.totalShared} shared races)</div>
-            <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:24, marginBottom:16 }}>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:36, fontWeight:900, color:h2h.d1ahead>=h2h.d2ahead?T.accent:T.textMid, fontFamily:"'Barlow Condensed',sans-serif", lineHeight:1 }}>{h2h.d1ahead}</div>
-                <div style={{ fontSize:12, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", marginTop:4 }}>{driver1.split(" ").pop()}</div>
-              </div>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:14, fontWeight:700, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{h2h.ties > 0 ? `${h2h.ties} ties` : "—"}</div>
-              </div>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:36, fontWeight:900, color:h2h.d2ahead>=h2h.d1ahead?T.accent:T.textMid, fontFamily:"'Barlow Condensed',sans-serif", lineHeight:1 }}>{h2h.d2ahead}</div>
-                <div style={{ fontSize:12, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", marginTop:4 }}>{driver2.split(" ").pop()}</div>
-              </div>
-            </div>
+          {/* Stat comparison table */}
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, overflowX:"auto" }}>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Category Comparison</div>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign:"left", padding:"6px 8px", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase", borderBottom:`1px solid ${T.border}` }}>Stat</th>
+                  {h2hData.drivers.map((d, i) => (
+                    <th key={d} style={{ textAlign:"center", padding:"6px 8px", color:H2H_COLORS[selectedDrivers.indexOf(d)], fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", borderBottom:`1px solid ${T.border}` }}>{d.split(" ").pop()}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { key:"races", label:"Races", lb:false },
+                  { key:"wins", label:"Wins", lb:false },
+                  { key:"top5", label:"Top 5s", lb:false },
+                  { key:"top10", label:"Top 10s", lb:false },
+                  { key:"avgFinish", label:"Avg Finish", lb:true, fmt:1 },
+                  { key:"bestFinish", label:"Best Finish", lb:true },
+                  { key:"worstFinish", label:"Worst Finish", lb:true },
+                  { key:"lapsLed", label:"Laps Led", lb:false },
+                ].map(cat => {
+                  const vals = h2hData.drivers.map(d => h2hData.stats[d][cat.key] ?? 0);
+                  const best = cat.lb ? Math.min(...vals.filter(v=>v>0||cat.key==="avgFinish")) : Math.max(...vals);
+                  return (
+                    <tr key={cat.key} style={{ borderBottom:`1px solid ${T.border}` }}>
+                      <td style={{ padding:"8px", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>{cat.label}</td>
+                      {h2hData.drivers.map((d, i) => {
+                        const v = h2hData.stats[d][cat.key];
+                        const isBest = v === best && vals.filter(x=>x===best).length < vals.length;
+                        const display = v == null ? "—" : cat.fmt ? v.toFixed(cat.fmt) : v;
+                        return (
+                          <td key={d} style={{ textAlign:"center", padding:"8px", fontWeight:isBest?800:500, color:isBest?T.green:T.textMid }}>
+                            {display}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-            {/* By track type */}
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:10 }}>By Track Type</div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(140px, 1fr))", gap:8 }}>
-              {Object.entries(h2h.byType).map(([type, rec]) => {
-                const total = rec.d1 + rec.d2;
-                if (total === 0) return null;
-                const color = CSV_TYPE_COLORS[type] || T.textMid;
+          {/* Pairwise head-to-head records */}
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Pairwise Head-to-Head Records</div>
+            <div style={{ display:"grid", gridTemplateColumns:`repeat(auto-fit, minmax(${h2hData.drivers.length > 2 ? 220 : 280}px, 1fr))`, gap:12 }}>
+              {Object.entries(h2hData.pairwise).map(([pk, rec]) => {
+                const [d1, d2] = pk.split("|");
+                const c1 = H2H_COLORS[selectedDrivers.indexOf(d1)];
+                const c2 = H2H_COLORS[selectedDrivers.indexOf(d2)];
+                const total = rec.d1 + rec.d2 + rec.ties;
                 return (
-                  <div key={type} style={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 12px" }}>
-                    <div style={{ fontSize:9, color, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6 }}>{type}</div>
-                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:16, fontWeight:900, fontFamily:"'Barlow Condensed',sans-serif" }}>
-                      <span style={{ color:rec.d1>=rec.d2?color:T.textDim }}>{rec.d1}</span>
-                      <span style={{ fontSize:10, color:T.textDim, alignSelf:"center" }}>-</span>
-                      <span style={{ color:rec.d2>=rec.d1?color:T.textDim }}>{rec.d2}</span>
+                  <div key={pk} style={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:10, padding:14 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:c1, fontFamily:"'Barlow Condensed',sans-serif" }}>{d1.split(" ").pop()}</span>
+                      <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{total} shared</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:c2, fontFamily:"'Barlow Condensed',sans-serif" }}>{d2.split(" ").pop()}</span>
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:16, marginBottom:10 }}>
+                      <div style={{ fontSize:28, fontWeight:900, color:rec.d1>=rec.d2?c1:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", lineHeight:1 }}>{rec.d1}</div>
+                      <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{rec.ties > 0 ? `${rec.ties}T` : "—"}</div>
+                      <div style={{ fontSize:28, fontWeight:900, color:rec.d2>=rec.d1?c2:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", lineHeight:1 }}>{rec.d2}</div>
+                    </div>
+                    {/* Mini track type breakdown */}
+                    <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                      {Object.entries(h2hData.pairByType[pk]).map(([type, tr]) => {
+                        if (tr.d1 + tr.d2 === 0) return null;
+                        const tc = CSV_TYPE_COLORS[type] || T.textDim;
+                        return (
+                          <div key={type} style={{ fontSize:8, padding:"2px 6px", borderRadius:4, background:`${tc}15`, color:tc, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1 }}>
+                            {type.substring(0,3).toUpperCase()} {tr.d1}-{tr.d2}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -4862,38 +4940,255 @@ function DaHeadToHead({ csvData }) {
             </div>
           </div>
 
-          {/* Stat comparison bars */}
+          {/* Avg Finish Trend chart */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:T.accent, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>{driver1.split(" ").pop()}</div>
-              <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, fontFamily:"'Barlow Condensed',sans-serif", textTransform:"uppercase" }}>Category Comparison</div>
-              <div style={{ fontSize:13, fontWeight:700, color:T.accent, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>{driver2.split(" ").pop()}</div>
-            </div>
-            {cats.map(c => {
-              const v1 = c.v1 ?? 0, v2 = c.v2 ?? 0;
-              const d1 = typeof v1 === "number" ? (c.label.includes("Finish") ? v1.toFixed(1) : v1) : "—";
-              const d2 = typeof v2 === "number" ? (c.label.includes("Finish") ? v2.toFixed(1) : v2) : "—";
-              const w1 = c.lowerBetter ? (v1 < v2) : (v1 > v2);
-              const w2 = c.lowerBetter ? (v2 < v1) : (v2 > v1);
-              return (
-                <div key={c.label} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8, padding:"6px 0" }}>
-                  <span style={{ width:50, textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", fontSize:13, fontWeight:w1?800:500, color:w1?T.green:T.textMid }}>{d1}</span>
-                  <span style={{ width:10, textAlign:"center", fontSize:10, color:w1?T.green:w2?T.red:T.textDim }}>{w1?"◀":""}</span>
-                  <div style={{ flex:1, textAlign:"center", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>{c.label}</div>
-                  <span style={{ width:10, textAlign:"center", fontSize:10, color:w2?T.green:w1?T.red:T.textDim }}>{w2?"▶":""}</span>
-                  <span style={{ width:50, textAlign:"left", fontFamily:"'IBM Plex Mono',monospace", fontSize:13, fontWeight:w2?800:500, color:w2?T.green:T.textMid }}>{d2}</span>
-                </div>
-              );
-            })}
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Avg Finish by Season</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={h2hData.yearlyTrend} margin={{ top:5, right:20, left:0, bottom:5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
+                <XAxis dataKey="year" tick={{ fill:T.textDim, fontSize:10, fontFamily:"'IBM Plex Mono',monospace" }} stroke={T.border} />
+                <YAxis reversed tick={{ fill:T.textDim, fontSize:10, fontFamily:"'IBM Plex Mono',monospace" }} stroke={T.border} domain={["auto","auto"]} />
+                <Tooltip contentStyle={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:8, fontSize:11, fontFamily:"'IBM Plex Mono',monospace" }} labelStyle={{ color:T.text, fontWeight:700 }} />
+                {h2hData.drivers.map((d, i) => (
+                  <Line key={d} type="monotone" dataKey={d} stroke={H2H_COLORS[selectedDrivers.indexOf(d)]} strokeWidth={2} dot={{ r:3 }} name={d.split(" ").pop()} connectNulls />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </>
       )}
 
-      {(!driver1 || !driver2) && (
+      {!ready && (
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"40px 20px", gap:12, textAlign:"center" }}>
           <div style={{ fontSize:28 }}>⚔️</div>
-          <div style={{ fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.textMid }}>Select Two Drivers to Compare</div>
-          <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Choose from the dropdowns above</div>
+          <div style={{ fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.textMid }}>Select 2–4 Drivers to Compare</div>
+          <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Choose from the dropdowns above · Drivers 3 & 4 are optional</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TEAM HEAD-TO-HEAD — Sub-tab
+// ─────────────────────────────────────────────────────────────
+function DaTeamH2H({ csvData }) {
+  const [selectedTeams, setSelectedTeams] = useState(["","","",""]);
+
+  const byDriver = useMemo(() => {
+    const bd = {};
+    for (const r of csvData) {
+      const d = r[0]; if (!d) continue;
+      if (!bd[d]) bd[d] = [];
+      bd[d].push(r);
+    }
+    return bd;
+  }, [csvData]);
+
+  const setTeam = (idx, val) => {
+    setSelectedTeams(prev => { const next = [...prev]; next[idx] = val; return next; });
+  };
+
+  const activeTeams = selectedTeams.filter(t => t !== "");
+  const uniqueActive = [...new Set(activeTeams)];
+  const ready = uniqueActive.length >= 2 && uniqueActive.length === activeTeams.length;
+
+  // Compute team-level stats
+  const teamData = useMemo(() => {
+    if (!ready) return null;
+    const teams = uniqueActive;
+
+    function teamStats(teamName) {
+      const drivers = (TEAM_ROSTER_2026[teamName] || []).filter(d => byDriver[d]);
+      const allRaces = drivers.flatMap(d => byDriver[d] || []);
+      const finishes = allRaces.map(r => r[3]).filter(v => v > 0);
+      return {
+        teamName,
+        drivers,
+        driverCount: drivers.length,
+        totalRaces: allRaces.length,
+        wins: finishes.filter(f => f === 1).length,
+        top5: finishes.filter(f => f <= 5).length,
+        top10: finishes.filter(f => f <= 10).length,
+        avgFinish: finishes.length ? finishes.reduce((a,b)=>a+b,0)/finishes.length : null,
+        bestFinish: finishes.length ? Math.min(...finishes) : null,
+        lapsLed: allRaces.reduce((a,r) => a + (r[5]||0), 0),
+      };
+    }
+
+    const stats = {};
+    for (const t of teams) stats[t] = teamStats(t);
+
+    // Yearly trend per team
+    const years = [...new Set(csvData.map(r => r[2]))].sort();
+    const yearlyTrend = years.map(yr => {
+      const row = { year: yr };
+      for (const t of teams) {
+        const drivers = (TEAM_ROSTER_2026[t] || []).filter(d => byDriver[d]);
+        const allFinishes = drivers.flatMap(d => (byDriver[d] || []).filter(r => r[2] === yr).map(r => r[3])).filter(v => v > 0);
+        row[t] = allFinishes.length ? +(allFinishes.reduce((a,b)=>a+b,0)/allFinishes.length).toFixed(1) : null;
+      }
+      return row;
+    });
+
+    // Wins per year for bar chart
+    const winsPerYear = years.map(yr => {
+      const row = { year: yr };
+      for (const t of teams) {
+        const drivers = (TEAM_ROSTER_2026[t] || []).filter(d => byDriver[d]);
+        row[t] = drivers.flatMap(d => (byDriver[d] || []).filter(r => r[2] === yr && r[3] === 1)).length;
+      }
+      return row;
+    });
+
+    return { teams, stats, yearlyTrend, winsPerYear };
+  }, [ready, uniqueActive.join(","), byDriver, csvData]);
+
+  const selStyle = { width:"100%", padding:"10px 14px", background:T.surface2, color:T.text, border:`1px solid ${T.border2}`, borderRadius:8, fontSize:13, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" };
+  const labelStyle = { fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* Team selectors */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:12 }}>
+        {[0,1,2,3].map(idx => {
+          const others = selectedTeams.filter((t,i) => i !== idx && t !== "");
+          const color = H2H_COLORS[idx];
+          return (
+            <div key={idx} style={{ background:T.surface, border:`1px solid ${selectedTeams[idx]?color:T.border}`, borderRadius:12, padding:16, transition:"border-color 0.2s" }}>
+              <div style={{ ...labelStyle, color: selectedTeams[idx] ? color : T.textDim }}>Team {idx+1}{idx >= 2 ? " (optional)" : ""}</div>
+              <select value={selectedTeams[idx]} onChange={e=>setTeam(idx, e.target.value)} style={selStyle}>
+                <option value="">— {idx >= 2 ? "Optional" : "Select"} —</option>
+                {TEAM_NAMES_2026.filter(t=>!others.includes(t)).map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+              {selectedTeams[idx] && (
+                <div style={{ marginTop:8, fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", lineHeight:1.6 }}>
+                  {(TEAM_ROSTER_2026[selectedTeams[idx]] || []).join(" · ")}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {teamData && (
+        <>
+          {/* Stat comparison table */}
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, overflowX:"auto" }}>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Team Comparison (All Drivers Combined)</div>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign:"left", padding:"6px 8px", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase", borderBottom:`1px solid ${T.border}` }}>Stat</th>
+                  {teamData.teams.map(t => (
+                    <th key={t} style={{ textAlign:"center", padding:"6px 8px", color:H2H_COLORS[selectedTeams.indexOf(t)], fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, letterSpacing:0.5, borderBottom:`1px solid ${T.border}` }}>{t.replace(" Motorsports","").replace(" Racing","").replace(" Motor Club","").replace(" Factory Team","")}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { key:"driverCount", label:"Drivers", lb:false },
+                  { key:"totalRaces", label:"Total Races", lb:false },
+                  { key:"wins", label:"Wins", lb:false },
+                  { key:"top5", label:"Top 5s", lb:false },
+                  { key:"top10", label:"Top 10s", lb:false },
+                  { key:"avgFinish", label:"Avg Finish", lb:true, fmt:1 },
+                  { key:"bestFinish", label:"Best Finish", lb:true },
+                  { key:"lapsLed", label:"Laps Led", lb:false },
+                ].map(cat => {
+                  const vals = teamData.teams.map(t => teamData.stats[t][cat.key] ?? 0);
+                  const best = cat.lb ? Math.min(...vals.filter(v=>v>0)) : Math.max(...vals);
+                  return (
+                    <tr key={cat.key} style={{ borderBottom:`1px solid ${T.border}` }}>
+                      <td style={{ padding:"8px", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>{cat.label}</td>
+                      {teamData.teams.map(t => {
+                        const v = teamData.stats[t][cat.key];
+                        const isBest = v === best && vals.filter(x=>x===best).length < vals.length;
+                        const display = v == null ? "—" : cat.fmt ? v.toFixed(cat.fmt) : v;
+                        return (
+                          <td key={t} style={{ textAlign:"center", padding:"8px", fontWeight:isBest?800:500, color:isBest?T.green:T.textMid }}>
+                            {display}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Avg Finish trend */}
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Team Avg Finish by Season</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={teamData.yearlyTrend} margin={{ top:5, right:20, left:0, bottom:5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
+                <XAxis dataKey="year" tick={{ fill:T.textDim, fontSize:10, fontFamily:"'IBM Plex Mono',monospace" }} stroke={T.border} />
+                <YAxis reversed tick={{ fill:T.textDim, fontSize:10, fontFamily:"'IBM Plex Mono',monospace" }} stroke={T.border} domain={["auto","auto"]} />
+                <Tooltip contentStyle={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:8, fontSize:11, fontFamily:"'IBM Plex Mono',monospace" }} labelStyle={{ color:T.text, fontWeight:700 }} />
+                {teamData.teams.map(t => (
+                  <Line key={t} type="monotone" dataKey={t} stroke={H2H_COLORS[selectedTeams.indexOf(t)]} strokeWidth={2} dot={{ r:3 }} name={t.replace(" Motorsports","").replace(" Racing","").replace(" Motor Club","").replace(" Factory Team","")} connectNulls />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Wins per year bar chart */}
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Wins by Season</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={teamData.winsPerYear} margin={{ top:5, right:20, left:0, bottom:5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
+                <XAxis dataKey="year" tick={{ fill:T.textDim, fontSize:10, fontFamily:"'IBM Plex Mono',monospace" }} stroke={T.border} />
+                <YAxis tick={{ fill:T.textDim, fontSize:10, fontFamily:"'IBM Plex Mono',monospace" }} stroke={T.border} allowDecimals={false} />
+                <Tooltip contentStyle={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:8, fontSize:11, fontFamily:"'IBM Plex Mono',monospace" }} labelStyle={{ color:T.text, fontWeight:700 }} />
+                {teamData.teams.map(t => (
+                  <Bar key={t} dataKey={t} fill={H2H_COLORS[selectedTeams.indexOf(t)]} name={t.replace(" Motorsports","").replace(" Racing","").replace(" Motor Club","").replace(" Factory Team","")} radius={[3,3,0,0]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Per-driver breakdown within each team */}
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Individual Driver Breakdown</div>
+            <div style={{ display:"grid", gridTemplateColumns:`repeat(auto-fit, minmax(200px, 1fr))`, gap:12 }}>
+              {teamData.teams.map(t => {
+                const color = H2H_COLORS[selectedTeams.indexOf(t)];
+                const drivers = (TEAM_ROSTER_2026[t] || []).filter(d => byDriver[d]);
+                return (
+                  <div key={t} style={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:10, padding:14 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", marginBottom:10, borderBottom:`1px solid ${T.border}`, paddingBottom:8 }}>{t}</div>
+                    {drivers.map(d => {
+                      const races = byDriver[d] || [];
+                      const finishes = races.map(r => r[3]).filter(v => v > 0);
+                      const avg = finishes.length ? (finishes.reduce((a,b)=>a+b,0)/finishes.length).toFixed(1) : "—";
+                      const wins = finishes.filter(f => f === 1).length;
+                      const t5 = finishes.filter(f => f <= 5).length;
+                      return (
+                        <div key={d} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 0", fontSize:11 }}>
+                          <span style={{ color:T.text, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:600 }}>{d}</span>
+                          <span style={{ color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", fontSize:10 }}>
+                            {avg} avg · {wins}W · {t5}T5
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {drivers.length === 0 && <div style={{ fontSize:10, color:T.textDim, fontStyle:"italic" }}>No CSV data</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {!ready && (
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"40px 20px", gap:12, textAlign:"center" }}>
+          <div style={{ fontSize:28 }}>🏁</div>
+          <div style={{ fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.textMid }}>Select 2–4 Teams to Compare</div>
+          <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Choose from the dropdowns above · Teams 3 & 4 are optional</div>
         </div>
       )}
     </div>
@@ -5428,6 +5723,7 @@ function DriverAnalyticsTab({ csvData, incrementTool }) {
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
         {subTab === "breakdown"   && <DaTrackBreakdown csvData={csvData} />}
         {subTab === "h2h"         && <DaHeadToHead csvData={csvData} />}
+        {subTab === "teamh2h"     && <DaTeamH2H csvData={csvData} />}
         {subTab === "consistency" && <DaConsistencyScore csvData={csvData} />}
         {subTab === "dnfrisk"     && <DaBadDayRisk csvData={csvData} />}
       </div>
