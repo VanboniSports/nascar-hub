@@ -49,20 +49,21 @@ const PREDICTOR_DESCRIPTIONS = {
 // TOOL USAGE TRACKING — keys for per-tool counters
 // ─────────────────────────────────────────────────────────────
 const TOOL_USAGE_KEYS = [
-  { key:"race_predictor",    label:"Race Predictor",    type:"action" },
-  { key:"track_lookup",      label:"Track Stats Lookup", type:"action" },
-  { key:"track_leaderboard", label:"Track Leaderboard",  type:"action" },
-  { key:"power_rankings",    label:"Power Rankings",     type:"view"   },
-  { key:"battle_tracker",    label:"Battle Tracker",     type:"view"   },
-  { key:"season_stats",      label:"Season Stats",       type:"view"   },
-  { key:"driver_analytics",  label:"Driver Analytics",   type:"view"   },
-  { key:"pr_trends",         label:"PR Trends",          type:"view"   },
-  { key:"pr_compare",        label:"PR Compare",         type:"view"   },
-  { key:"driver_h2h",        label:"Driver Head-to-Head", type:"action" },
-  { key:"team_h2h",          label:"Team Head-to-Head",   type:"action" },
-  { key:"sleeper_detector",  label:"Sleeper Detector",    type:"view"   },
-  { key:"good_bad_day",      label:"Good Day / Bad Day",  type:"action" },
-  { key:"mfg_trends",        label:"Manufacturer Trends", type:"view"   },
+  { key:"race_predictor",    label:"Race Predictor",       type:"action" },
+  { key:"this_week_predict", label:"This Week Quick Predict", type:"action" },
+  { key:"track_lookup",      label:"Track Stats Lookup",   type:"action" },
+  { key:"track_leaderboard", label:"Track Leaderboard",    type:"view"   },
+  { key:"driver_h2h",        label:"Driver Head-to-Head",  type:"action" },
+  { key:"team_h2h",          label:"Team Head-to-Head",    type:"action" },
+  { key:"sleeper_detector",  label:"Sleeper Detector",     type:"action" },
+  { key:"good_bad_day",      label:"Good Day / Bad Day",   type:"action" },
+  { key:"power_rankings",    label:"Power Rankings",       type:"view"   },
+  { key:"season_stats",      label:"Season Stats",         type:"view"   },
+  { key:"battle_tracker",    label:"Battle Tracker",       type:"view"   },
+  { key:"pr_trends",         label:"PR Trends",            type:"view"   },
+  { key:"pr_compare",        label:"PR Compare",           type:"view"   },
+  { key:"driver_analytics",  label:"Driver Analytics",     type:"view"   },
+  { key:"mfg_trends",        label:"Manufacturer Trends",  type:"view"   },
 ];
 
 const PREDICTOR_COLORS = {
@@ -1023,7 +1024,7 @@ function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
   const runQuickPredict = () => {
     if (!race || !csvData.length) return;
     setLoading(true);
-    incrementTool?.("race_predictor");
+    incrementTool?.("this_week_predict");
     setTimeout(() => {
       const preds = runEnhancedPureStatsPrediction(csvData, race.track, race.type);
       setQuickResults(preds.slice(0, 5));
@@ -5991,16 +5992,44 @@ export default function NASCARHub() {
   }, []);
 
   // Increment a tool usage counter — queues if Supabase hasn't loaded yet
+  // Uses read-merge-write so concurrent visitors don't overwrite each other's counts
   const toolUsageSaveTimer = useRef(null);
+  const toolUsagePending = useRef({}); // pending increments not yet saved to Supabase
+
   const flushToolUsage = useCallback((base, keys) => {
+    // Update local state immediately for responsive UI
     let merged = { ...base };
     for (const k of keys) merged[k] = (merged[k] || 0) + 1;
     toolUsageRef.current = merged;
     setToolUsage(merged);
-    // Debounce save
+    // Track pending increments (keys that haven't been saved to Supabase yet)
+    for (const k of keys) toolUsagePending.current[k] = (toolUsagePending.current[k] || 0) + 1;
+    // Debounce save — read latest from Supabase, merge our pending increments, write back
     if (toolUsageSaveTimer.current) clearTimeout(toolUsageSaveTimer.current);
-    toolUsageSaveTimer.current = setTimeout(() => {
-      sb?.from("app_state").upsert({ key:"toolUsage", value:toolUsageRef.current }, { onConflict:"key" }).catch(e => console.error("Tool usage save error:", e));
+    toolUsageSaveTimer.current = setTimeout(async () => {
+      const pending = { ...toolUsagePending.current };
+      toolUsagePending.current = {};
+      try {
+        // Read latest from Supabase (another visitor may have incremented)
+        const { data: rows } = await sb.from("app_state").select("*").eq("key","toolUsage");
+        const remote = rows?.[0]?.value || {};
+        // Merge: remote counts + our pending increments
+        const final = { ...remote };
+        for (const [k, inc] of Object.entries(pending)) {
+          final[k] = (final[k] || 0) + inc;
+        }
+        // Write merged result back
+        await sb.from("app_state").upsert({ key:"toolUsage", value:final }, { onConflict:"key" });
+        // Update local state to match what we just wrote
+        toolUsageRef.current = final;
+        setToolUsage(final);
+      } catch (e) {
+        // On error, put pending increments back so they retry next flush
+        for (const [k, inc] of Object.entries(pending)) {
+          toolUsagePending.current[k] = (toolUsagePending.current[k] || 0) + inc;
+        }
+        console.error("Tool usage save error:", e);
+      }
     }, 2000);
   }, []);
 
