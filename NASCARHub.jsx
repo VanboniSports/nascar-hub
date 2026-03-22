@@ -176,6 +176,26 @@ const SCHEDULE = [
 ];
 
 // ─────────────────────────────────────────────────────────────
+// THIS WEEK'S RACE — determine next upcoming race
+// ─────────────────────────────────────────────────────────────
+function getThisWeeksRace() {
+  const now = new Date();
+  const yr = 2026;
+  for (const r of SCHEDULE) {
+    // Parse "Feb 15" → Date(2026, month, day) — race day at 11:59 PM to include race day
+    const parts = r.date.split(" ");
+    const months = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+    const m = months[parts[0]];
+    const d = parseInt(parts[1]);
+    if (m == null || isNaN(d)) continue;
+    const raceDate = new Date(yr, m, d, 23, 59, 59);
+    if (raceDate >= now) return { ...r, raceDate };
+  }
+  // If season is over, return last race
+  return { ...SCHEDULE[SCHEDULE.length - 1], raceDate: new Date(yr, 10, 8, 23, 59, 59) };
+}
+
+// ─────────────────────────────────────────────────────────────
 // CSV DATA LAYER — shared across Track Stats tools
 // ─────────────────────────────────────────────────────────────
 const CSV_TRACK_TYPES = {"Bristol Motor Speedway":"Short Track","Martinsville Speedway":"Short Track","Richmond Raceway":"Short Track","New Hampshire Motor Speedway":"Short Track","Iowa Speedway":"Short Track","North Wilkesboro Speedway":"Short Track","Circuit Of The Americas":"Road Course","Sonoma Raceway":"Road Course","Road America":"Road Course","Watkins Glen International Raceway":"Road Course","Chicago Street Course":"Road Course","Autodromo Hermanos Rodriguez":"Road Course","Naval Base Coronado Street Course":"Road Course","Charlotte Motor Speedway":"Intermediate","Kansas Speedway":"Intermediate","Las Vegas Motor Speedway":"Intermediate","Michigan International Speedway":"Intermediate","Texas Motor Speedway":"Intermediate","Homestead-Miami Speedway":"Intermediate","Nashville Superspeedway":"Intermediate","Dover International Speedway":"Intermediate","Phoenix Raceway":"Intermediate","Pocono Raceway":"Intermediate","World Wide Technology Raceway":"Intermediate","Darlington Raceway":"Intermediate","Autoclub Speedway":"Intermediate","Echopark Speedway":"Superspeedway","Chicagoland Speedway":"Intermediate","Indianapolis Motor Speedway":"Road Course","Daytona International Speedway":"Superspeedway","Talladega Superspeedway":"Superspeedway","Watkins Glen International":"Road Course"};
@@ -961,6 +981,327 @@ function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
 }
 
 // Predictor model metadata
+// ─────────────────────────────────────────────────────────────
+// THIS WEEK'S RACE — Sidebar (desktop) / Banner (mobile)
+// ─────────────────────────────────────────────────────────────
+function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
+  const [expanded, setExpanded] = useState(false);
+  const [quickResults, setQuickResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const race = useMemo(() => getThisWeeksRace(), []);
+  const trackType = race ? (CSV_TRACK_TYPES[race.track] || TL[race.type] || "Intermediate") : "";
+  const typeColor = race ? (TC[race.type] || T.accent) : T.accent;
+
+  // Recent winners at this track from CSV
+  const recentWinners = useMemo(() => {
+    if (!csvData.length || !race) return [];
+    const wins = [];
+    for (const r of csvData) {
+      if (r[3] === 1 && predMatchTrack(race.track, r[1])) {
+        wins.push({ driver: r[0], year: r[2], date: r[9] });
+      }
+    }
+    // Sort by date descending, take last 3
+    wins.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    return wins.slice(0, 3);
+  }, [csvData, race]);
+
+  // Days until race
+  const daysUntil = useMemo(() => {
+    if (!race?.raceDate) return null;
+    const now = new Date();
+    const diff = Math.ceil((race.raceDate - now) / (1000 * 60 * 60 * 24));
+    return Math.max(0, diff);
+  }, [race]);
+
+  const runQuickPredict = () => {
+    if (!race || !csvData.length) return;
+    setLoading(true);
+    incrementTool?.("race_predictor");
+    setTimeout(() => {
+      const preds = runEnhancedPureStatsPrediction(csvData, race.track, race.type);
+      setQuickResults(preds.slice(0, 5));
+      setLoading(false);
+    }, 300);
+  };
+
+  if (!race) return null;
+
+  const trackTypeFull = TL[race.type] || race.type;
+
+  // ── Mobile banner mode ──
+  if (mode === "banner") {
+    return (
+      <div style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+        {/* Collapsed row */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 16px", background: "transparent", border: "none", cursor: "pointer", gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+            <div style={{
+              width: 6, height: 28, borderRadius: 3, background: typeColor, flexShrink: 0,
+            }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif",
+                letterSpacing: 1.5, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>
+                {race.name}
+              </div>
+              <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                {race.date} · <span style={{ color: typeColor }}>{trackTypeFull}</span>
+                {daysUntil != null && (
+                  <span style={{ color: daysUntil === 0 ? T.gold : T.textDim }}> · {daysUntil === 0 ? "RACE DAY" : `${daysUntil}d away`}</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textDim} strokeWidth="2.5" strokeLinecap="round" style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", flexShrink: 0 }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {/* Expanded content */}
+        {expanded && (
+          <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+              <span>{race.track}</span>
+              <span>{race.length} mi · {race.laps} laps</span>
+            </div>
+
+            {recentWinners.length > 0 && (
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>RECENT WINNERS HERE</div>
+                {recentWinners.map((w, i) => (
+                  <div key={i} style={{ fontSize: 11, color: T.text, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.6 }}>
+                    <span style={{ color: T.gold }}>🏆</span> {w.driver} <span style={{ color: T.textDim }}>({w.year})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!quickResults ? (
+              <button onClick={runQuickPredict} disabled={loading || !csvData.length}
+                style={{
+                  padding: "8px 16px", borderRadius: 6, border: `1px solid ${typeColor}40`,
+                  background: `${typeColor}15`, color: typeColor, fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase",
+                  cursor: csvData.length ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}>
+                {loading ? <><Ic.Spinner /> Running…</> : "⚡ Quick Predict"}
+              </button>
+            ) : (
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#e879f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>TOP 5 — ENHANCED PURE STATS</div>
+                {quickResults.map((p, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: i < 4 ? `1px solid ${T.border}` : "none" }}>
+                    <span style={{ width: 20, height: 20, borderRadius: "50%", background: i < 3 ? `${typeColor}22` : `${T.border}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: i < 3 ? typeColor : T.textDim, flexShrink: 0 }}>{i + 1}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>#{p.num} {p.driver}</div>
+                    </div>
+                    <span style={{ fontSize: 10, color: T.gold, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace" }}>{p.winPct}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Desktop sidebar mode ──
+  return (
+    <aside style={{
+      width: 280, minWidth: 280, flexShrink: 0,
+      background: T.surface, borderLeft: `1px solid ${T.border}`,
+      display: "flex", flexDirection: "column", overflow: "auto",
+      fontFamily: "'Barlow',sans-serif",
+    }}>
+      {/* Header stripe */}
+      <div style={{
+        padding: "14px 16px 12px", borderBottom: `1px solid ${T.border}`,
+        background: `linear-gradient(135deg, ${typeColor}10, transparent)`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <div style={{
+            width: 4, height: 32, borderRadius: 2, background: typeColor,
+          }} />
+          <div>
+            <div style={{
+              fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace",
+              letterSpacing: 2, textTransform: "uppercase", marginBottom: 2,
+            }}>
+              THIS WEEK
+            </div>
+            <div style={{
+              fontSize: 16, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif",
+              letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1,
+            }}>
+              {race.name}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{
+            display: "inline-block", padding: "2px 8px", borderRadius: 4,
+            background: `${typeColor}18`, border: `1px solid ${typeColor}30`,
+            fontSize: 10, fontWeight: 700, color: typeColor,
+            fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase",
+          }}>
+            {trackTypeFull}
+          </span>
+          <span style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+            {race.date}
+          </span>
+          {daysUntil != null && (
+            <span style={{
+              fontSize: 10, fontWeight: 700,
+              color: daysUntil === 0 ? T.gold : daysUntil <= 2 ? T.green : T.textDim,
+              fontFamily: "'IBM Plex Mono',monospace",
+            }}>
+              {daysUntil === 0 ? "🏁 RACE DAY" : `${daysUntil}d`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Track info */}
+      <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
+          TRACK INFO
+        </div>
+        <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.8 }}>
+          {race.track}
+        </div>
+        <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
+          {[
+            { label: "LENGTH", value: `${race.length} mi` },
+            { label: "LAPS", value: race.laps },
+          ].map(s => (
+            <div key={s.label}>
+              <div style={{ fontSize: 8, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1.5 }}>{s.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif" }}>{s.value}</div>
+            </div>
+          ))}
+          {race.week > 0 && (
+            <div>
+              <div style={{ fontSize: 8, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1.5 }}>WEEK</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: typeColor, fontFamily: "'Barlow Condensed',sans-serif" }}>{race.week}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent winners at this track */}
+      {recentWinners.length > 0 && (
+        <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
+            RECENT WINNERS HERE
+          </div>
+          {recentWinners.map((w, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "5px 0",
+              borderBottom: i < recentWinners.length - 1 ? `1px solid ${T.border}` : "none",
+            }}>
+              <span style={{ fontSize: 13 }}>🏆</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{w.driver}</div>
+                <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{w.year}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Quick Predict */}
+      <div style={{ padding: "12px 16px", flex: 1 }}>
+        {!quickResults ? (
+          <button onClick={runQuickPredict} disabled={loading || !csvData.length}
+            style={{
+              width: "100%", padding: "10px 14px", borderRadius: 8,
+              border: `1px solid ${typeColor}40`, background: `${typeColor}12`,
+              color: typeColor, fontSize: 12, fontWeight: 800,
+              fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase",
+              cursor: csvData.length ? "pointer" : "default",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { if (csvData.length) { e.currentTarget.style.background = `${typeColor}25`; e.currentTarget.style.borderColor = `${typeColor}70`; }}}
+            onMouseLeave={e => { e.currentTarget.style.background = `${typeColor}12`; e.currentTarget.style.borderColor = `${typeColor}40`; }}
+          >
+            {loading ? <><Ic.Spinner /> Running…</> : "⚡ Quick Predict"}
+          </button>
+        ) : (
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: "#e879f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
+              🔬 TOP 5 — ENHANCED PURE STATS
+            </div>
+            {quickResults.map((p, i) => {
+              const dInfo = INITIAL_DRIVERS.find(d => d.num === p.num);
+              return (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "7px 0",
+                  borderBottom: i < 4 ? `1px solid ${T.border}` : "none",
+                }}>
+                  <span style={{
+                    width: 24, height: 24, borderRadius: "50%",
+                    background: i === 0 ? `${T.gold}22` : i < 3 ? `${typeColor}22` : `${T.border}44`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 900,
+                    color: i === 0 ? T.gold : i < 3 ? typeColor : T.textDim,
+                    flexShrink: 0,
+                  }}>
+                    {i + 1}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, color: T.text,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>
+                      #{p.num} {p.driver}
+                    </div>
+                    <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                      {dInfo?.team?.split(" ").map(w => w[0]).join("") || p.mfg}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: T.gold, fontFamily: "'IBM Plex Mono',monospace" }}>
+                      {p.winPct}%
+                    </div>
+                    <div style={{ fontSize: 8, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>WIN</div>
+                  </div>
+                </div>
+              );
+            })}
+            <button onClick={() => setQuickResults(null)}
+              style={{
+                width: "100%", marginTop: 10, padding: "6px", borderRadius: 6,
+                border: `1px solid ${T.border}`, background: "transparent",
+                color: T.textDim, fontSize: 10, fontFamily: "'IBM Plex Mono',monospace",
+                cursor: "pointer", letterSpacing: 1,
+              }}>
+              ↻ Re-run
+            </button>
+          </div>
+        )}
+        {!csvData.length && (
+          <div style={{ marginTop: 8, fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", textAlign: "center" }}>
+            CSV data loading…
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 const PRED_MODELS = [
   { id:"power",    label:"Power Rankings",     color:"#10b981", desc:"Supabase-connected live ratings", icon:"⚡" },
   { id:"pure",     label:"Pure Stats",         color:"#f59e0b", desc:"Track-type weighted statistics, no ML", icon:"📊" },
@@ -5461,6 +5802,12 @@ export default function NASCARHub() {
         ::-webkit-scrollbar-thumb{background:${T.scrollThumb};border-radius:3px}
         select,input,textarea{color-scheme:dark}
         textarea{color-scheme:dark}
+        .nascar-sidebar{display:flex}
+        .nascar-mobile-banner{display:none}
+        @media(max-width:768px){
+          .nascar-sidebar{display:none!important}
+          .nascar-mobile-banner{display:block}
+        }
       `}</style>
 
       <div style={{ minHeight:"100vh", background:T.bg, fontFamily:"'Barlow',sans-serif", color:T.text, display:"flex", flexDirection:"column" }}>
@@ -5517,17 +5864,29 @@ export default function NASCARHub() {
           </div>
         )}
 
-        {/* CONTENT */}
-        <main style={{ flex:1, overflow:"auto", padding:"24px 28px", maxWidth:1000, width:"100%" }}>
-          <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
-            {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
-            {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
-            {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
-            {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
-            {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
-            {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
+        {/* MOBILE BANNER */}
+        <div className="nascar-mobile-banner">
+          <ThisWeekPanel csvData={csvData} drivers={drivers} incrementTool={incrementTool} mode="banner" />
+        </div>
+
+        {/* CONTENT + SIDEBAR */}
+        <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
+          <main style={{ flex:1, overflow:"auto", padding:"24px 28px", maxWidth:1000, width:"100%" }}>
+            <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
+              {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
+              {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
+              {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
+              {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
+              {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
+              {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
+            </div>
+          </main>
+
+          {/* DESKTOP SIDEBAR */}
+          <div className="nascar-sidebar">
+            <ThisWeekPanel csvData={csvData} drivers={drivers} incrementTool={incrementTool} mode="sidebar" />
           </div>
-        </main>
+        </div>
 
         {/* GLOBAL ADMIN */}
         <GlobalAdminPanel
