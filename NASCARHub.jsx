@@ -5110,7 +5110,8 @@ async function loadFromSupabase() {
     const { data:rfRows }   = await sb.from("app_state").select("*").eq("key","recentFinishes");
     const { data:raRows }   = await sb.from("app_state").select("*").eq("key","raceArchive");
     const { data:spRows }   = await sb.from("app_state").select("*").eq("key","seasonPoints");
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows };
+    const { data:btRows }   = await sb.from("app_state").select("*").eq("key","battleRaces");
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 
@@ -5147,7 +5148,6 @@ export default function NASCARHub() {
 
   // Battle Tracker state — persisted via window.storage
   const [battleRaces, setBattleRaces] = useState([]);
-  const [battleLoaded, setBattleLoaded] = useState(false);
 
   // CSV Data state — shared across Track Stats tools
   const [csvData, setCsvData] = useState([]);
@@ -5157,14 +5157,8 @@ export default function NASCARHub() {
   // Season Points — manually entered NASCAR official points, keyed by "driverName__year"
   const [seasonPoints, setSeasonPoints] = useState({});
 
-  // Load Battle Tracker data + season points + auto-fetch CSV from GitHub
+  // Load CSV from GitHub + Battle Tracker data (battle races now loaded via Supabase below)
   useEffect(() => {
-    // Load battle races from localStorage
-    try {
-      const raw = localStorage.getItem("nascar_races");
-      if (raw) setBattleRaces(JSON.parse(raw));
-    } catch {}
-
     // Auto-fetch CSV from GitHub, fall back to localStorage cache
     setCsvLoading(true);
     setCsvError(null);
@@ -5202,7 +5196,6 @@ export default function NASCARHub() {
         setCsvLoading(false);
       });
 
-    setBattleLoaded(true);
   }, []);
 
   const saveCsvData = useCallback(async (parsed) => {
@@ -5236,7 +5229,9 @@ export default function NASCARHub() {
 
   const saveBattleRaces = useCallback(async (updated) => {
     setBattleRaces(updated);
-    try { localStorage.setItem("nascar_races", JSON.stringify(updated)); } catch {}
+    try {
+      await sb.from("app_state").upsert({ key:"battleRaces", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("Battle races save error:", e); }
   }, []);
 
   const saveSeasonPoints = useCallback(async (updated) => {
@@ -5252,7 +5247,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     loadFromSupabase().then(data => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -5261,6 +5256,7 @@ export default function NASCARHub() {
       if (rfRows?.[0]) setRecentFinishes(rfRows[0].value||{});
       if (raRows?.[0]) setRaceArchive(raRows[0].value||[]);
       if (spRows?.[0]) setSeasonPoints(spRows[0].value||{});
+      if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
       setSbStatus("live");
     });
   }, []);
