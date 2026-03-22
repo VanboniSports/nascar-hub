@@ -5373,7 +5373,7 @@ export default function NASCARHub() {
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:4, paddingLeft:14, borderLeft:`1px solid ${T.border}` }}>
               <span style={{ fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1.5, textTransform:"uppercase", whiteSpace:"nowrap" }}>by</span>
-              <img src={VBS_LOGO} alt="Vanboni Sports" style={{ height:28, filter:"invert(1)", opacity:0.85 }} />
+              <img src={VBS_LOGO} alt="Vanboni Sports" style={{ height:28, opacity:0.9 }} />
             </div>
             <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:12 }}>
               {saving && <span style={{ fontSize:10, color:T.textDim, display:"flex", alignItems:"center", gap:5 }}><Ic.Spinner />Saving…</span>}
