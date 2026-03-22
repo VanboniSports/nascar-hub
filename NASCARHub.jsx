@@ -58,6 +58,11 @@ const TOOL_USAGE_KEYS = [
   { key:"driver_analytics",  label:"Driver Analytics",   type:"view"   },
   { key:"pr_trends",         label:"PR Trends",          type:"view"   },
   { key:"pr_compare",        label:"PR Compare",         type:"view"   },
+  { key:"driver_h2h",        label:"Driver Head-to-Head", type:"action" },
+  { key:"team_h2h",          label:"Team Head-to-Head",   type:"action" },
+  { key:"sleeper_detector",  label:"Sleeper Detector",    type:"view"   },
+  { key:"good_bad_day",      label:"Good Day / Bad Day",  type:"action" },
+  { key:"mfg_trends",        label:"Manufacturer Trends", type:"view"   },
 ];
 
 const PREDICTOR_COLORS = {
@@ -1756,8 +1761,8 @@ function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoints, in
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
         {subTab === "standings"  && <SSStandingsTab csvData={csvData} drivers={drivers} seasonPoints={seasonPoints} />}
         {subTab === "compare"    && <SSCompareTab csvData={csvData} drivers={drivers} />}
-        {subTab === "mfgTrends"  && <SSMfgTrendsTab csvData={csvData} />}
-        {subTab === "sleeper"    && <SSSleeperTab csvData={csvData} drivers={drivers} />}
+        {subTab === "mfgTrends"  && <SSMfgTrendsTab csvData={csvData} incrementTool={incrementTool} />}
+        {subTab === "sleeper"    && <SSSleeperTab csvData={csvData} drivers={drivers} incrementTool={incrementTool} />}
       </div>
     </div>
   );
@@ -2060,9 +2065,11 @@ function SSCompareTab({ csvData, drivers }) {
 }
 
 // ── Sub-tab 3: Manufacturer Trends ──
-function SSMfgTrendsTab({ csvData }) {
+function SSMfgTrendsTab({ csvData, incrementTool }) {
   const [yearFilter, setYearFilter] = useState(2026);
   const [viewMode, setViewMode] = useState("season"); // "season" | "trackType"
+
+  useEffect(() => { incrementTool?.("mfg_trends"); }, []);
 
   const years = useMemo(() => {
     const yrs = new Set();
@@ -2243,10 +2250,12 @@ function SSMfgTrendsTab({ csvData }) {
 }
 
 // ── Sub-tab 4: Sleeper Detector ──
-function SSSleeperTab({ csvData, drivers }) {
+function SSSleeperTab({ csvData, drivers, incrementTool }) {
   const [yearFilter, setYearFilter] = useState(2026);
   const [sortKey, setSortKey] = useState("diff");
   const [sortAsc, setSortAsc] = useState(false);
+
+  useEffect(() => { incrementTool?.("sleeper_detector"); }, []);
 
   const years = useMemo(() => {
     const yrs = new Set();
@@ -4738,7 +4747,7 @@ function DaExpandedRow({ row }) {
 // ─────────────────────────────────────────────────────────────
 // HEAD TO HEAD — Sub-tab 2
 // ─────────────────────────────────────────────────────────────
-function DaHeadToHead({ csvData }) {
+function DaHeadToHead({ csvData, incrementTool }) {
   const [selectedDrivers, setSelectedDrivers] = useState(["","","",""]);
 
   const byDriver = useMemo(() => {
@@ -4760,6 +4769,13 @@ function DaHeadToHead({ csvData }) {
   const activeDrivers = selectedDrivers.filter(d => d !== "");
   const uniqueActive = [...new Set(activeDrivers)];
   const ready = uniqueActive.length >= 2 && uniqueActive.length === activeDrivers.length;
+
+  // Track usage when a valid comparison is formed
+  const prevReady = useRef(false);
+  useEffect(() => {
+    if (ready && !prevReady.current) incrementTool?.("driver_h2h");
+    prevReady.current = ready;
+  }, [ready]);
 
   // Compute stats for each selected driver
   const h2hData = useMemo(() => {
@@ -4974,7 +4990,7 @@ function DaHeadToHead({ csvData }) {
 // ─────────────────────────────────────────────────────────────
 // TEAM HEAD-TO-HEAD — Sub-tab
 // ─────────────────────────────────────────────────────────────
-function DaTeamH2H({ csvData }) {
+function DaTeamH2H({ csvData, incrementTool }) {
   const [selectedTeams, setSelectedTeams] = useState(["","","",""]);
 
   const byDriver = useMemo(() => {
@@ -4994,6 +5010,13 @@ function DaTeamH2H({ csvData }) {
   const activeTeams = selectedTeams.filter(t => t !== "");
   const uniqueActive = [...new Set(activeTeams)];
   const ready = uniqueActive.length >= 2 && uniqueActive.length === activeTeams.length;
+
+  // Track usage when a valid comparison is formed
+  const prevReady = useRef(false);
+  useEffect(() => {
+    if (ready && !prevReady.current) incrementTool?.("team_h2h");
+    prevReady.current = ready;
+  }, [ready]);
 
   // Compute team-level stats
   const teamData = useMemo(() => {
@@ -5329,13 +5352,15 @@ function DaConsistencyScore({ csvData }) {
 // ─────────────────────────────────────────────────────────────
 // BAD DAY / GOOD DAY RISK — Sub-tab 4
 // ─────────────────────────────────────────────────────────────
-function DaBadDayRisk({ csvData }) {
+function DaBadDayRisk({ csvData, incrementTool }) {
   const [mode, setMode] = useState("bad"); // "bad" or "good"
   const [sortCol, setSortCol] = useState("collapseRate");
   const [sortAsc, setSortAsc] = useState(false);
   const [selDriver, setSelDriver] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [trackFilter, setTrackFilter] = useState("All");
+
+  useEffect(() => { incrementTool?.("good_bad_day"); }, []);
 
   // Get unique tracks from CSV
   const allTracks = useMemo(() => {
@@ -5724,10 +5749,10 @@ function DriverAnalyticsTab({ csvData, incrementTool }) {
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
         {subTab === "breakdown"   && <DaTrackBreakdown csvData={csvData} />}
-        {subTab === "h2h"         && <DaHeadToHead csvData={csvData} />}
-        {subTab === "teamh2h"     && <DaTeamH2H csvData={csvData} />}
+        {subTab === "h2h"         && <DaHeadToHead csvData={csvData} incrementTool={incrementTool} />}
+        {subTab === "teamh2h"     && <DaTeamH2H csvData={csvData} incrementTool={incrementTool} />}
         {subTab === "consistency" && <DaConsistencyScore csvData={csvData} />}
-        {subTab === "dnfrisk"     && <DaBadDayRisk csvData={csvData} />}
+        {subTab === "dnfrisk"     && <DaBadDayRisk csvData={csvData} incrementTool={incrementTool} />}
       </div>
     </div>
   );
@@ -5878,6 +5903,8 @@ export default function NASCARHub() {
   // Tool Usage — per-tool counters, persisted via Supabase
   const [toolUsage, setToolUsage] = useState({});
   const toolUsageRef = useRef({});
+  const toolUsageLoaded = useRef(false);
+  const toolUsageQueue = useRef([]);
 
   // Load CSV from GitHub + Battle Tracker data (battle races now loaded via Supabase below)
   useEffect(() => {
@@ -5963,20 +5990,28 @@ export default function NASCARHub() {
     } catch (e) { console.error("Season points save error:", e); }
   }, []);
 
-  // Increment a tool usage counter — debounced Supabase save
+  // Increment a tool usage counter — queues if Supabase hasn't loaded yet
   const toolUsageSaveTimer = useRef(null);
-  const incrementTool = useCallback((toolKey) => {
-    setToolUsage(prev => {
-      const updated = { ...prev, [toolKey]: (prev[toolKey] || 0) + 1 };
-      toolUsageRef.current = updated;
-      // Debounce the Supabase save to 2s so rapid increments batch
-      if (toolUsageSaveTimer.current) clearTimeout(toolUsageSaveTimer.current);
-      toolUsageSaveTimer.current = setTimeout(() => {
-        sb?.from("app_state").upsert({ key:"toolUsage", value:toolUsageRef.current }, { onConflict:"key" }).catch(e => console.error("Tool usage save error:", e));
-      }, 2000);
-      return updated;
-    });
+  const flushToolUsage = useCallback((base, keys) => {
+    let merged = { ...base };
+    for (const k of keys) merged[k] = (merged[k] || 0) + 1;
+    toolUsageRef.current = merged;
+    setToolUsage(merged);
+    // Debounce save
+    if (toolUsageSaveTimer.current) clearTimeout(toolUsageSaveTimer.current);
+    toolUsageSaveTimer.current = setTimeout(() => {
+      sb?.from("app_state").upsert({ key:"toolUsage", value:toolUsageRef.current }, { onConflict:"key" }).catch(e => console.error("Tool usage save error:", e));
+    }, 2000);
   }, []);
+
+  const incrementTool = useCallback((toolKey) => {
+    if (!toolUsageLoaded.current) {
+      // Supabase data not yet loaded — queue this increment
+      toolUsageQueue.current.push(toolKey);
+      return;
+    }
+    flushToolUsage(toolUsageRef.current, [toolKey]);
+  }, [flushToolUsage]);
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -5998,11 +6033,23 @@ export default function NASCARHub() {
     });
     // Load tool usage separately (it's also in app_state)
     sb.from("app_state").select("*").eq("key","toolUsage").then(({ data: tuRows }) => {
-      if (tuRows?.[0]) {
-        const loaded = tuRows[0].value || {};
+      const loaded = tuRows?.[0]?.value || {};
+      toolUsageRef.current = loaded;
+      toolUsageLoaded.current = true;
+      // Flush any increments that were queued before load completed
+      const queued = toolUsageQueue.current;
+      toolUsageQueue.current = [];
+      if (queued.length > 0) {
+        flushToolUsage(loaded, queued);
+      } else {
         setToolUsage(loaded);
-        toolUsageRef.current = loaded;
       }
+    }).catch(() => {
+      // Even on error, mark as loaded so increments aren't lost forever
+      toolUsageLoaded.current = true;
+      const queued = toolUsageQueue.current;
+      toolUsageQueue.current = [];
+      if (queued.length > 0) flushToolUsage({}, queued);
     });
   }, []);
 
