@@ -1118,7 +1118,7 @@ function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
   // ── Desktop sidebar mode ──
   return (
     <aside style={{
-      flex: 1, minWidth: 260,
+      width: "100%", height: "100%",
       background: T.surface, borderLeft: `1px solid ${T.border}`,
       display: "flex", flexDirection: "column", alignItems: "center", overflow: "auto",
       fontFamily: "'Barlow',sans-serif",
@@ -6169,7 +6169,7 @@ export default function NASCARHub() {
 
         {/* CONTENT + SIDEBAR */}
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
-          <main style={{ flex:1, overflow:"auto", padding:"24px 28px", maxWidth:1000, width:"100%" }}>
+          <main style={{ flex:"0 1 1000px", overflow:"auto", padding:"24px 28px", width:"100%" }}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
               {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
               {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
@@ -6181,7 +6181,7 @@ export default function NASCARHub() {
           </main>
 
           {/* DESKTOP SIDEBAR */}
-          <div className="nascar-sidebar">
+          <div className="nascar-sidebar" style={{ flex:1, minWidth:0 }}>
             <ThisWeekPanel csvData={csvData} drivers={drivers} incrementTool={incrementTool} mode="sidebar" />
           </div>
         </div>
