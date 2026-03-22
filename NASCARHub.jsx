@@ -59,7 +59,6 @@ const TOOL_USAGE_KEYS = [
   { key:"pr_trends",         label:"PR Trends",          type:"view"   },
   { key:"pr_compare",        label:"PR Compare",         type:"view"   },
 ];
-};
 
 const PREDICTOR_COLORS = {
   "Pure Stats": "#f59e0b",
