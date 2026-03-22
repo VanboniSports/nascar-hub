@@ -45,6 +45,22 @@ const PREDICTOR_DESCRIPTIONS = {
   "My Gut": "Personal picks based on intuition & race knowledge",
 };
 
+// ─────────────────────────────────────────────────────────────
+// TOOL USAGE TRACKING — keys for per-tool counters
+// ─────────────────────────────────────────────────────────────
+const TOOL_USAGE_KEYS = [
+  { key:"race_predictor",    label:"Race Predictor",    type:"action" },
+  { key:"track_lookup",      label:"Track Stats Lookup", type:"action" },
+  { key:"track_leaderboard", label:"Track Leaderboard",  type:"action" },
+  { key:"power_rankings",    label:"Power Rankings",     type:"view"   },
+  { key:"battle_tracker",    label:"Battle Tracker",     type:"view"   },
+  { key:"season_stats",      label:"Season Stats",       type:"view"   },
+  { key:"driver_analytics",  label:"Driver Analytics",   type:"view"   },
+  { key:"pr_trends",         label:"PR Trends",          type:"view"   },
+  { key:"pr_compare",        label:"PR Compare",         type:"view"   },
+];
+};
+
 const PREDICTOR_COLORS = {
   "Pure Stats": "#f59e0b",
   "Enhanced Pure Stats": "#e879f9",
@@ -955,7 +971,7 @@ const PRED_MODELS = [
 // ─────────────────────────────────────────────────────────────
 // PREDICTOR TAB — with model selector
 // ─────────────────────────────────────────────────────────────
-function PredictorTab({ drivers, csvData }) {
+function PredictorTab({ drivers, csvData, incrementTool }) {
   const [selectedWeek, setSelectedWeek] = useState("");
   const [selectedModel, setSelectedModel] = useState("power");
   const [results, setResults] = useState([]);
@@ -967,6 +983,7 @@ function PredictorTab({ drivers, csvData }) {
 
   const runPrediction = () => {
     if (!race) return;
+    incrementTool?.("race_predictor");
 
     if (selectedModel === "power") {
       // Original Power Rankings model — unchanged
@@ -1373,8 +1390,10 @@ const SSChartTooltip = ({ active, payload, label }) => {
   );
 };
 
-function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoints }) {
+function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoints, incrementTool }) {
   const [subTab, setSubTab] = useState("standings");
+
+  useEffect(() => { incrementTool?.("season_stats"); }, []);
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
@@ -2353,9 +2372,11 @@ function BattleRaceDetail({ race, onBack }) {
 // ─────────────────────────────────────────────────────────────
 // BATTLE TRACKER TAB — Dashboard
 // ─────────────────────────────────────────────────────────────
-function BattleTrackerTab({ battleRaces }) {
+function BattleTrackerTab({ battleRaces, incrementTool }) {
   const [view, setView] = useState("dashboard");
   const [selectedRace, setSelectedRace] = useState(null);
+
+  useEffect(() => { incrementTool?.("battle_tracker"); }, []);
 
   const leaderboard = PREDICTORS.map((predictor) => {
     let totalPoints = 0, racesScored = 0, wins = 0, top3 = 0, top5 = 0;
@@ -2679,12 +2700,12 @@ function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
 // ─────────────────────────────────────────────────────────────
 // GLOBAL ADMIN PANEL — lives at the bottom of the app
 // ─────────────────────────────────────────────────────────────
-function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave }) {
+function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
   const [pwErr, setPwErr] = useState(false);
-  const [adminSection, setAdminSection] = useState("power"); // "power" | "battle" | "csv" | "points"
+  const [adminSection, setAdminSection] = useState("power"); // "power" | "battle" | "csv" | "points" | "usage"
 
   // Power Rankings admin state
   const [raceName, setRaceName] = useState("");
@@ -2873,7 +2894,7 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
               {/* Admin sub-nav */}
               <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, paddingBottom:0 }}>
-                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"}].map(tab => {
+                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"},{id:"usage",label:"Tool Usage",icon:"Trend"}].map(tab => {
                   const active = adminSection === tab.id;
                   return (
                     <button key={tab.id} onClick={()=>setAdminSection(tab.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
@@ -3197,6 +3218,51 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
                 />
               )}
 
+              {/* ─── TOOL USAGE ADMIN ─── */}
+              {adminSection === "usage" && (() => {
+                const totalUses = Object.values(toolUsage || {}).reduce((a,b)=>a+b,0);
+                const maxUses = Math.max(1, ...Object.values(toolUsage || {}).map(v=>v||0));
+                return (
+                  <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+                    {/* Total header */}
+                    <div style={{ display:"flex", alignItems:"center", gap:16, padding:"16px 20px", background:T.accentSoft, border:`1px solid ${T.accent}30`, borderRadius:12 }}>
+                      <div style={{ fontSize:36, fontWeight:900, color:T.accent, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:-1 }}>{totalUses.toLocaleString()}</div>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>Total Tool Uses</div>
+                        <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Across all visitors · Persisted via Supabase</div>
+                      </div>
+                    </div>
+
+                    {/* Per-tool breakdown */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>Breakdown by Tool</div>
+                      {TOOL_USAGE_KEYS.map(({ key, label, type }) => {
+                        const count = toolUsage?.[key] || 0;
+                        const pct = maxUses > 0 ? (count / maxUses) * 100 : 0;
+                        return (
+                          <div key={key} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10 }}>
+                            <div style={{ flex:"0 0 160px", display:"flex", flexDirection:"column" }}>
+                              <span style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5 }}>{label}</span>
+                              <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>{type === "action" ? "on submit" : "on tab open"}</span>
+                            </div>
+                            <div style={{ flex:1, height:8, background:T.surface3, borderRadius:4, overflow:"hidden" }}>
+                              <div style={{ width:`${pct}%`, height:"100%", background: type === "action" ? T.accent : T.green, borderRadius:4, transition:"width 0.3s ease" }} />
+                            </div>
+                            <div style={{ flex:"0 0 60px", textAlign:"right", fontSize:15, fontWeight:900, color: count > 0 ? T.text : T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>{count.toLocaleString()}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Legend */}
+                    <div style={{ display:"flex", gap:16, fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
+                      <span style={{ display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:2, background:T.accent }} /> Action-based (on submit/run)</span>
+                      <span style={{ display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:2, background:T.green }} /> View-based (on tab open)</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
             </div>
           )}
         </div>
@@ -3208,12 +3274,14 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
 // ─────────────────────────────────────────────────────────────
 // TRACK LEADERBOARD — CSV-powered
 // ─────────────────────────────────────────────────────────────
-function TrackLeaderboardTab({ csvData }) {
+function TrackLeaderboardTab({ csvData, incrementTool }) {
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [trackSearch, setTrackSearch] = useState("");
   const [trackOpen, setTrackOpen] = useState(false);
   const [sortCol, setSortCol] = useState("avgFinish");
   const [sortDir, setSortDir] = useState(1);
+
+  useEffect(() => { incrementTool?.("track_leaderboard"); }, []);
 
   // Build BY_TRACK index from csvData
   const { byTrack, allTracks } = useMemo(() => {
@@ -3504,7 +3572,7 @@ function StatCard({ label, value, highlight }) {
   );
 }
 
-function DriverTrackLookup({ csvData }) {
+function DriverTrackLookup({ csvData, incrementTool }) {
   const [selDriver, setSelDriver] = useState("");
   const [selTrack, setSelTrack] = useState("");
   const [result, setResult] = useState(null);
@@ -3617,6 +3685,7 @@ function DriverTrackLookup({ csvData }) {
 
   function handleLookup() {
     if (!selDriver && !selTrack) return;
+    incrementTool?.("track_lookup");
     if (selDriver && selTrack) {
       const stats = computeDriverTrackStats(selDriver, selTrack);
       setResult({ mode:"driver+track", driver:selDriver, track:selTrack, stats });
@@ -3928,7 +3997,7 @@ const DA_SUBTABS = [
   { id:"dnfrisk",     label:"Bad / Good Day",            icon:"Alert"   },
 ];
 
-function TrackStatsTab({ csvData }) {
+function TrackStatsTab({ csvData, incrementTool }) {
   const [subTab, setSubTab] = useState("lookup");
 
   return (
@@ -3948,8 +4017,8 @@ function TrackStatsTab({ csvData }) {
 
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "lookup"      && <DriverTrackLookup csvData={csvData} />}
-        {subTab === "leaderboard" && <TrackLeaderboardTab csvData={csvData} />}
+        {subTab === "lookup"      && <DriverTrackLookup csvData={csvData} incrementTool={incrementTool} />}
+        {subTab === "leaderboard" && <TrackLeaderboardTab csvData={csvData} incrementTool={incrementTool} />}
       </div>
     </div>
   );
@@ -4971,8 +5040,10 @@ function DaBadDayRisk({ csvData }) {
 // ─────────────────────────────────────────────────────────────
 // DRIVER ANALYTICS TAB — wrapper with sub-navigation
 // ─────────────────────────────────────────────────────────────
-function DriverAnalyticsTab({ csvData }) {
+function DriverAnalyticsTab({ csvData, incrementTool }) {
   const [subTab, setSubTab] = useState("breakdown");
+
+  useEffect(() => { incrementTool?.("driver_analytics"); }, []);
 
   if (csvData.length === 0) {
     return (
@@ -5049,8 +5120,17 @@ function ComingSoon({ title, items=[] }) {
 // ─────────────────────────────────────────────────────────────
 // POWER RANKINGS WRAPPER — sub-tabs (no admin)
 // ─────────────────────────────────────────────────────────────
-function PowerRankingsTab({ drivers, prevRanks, ratingHistory }) {
+function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementTool }) {
   const [subTab, setSubTab] = useState("rankings");
+
+  useEffect(() => { incrementTool?.("power_rankings"); }, []);
+
+  // Track sub-tab views for Compare and Trends
+  const handleSubTab = (id) => {
+    setSubTab(id);
+    if (id === "compare") incrementTool?.("pr_compare");
+    if (id === "trends") incrementTool?.("pr_trends");
+  };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
@@ -5058,7 +5138,7 @@ function PowerRankingsTab({ drivers, prevRanks, ratingHistory }) {
         {PR_SUBTABS.map(st => {
           const active = st.id === subTab;
           return (
-            <button key={st.id} onClick={()=>setSubTab(st.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
+            <button key={st.id} onClick={()=>handleSubTab(st.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
               <span style={{ opacity:active?1:0.5 }}>{Ic[st.icon]?.()}</span>
               {st.label}
             </button>
@@ -5157,6 +5237,10 @@ export default function NASCARHub() {
   // Season Points — manually entered NASCAR official points, keyed by "driverName__year"
   const [seasonPoints, setSeasonPoints] = useState({});
 
+  // Tool Usage — per-tool counters, persisted via Supabase
+  const [toolUsage, setToolUsage] = useState({});
+  const toolUsageRef = useRef({});
+
   // Load CSV from GitHub + Battle Tracker data (battle races now loaded via Supabase below)
   useEffect(() => {
     // Auto-fetch CSV from GitHub, fall back to localStorage cache
@@ -5241,6 +5325,21 @@ export default function NASCARHub() {
     } catch (e) { console.error("Season points save error:", e); }
   }, []);
 
+  // Increment a tool usage counter — debounced Supabase save
+  const toolUsageSaveTimer = useRef(null);
+  const incrementTool = useCallback((toolKey) => {
+    setToolUsage(prev => {
+      const updated = { ...prev, [toolKey]: (prev[toolKey] || 0) + 1 };
+      toolUsageRef.current = updated;
+      // Debounce the Supabase save to 2s so rapid increments batch
+      if (toolUsageSaveTimer.current) clearTimeout(toolUsageSaveTimer.current);
+      toolUsageSaveTimer.current = setTimeout(() => {
+        sb?.from("app_state").upsert({ key:"toolUsage", value:toolUsageRef.current }, { onConflict:"key" }).catch(e => console.error("Tool usage save error:", e));
+      }, 2000);
+      return updated;
+    });
+  }, []);
+
   // Load from Supabase on mount
   useEffect(() => {
     if (!sb) return;
@@ -5258,6 +5357,14 @@ export default function NASCARHub() {
       if (spRows?.[0]) setSeasonPoints(spRows[0].value||{});
       if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
       setSbStatus("live");
+    });
+    // Load tool usage separately (it's also in app_state)
+    sb.from("app_state").select("*").eq("key","toolUsage").then(({ data: tuRows }) => {
+      if (tuRows?.[0]) {
+        const loaded = tuRows[0].value || {};
+        setToolUsage(loaded);
+        toolUsageRef.current = loaded;
+      }
     });
   }, []);
 
@@ -5372,6 +5479,13 @@ export default function NASCARHub() {
               <img src={VBS_LOGO} alt="Vanboni Sports" style={{ height:28, opacity:0.9 }} />
             </div>
             <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:12 }}>
+              {(() => { const total = Object.values(toolUsage).reduce((a,b)=>a+b,0); return total > 0 ? (
+                <div style={{ display:"flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:6, background:T.accentSoft, border:`1px solid ${T.accent}30` }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
+                  <span style={{ fontSize:11, fontWeight:700, color:T.accent, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5 }}>{total.toLocaleString()}</span>
+                  <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>tools used</span>
+                </div>
+              ) : null; })()}
               {saving && <span style={{ fontSize:10, color:T.textDim, display:"flex", alignItems:"center", gap:5 }}><Ic.Spinner />Saving…</span>}
               <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:10, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1 }}>
                 <span style={{ color:sbColor, fontSize:8 }}>●</span>
@@ -5407,12 +5521,12 @@ export default function NASCARHub() {
         {/* CONTENT */}
         <main style={{ flex:1, overflow:"auto", padding:"24px 28px", maxWidth:1000, width:"100%" }}>
           <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
-            {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} />}
-            {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} />}
-            {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} />}
-            {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} />}
-            {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} />}
-            {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} />}
+            {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
+            {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
+            {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
+            {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
+            {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
+            {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
           </div>
         </main>
 
@@ -5435,6 +5549,7 @@ export default function NASCARHub() {
           onCsvRefresh={refreshCsv}
           seasonPoints={seasonPoints}
           onSeasonPointsSave={saveSeasonPoints}
+          toolUsage={toolUsage}
         />
 
         {/* FOOTER */}
