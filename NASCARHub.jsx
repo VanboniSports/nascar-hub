@@ -6986,10 +6986,19 @@ export default function NASCARHub() {
       toolUsagePending.current = {};
       try {
         // Read latest from Supabase (another visitor may have incremented)
-        const { data: rows } = await sb.from("app_state").select("*").eq("key","toolUsage");
-        const remote = rows?.[0]?.value || {};
-        // Merge: remote counts + our pending increments
-        const final = { ...remote };
+        const { data: rows, error: readErr } = await sb.from("app_state").select("*").eq("key","toolUsage");
+        // SAFETY: if the read fails or returns nothing, fall back to our best
+        // local state so we never overwrite remote data with an empty object
+        if (readErr) throw readErr;
+        const remote = (rows && rows.length > 0 && rows[0].value && typeof rows[0].value === "object")
+          ? rows[0].value
+          : toolUsageRef.current;  // fall back to local instead of {}
+        // Merge: take the MAX of remote vs local for each key (prevents data loss),
+        // then add pending increments on top
+        const safeBase = {};
+        const allKeys = new Set([...Object.keys(remote), ...Object.keys(toolUsageRef.current)]);
+        for (const k of allKeys) safeBase[k] = Math.max(remote[k] || 0, toolUsageRef.current[k] || 0);
+        const final = { ...safeBase };
         for (const [k, inc] of Object.entries(pending)) {
           final[k] = (final[k] || 0) + inc;
         }
@@ -7052,10 +7061,12 @@ export default function NASCARHub() {
       }
     }).catch(() => {
       // Even on error, mark as loaded so increments aren't lost forever
+      // But do NOT flush with an empty base — that could overwrite remote data
       toolUsageLoaded.current = true;
       const queued = toolUsageQueue.current;
       toolUsageQueue.current = [];
-      if (queued.length > 0) flushToolUsage({}, queued);
+      // Queue will be picked up by next incrementTool call which uses toolUsageRef.current as base
+      if (queued.length > 0) flushToolUsage(toolUsageRef.current, queued);
     });
   }, []);
 
