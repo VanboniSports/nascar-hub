@@ -64,6 +64,7 @@ const TOOL_USAGE_KEYS = [
   { key:"pr_compare",        label:"PR Compare",           type:"view"   },
   { key:"driver_analytics",  label:"Driver Analytics",     type:"view"   },
   { key:"mfg_trends",        label:"Manufacturer Trends",  type:"view"   },
+  { key:"dfs_optimizer",     label:"DFS Optimizer",        type:"action" },
 ];
 
 const PREDICTOR_COLORS = {
@@ -584,6 +585,7 @@ const TABS = [
   { id:"tracks",    label:"Track Stats",    icon:"Flag"    },
   { id:"analytics", label:"Driver Analytics",icon:"Trend"  },
   { id:"season",    label:"Season Stats",   icon:"Chart"   },
+  { id:"dfs",       label:"DFS Optimizer",  icon:"Trophy"  },
 ];
 
 const PR_SUBTABS = [
@@ -3052,7 +3054,7 @@ function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
 // ─────────────────────────────────────────────────────────────
 // GLOBAL ADMIN PANEL — lives at the bottom of the app
 // ─────────────────────────────────────────────────────────────
-function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage }) {
+function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -3246,7 +3248,7 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
               {/* Admin sub-nav */}
               <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, paddingBottom:0 }}>
-                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"},{id:"usage",label:"Tool Usage",icon:"Trend"}].map(tab => {
+                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"},{id:"dfs",label:"DFS Salaries",icon:"Flag"},{id:"usage",label:"Tool Usage",icon:"Trend"}].map(tab => {
                   const active = adminSection === tab.id;
                   return (
                     <button key={tab.id} onClick={()=>setAdminSection(tab.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
@@ -3567,6 +3569,16 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
                   drivers={drivers}
                   seasonPoints={seasonPoints}
                   onSave={onSeasonPointsSave}
+                />
+              )}
+
+              {/* ─── DFS SALARIES ADMIN ─── */}
+              {adminSection === "dfs" && (
+                <DFSAdminSection
+                  dfsSalaries={dfsSalaries}
+                  onDfsSalariesSave={onDfsSalariesSave}
+                  dfsDisabled={dfsDisabled}
+                  onDfsDisabledSave={onDfsDisabledSave}
                 />
               )}
 
@@ -5855,7 +5867,9 @@ async function loadFromSupabase() {
     const { data:raRows }   = await sb.from("app_state").select("*").eq("key","raceArchive");
     const { data:spRows }   = await sb.from("app_state").select("*").eq("key","seasonPoints");
     const { data:btRows }   = await sb.from("app_state").select("*").eq("key","battleRaces");
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows };
+    const { data:dsRows }   = await sb.from("app_state").select("*").eq("key","dfsSalaries");
+    const { data:ddRows }   = await sb.from("app_state").select("*").eq("key","dfsDisabled");
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 
@@ -5995,6 +6009,807 @@ function WelcomeModal({ onDismiss }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// DFS LINEUP OPTIMIZER
+// ═══════════════════════════════════════════════════════════════════════
+
+// §1 PLATFORM CONFIGS
+const DFS_PLATFORMS = {
+  dk: {
+    id: "dk", name: "DraftKings", abbr: "DK",
+    color: "#FF6600", colorSoft: "rgba(255,102,0,0.10)",
+    colorGlow: "rgba(255,102,0,0.22)",
+    rosterSize: 6, salaryCap: 50000, salaryLabel: "$50,000",
+  },
+  fd: {
+    id: "fd", name: "FanDuel", abbr: "FD",
+    color: "#1493FF", colorSoft: "rgba(20,147,255,0.10)",
+    colorGlow: "rgba(20,147,255,0.22)",
+    rosterSize: 5, salaryCap: 50000, salaryLabel: "$50,000",
+  },
+};
+
+// §2 SCORING ENGINES
+function dfsScoreDK(fin, start, lapsLed, totalLaps, isMostLapsLed) {
+  let finPts = 0;
+  if (fin === 1)       finPts = 45;
+  else if (fin === 2)  finPts = 42;
+  else if (fin <= 43)  finPts = 43 - fin;
+  else                 finPts = 1;
+  const placeDiff  = (start - fin) * 0.5;
+  const ledPts     = lapsLed * 0.25;
+  const fastLapPts = Math.round(lapsLed * 0.30) * 0.45;
+  const mostBonus  = isMostLapsLed ? 5 : 0;
+  return finPts + placeDiff + ledPts + fastLapPts + mostBonus;
+}
+
+function dfsScoreFD(fin, start, lapsLed, totalLaps, lapsCompleted) {
+  let finPts = 0;
+  if (fin === 1)       finPts = 43;
+  else if (fin === 2)  finPts = 40;
+  else if (fin === 3)  finPts = 38;
+  else if (fin <= 40)  finPts = 41 - fin;
+  else                 finPts = 1;
+  const placeDiff   = (start - fin) * 0.5;
+  const ledPts      = lapsLed * 0.1;
+  const compPts     = (lapsCompleted || totalLaps) * 0.1;
+  return finPts + placeDiff + ledPts + compPts;
+}
+
+// §3 PROJECT DFS POINTS
+function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
+  if (!csvData?.length || !race) return [];
+  const disabledSet = new Set((disabledDrivers || []).map(d => d.name));
+  const driverIdx   = predBuildDriverIndex(csvData);
+  const trackType   = predGetTrackType(race.track);
+  const totalLaps   = race.laps || 200;
+  const projections = [];
+  for (const driverName of FULL_TIMER_NAMES) {
+    if (disabledSet.has(driverName)) continue;
+    const rows = driverIdx[driverName];
+    if (!rows || rows.length === 0) continue;
+    const sorted = [...rows].sort((a, b) => (a[9] || "").localeCompare(b[9] || ""));
+    const recent    = sorted.slice(-5);
+    const recentAvg = recent.reduce((s, r) => s + r[3], 0) / recent.length;
+    const trackRows       = rows.filter(r => predMatchTrack(race.track, r[1]));
+    const trackAvg        = trackRows.length > 0 ? trackRows.reduce((s, r) => s + r[3], 0) / trackRows.length : 20.0;
+    const trackWins       = trackRows.filter(r => r[3] === 1).length;
+    const trackRaces      = trackRows.length;
+    const trackBestFinish = trackRows.length > 0 ? Math.min(...trackRows.map(r => r[3])) : 40;
+    const typeRows = rows.filter(r => predGetTrackType(r[1]) === trackType);
+    const typeAvg  = typeRows.length > 0 ? typeRows.reduce((s, r) => s + r[3], 0) / typeRows.length : 20.0;
+    const typeRowsSorted = [...typeRows].sort((a, b) => (a[9] || "").localeCompare(b[9] || ""));
+    const recentType     = typeRowsSorted.slice(-3);
+    const recentTypeAvg  = recentType.length > 0 ? recentType.reduce((s, r) => s + r[3], 0) / recentType.length : 20.0;
+    const avgStart = trackRows.length > 0
+      ? trackRows.reduce((s, r) => s + r[4], 0) / trackRows.length
+      : typeRows.length > 0
+        ? typeRows.reduce((s, r) => s + r[4], 0) / typeRows.length
+        : 20.0;
+    const trackLapsLed       = trackRows.reduce((s, r) => s + r[5], 0);
+    const trackLapsCompleted = trackRows.reduce((s, r) => s + r[8], 0);
+    const trackLedPct        = trackLapsCompleted > 0 ? trackLapsLed / trackLapsCompleted : 0;
+    const typeLapsLed       = typeRows.reduce((s, r) => s + r[5], 0);
+    const typeLapsCompleted = typeRows.reduce((s, r) => s + r[8], 0);
+    const typeLedPct        = typeLapsCompleted > 0 ? typeLapsLed / typeLapsCompleted : 0;
+    const blendedLedPct = trackRows.length >= 3
+      ? trackLedPct * 0.7 + typeLedPct * 0.3
+      : trackRows.length >= 1
+        ? trackLedPct * 0.4 + typeLedPct * 0.6
+        : typeLedPct;
+    const projLapsLed = Math.round(blendedLedPct * totalLaps);
+    let projFinish;
+    if (trackRaces >= 5)      projFinish = trackAvg * 0.55 + typeAvg * 0.25 + recentTypeAvg * 0.10 + recentAvg * 0.10;
+    else if (trackRaces >= 2) projFinish = trackAvg * 0.35 + typeAvg * 0.35 + recentTypeAvg * 0.15 + recentAvg * 0.15;
+    else                      projFinish = typeAvg  * 0.50 + recentTypeAvg * 0.25 + recentAvg * 0.25;
+    if (trackWins >= 3)      projFinish *= 0.88;
+    else if (trackWins >= 1) projFinish *= 0.93;
+    projFinish = Math.max(1, Math.min(40, Math.round(projFinish * 10) / 10));
+    const projStart = Math.max(1, Math.min(40, Math.round(avgStart)));
+    let projectedPts;
+    if (platformId === "dk") {
+      const isMostLaps = projLapsLed > totalLaps * 0.25;
+      projectedPts = dfsScoreDK(Math.round(projFinish), projStart, projLapsLed, totalLaps, isMostLaps);
+    } else {
+      projectedPts = dfsScoreFD(Math.round(projFinish), projStart, projLapsLed, totalLaps, totalLaps);
+    }
+    const dInfo = INITIAL_DRIVERS.find(d => d.name === driverName);
+    const tags = [];
+    if (trackWins >= 2) tags.push("Track Ace");
+    else if (trackWins >= 1) tags.push("Track Winner");
+    if (trackAvg <= 8 && trackRaces >= 3) tags.push("Elite Trk Avg");
+    if (recentAvg <= 8) tags.push("Hot Streak");
+    if (projLapsLed > totalLaps * 0.10) tags.push("Dominator");
+    if (projStart >= 25 && Math.round(projFinish) <= 15) tags.push("PD Play");
+    if (recentTypeAvg <= 10 && typeRows.length >= 5) tags.push("Type Specialist");
+    projections.push({
+      driver: driverName,
+      num: dInfo?.num || "?",
+      team: dInfo?.team || "",
+      mfg: dInfo?.mfg || "",
+      rookie: dInfo?.rookie || false,
+      projectedPts: Math.round(projectedPts * 10) / 10,
+      projFinish: Math.round(projFinish * 10) / 10,
+      projStart,
+      projLapsLed,
+      trackAvg: trackAvg.toFixed(1),
+      trackRaces,
+      trackWins,
+      trackBestFinish,
+      typeAvg: typeAvg.toFixed(1),
+      recentAvg: recentAvg.toFixed(1),
+      recentTypeAvg: recentTypeAvg.toFixed(1),
+      tags,
+      salary: 0,
+      value: 0,
+    });
+  }
+  projections.sort((a, b) => b.projectedPts - a.projectedPts);
+  return projections;
+}
+
+// §4 LINEUP OPTIMIZER
+function dfsGreedyLineup(pool, rosterSize, salaryCap) {
+  const lineup = [];
+  let remaining = salaryCap;
+  const used = new Set();
+  for (const d of pool) {
+    if (used.has(d.num)) continue;
+    if (d.salary <= 0) continue;
+    if (d.salary > remaining) continue;
+    if (lineup.length >= rosterSize) break;
+    lineup.push(d);
+    remaining -= d.salary;
+    used.add(d.num);
+  }
+  return lineup.length === rosterSize ? lineup : null;
+}
+
+function dfsStarsAndScrubs(eligible, rosterSize, salaryCap) {
+  const byPts   = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
+  const byValue = [...eligible].sort((a, b) => b.value - a.value);
+  const stars = byPts.slice(0, 2).filter(d => d.salary > 0);
+  if (stars.length < 2) return null;
+  const starNums = new Set(stars.map(d => d.num));
+  let remaining  = salaryCap - stars.reduce((s, d) => s + d.salary, 0);
+  const scrubs = [];
+  for (const d of byValue) {
+    if (starNums.has(d.num)) continue;
+    if (d.salary <= 0 || d.salary > remaining) continue;
+    scrubs.push(d);
+    remaining -= d.salary;
+    if (stars.length + scrubs.length >= rosterSize) break;
+  }
+  const lineup = [...stars, ...scrubs];
+  return lineup.length === rosterSize ? lineup : null;
+}
+
+function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
+  const bySalary = [...eligible].filter(d => d.salary > 0).sort((a, b) => b.salary - a.salary);
+  const tierSize = Math.ceil(bySalary.length / rosterSize);
+  const tiers = [];
+  for (let i = 0; i < rosterSize; i++) {
+    tiers.push(bySalary.slice(i * tierSize, (i + 1) * tierSize));
+  }
+  const lineup = [];
+  let remaining = salaryCap;
+  const used = new Set();
+  for (const tier of tiers) {
+    const tierByValue = [...tier].sort((a, b) => b.value - a.value);
+    let picked = false;
+    for (const d of tierByValue) {
+      if (used.has(d.num) || d.salary > remaining) continue;
+      lineup.push(d);
+      remaining -= d.salary;
+      used.add(d.num);
+      picked = true;
+      break;
+    }
+    if (!picked) {
+      for (const d of [...eligible].sort((a, b) => b.value - a.value)) {
+        if (used.has(d.num) || d.salary <= 0 || d.salary > remaining) continue;
+        lineup.push(d);
+        remaining -= d.salary;
+        used.add(d.num);
+        break;
+      }
+    }
+  }
+  return lineup.length === rosterSize ? lineup : null;
+}
+
+function dfsContrarianLineup(eligible, rosterSize, salaryCap) {
+  const byPts = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
+  const topNums = new Set(byPts.slice(0, 3).map(d => d.num));
+  const pool = [...eligible].filter(d => !topNums.has(d.num)).sort((a, b) => b.value - a.value);
+  return dfsGreedyLineup(pool, rosterSize, salaryCap);
+}
+
+function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
+  const eligible = projections.filter(p => p.salary > 0 && p.projectedPts > 0);
+  if (eligible.length < rosterSize) return [];
+  const lineups = [];
+  const seen    = new Set();
+  const tryAdd = (lineup, strategy) => {
+    if (!lineup) return;
+    const key = lineup.map(d => d.num).sort().join(",");
+    if (seen.has(key)) return;
+    seen.add(key);
+    const totalSalary = lineup.reduce((s, d) => s + d.salary, 0);
+    const totalPts    = lineup.reduce((s, d) => s + d.projectedPts, 0);
+    lineups.push({
+      drivers: lineup, strategy, totalSalary,
+      totalPts: Math.round(totalPts * 10) / 10,
+      remaining: salaryCap - totalSalary,
+    });
+  };
+  const byValue = [...eligible].sort((a, b) => b.value - a.value);
+  tryAdd(dfsGreedyLineup(byValue, rosterSize, salaryCap), "Best Value");
+  const byPts = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
+  tryAdd(dfsGreedyLineup(byPts, rosterSize, salaryCap), "Max Points");
+  tryAdd(dfsStarsAndScrubs(eligible, rosterSize, salaryCap), "Stars & Scrubs");
+  tryAdd(dfsBalancedLineup(eligible, rosterSize, salaryCap), "Balanced");
+  tryAdd(dfsContrarianLineup(eligible, rosterSize, salaryCap), "Contrarian");
+  lineups.sort((a, b) => b.totalPts - a.totalPts);
+  return lineups.slice(0, count || 5);
+}
+
+// §5 DFS TAB — Public-facing component
+function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
+  const [platform, setPlatform]         = useState("dk");
+  const [selectedWeek, setSelectedWeek] = useState("");
+  const [viewMode, setViewMode]         = useState("top");
+  const [lineups, setLineups]           = useState([]);
+  const [allProjections, setAllProjections] = useState([]);
+
+  useEffect(() => { incrementTool?.("dfs_optimizer"); }, []);
+
+  const plat = DFS_PLATFORMS[platform];
+  const race = selectedWeek === "allstar"
+    ? SCHEDULE.find(r => r.allStar)
+    : SCHEDULE.find(r => !r.allStar && r.week === parseInt(selectedWeek));
+
+  const hasCsv     = csvData.length > 0;
+  const salaryData = dfsSalaries?.[platform] || {};
+  const hasSalary  = Object.keys(salaryData).length > 0;
+  const salaryUpdatedAt = dfsSalaries?.[`${platform}_updated`] || null;
+
+  const runOptimizer = () => {
+    if (!race || !hasCsv) return;
+    let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled);
+    projections = projections.map(p => {
+      const sal = salaryData[p.driver] || 0;
+      return { ...p, salary: sal, value: sal > 0 ? Math.round((p.projectedPts / (sal / 1000)) * 100) / 100 : 0 };
+    });
+    setAllProjections(projections);
+    if (!hasSalary) { setLineups([]); return; }
+    const results = dfsOptimizeLineups(projections, plat.rosterSize, plat.salaryCap, 5);
+    setLineups(results);
+  };
+
+  const fmtSalary = (s) => "$" + (s || 0).toLocaleString();
+  const fmtPts    = (p) => (p || 0).toFixed(1);
+  const pctBar    = (used, cap) => Math.min(100, Math.round((used / cap) * 100));
+  const col = plat.color;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* PLATFORM TOGGLE */}
+      <div style={{ display: "flex", gap: 8 }}>
+        {Object.values(DFS_PLATFORMS).map(p => {
+          const active = platform === p.id;
+          return (
+            <button key={p.id} onClick={() => { setPlatform(p.id); setLineups([]); setAllProjections([]); }}
+              style={{
+                flex: "1 1 200px", padding: "14px 18px", borderRadius: 10, cursor: "pointer",
+                background: active ? p.colorSoft : T.surface,
+                border: `2px solid ${active ? p.color : T.border}`,
+                textAlign: "left", transition: "all 0.15s",
+              }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 22, fontWeight: 900, color: active ? p.color : T.textDim, fontFamily: "'Barlow Condensed',sans-serif" }}>{p.abbr}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: active ? p.color : T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{p.name}</div>
+                  <div style={{ fontSize: 10, color: active ? `${p.color}cc` : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                    {p.rosterSize} drivers · {p.salaryLabel} cap
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* INFO LEGEND */}
+      <InfoLegend title="DFS Optimizer Guide">
+        <div>
+          <div style={{ fontWeight: 700, color: T.text, marginBottom: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 1 }}>HOW IT WORKS</div>
+          <div style={{ marginBottom: 10, lineHeight: 1.7 }}>
+            The optimizer projects DFS fantasy points for each driver using track history, track-type performance, recent form, and laps-led dominance from the CSV data. It then finds the best combination of drivers that maximizes total projected points while staying under the salary cap.
+          </div>
+          <div style={{ fontWeight: 700, color: T.text, marginBottom: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 1 }}>LINEUP STRATEGIES</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+            {[
+              ["Best Value", "Fills roster by highest points-per-$1K salary"],
+              ["Max Points", "Prioritizes highest raw projected points"],
+              ["Stars & Scrubs", "Locks in top-2 studs, fills rest with bargains"],
+              ["Balanced", "Picks one driver from each salary tier"],
+              ["Contrarian", "Skips the top-3 chalk picks for low-ownership upside"],
+            ].map(([l, d]) => (
+              <div key={l}><span style={{ fontWeight: 700, color: col }}>{l}</span> — {d}</div>
+            ))}
+          </div>
+          <div style={{ fontWeight: 700, color: T.text, marginBottom: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 1 }}>DRIVER VALUE TAGS</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {[
+              ["Track Ace", "2+ wins at this track"],
+              ["Track Winner", "1 win at this track"],
+              ["Elite Trk Avg", "Avg finish ≤ 8 (3+ track races)"],
+              ["Hot Streak", "Last 5 overall avg ≤ 8"],
+              ["Dominator", "Projected 10%+ laps led"],
+              ["PD Play", "Place diff upside"],
+              ["Type Specialist", "Strong recent type avg"],
+            ].map(([tag, desc]) => (
+              <span key={tag} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 4, background: `${col}15`, border: `1px solid ${col}30`, color: col }}>
+                <span style={{ fontWeight: 700 }}>{tag}</span> = {desc}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontWeight: 700, color: T.text, marginBottom: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 1 }}>
+            {platform === "dk" ? "DRAFTKINGS" : "FANDUEL"} SCORING
+          </div>
+          <div style={{ lineHeight: 1.7, borderTop: `1px solid ${T.border}`, paddingTop: 8 }}>
+            {platform === "dk" ? (
+              <>Finish: 1st=45, 2nd=42, 3rd=40…40th=3 · Place Diff: ±0.5/pos · Laps Led: 0.25/lap · Fastest Laps: 0.45/lap · Most Laps Led Bonus: 5pts</>
+            ) : (
+              <>Finish: 1st=43, 2nd=40, 3rd=38, 4th=37…40th=1 · Place Diff: ±0.5/pos · Laps Led: 0.1/lap · Laps Completed: 0.1/lap</>
+            )}
+          </div>
+        </div>
+      </InfoLegend>
+
+      {/* STATUS BADGES */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 200px", padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+          <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 }}>CSV Data</div>
+          <div style={{ fontSize: 12, color: hasCsv ? T.green : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+            {hasCsv ? `✓ ${csvData.length.toLocaleString()} records` : "No data loaded"}
+          </div>
+        </div>
+        <div style={{ flex: "1 1 200px", padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+          <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 }}>{plat.abbr} Salaries</div>
+          <div style={{ fontSize: 12, color: hasSalary ? T.green : T.gold, fontFamily: "'IBM Plex Mono',monospace" }}>
+            {hasSalary
+              ? `✓ ${Object.keys(salaryData).length} drivers${salaryUpdatedAt ? ` · ${salaryUpdatedAt}` : ""}`
+              : "⚠ Upload via Admin Panel"
+            }
+          </div>
+        </div>
+      </div>
+
+      {/* EXCLUDED DRIVERS */}
+      {dfsDisabled?.length > 0 && (
+        <div style={{ padding: "8px 14px", background: T.redBg, border: `1px solid ${T.red}30`, borderRadius: 8, fontSize: 11, color: T.red, fontFamily: "'IBM Plex Mono',monospace" }}>
+          <span style={{ fontWeight: 700 }}>Excluded drivers:</span>{" "}
+          {dfsDisabled.map((d, i) => (
+            <span key={d.name}>{i > 0 ? ", " : ""}{d.name}{d.reason ? ` (${d.reason})` : ""}</span>
+          ))}
+        </div>
+      )}
+
+      {/* RACE SELECTOR + RUN */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ flex: "1 1 300px" }}>
+          <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Select Race</label>
+          <select value={selectedWeek} onChange={e => { setSelectedWeek(e.target.value); setLineups([]); setAllProjections([]); }}
+            style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none" }}>
+            <option value="">Choose a race…</option>
+            {SCHEDULE.map(r => (
+              <option key={r.allStar ? "allstar" : r.week} value={r.allStar ? "allstar" : r.week}>
+                {r.allStar ? "★" : `Wk ${r.week}`} · {r.date} · {r.name}{r.allStar ? " (Non-Points)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button onClick={runOptimizer} disabled={!race || !hasCsv}
+          style={{
+            padding: "9px 24px", background: (race && hasCsv) ? col : "#1a2d40",
+            color: (race && hasCsv) ? "#fff" : T.textDim, border: "none", borderRadius: 8,
+            cursor: (race && hasCsv) ? "pointer" : "default", fontSize: 13, fontWeight: 700,
+            fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase",
+            boxShadow: (race && hasCsv) ? `0 4px 18px ${plat.colorGlow}` : "none",
+          }}>
+          {hasSalary ? "Optimize Lineups" : "Preview Projections"}
+        </button>
+      </div>
+
+      {/* TRACK INFO */}
+      {race && (
+        <div style={{ padding: "10px 16px", background: `${TC[race.type] || T.accent}10`, border: `1px solid ${TC[race.type] || T.accent}30`, borderRadius: 8, fontSize: 13, color: TC[race.type] || T.accent, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 600, letterSpacing: 0.5 }}>
+          {race.track} · <span style={{ textTransform: "uppercase" }}>{TL[race.type]}</span> · {race.length} mi · {race.laps} laps
+        </div>
+      )}
+
+      {/* VIEW MODE TABS */}
+      {allProjections.length > 0 && hasSalary && (
+        <div style={{ display: "flex", gap: 2, borderBottom: `1px solid ${T.border}`, paddingBottom: 0 }}>
+          {[
+            { id: "top",  label: "Top Lineups" },
+            { id: "best", label: "Best Lineup" },
+            { id: "all",  label: "All Drivers" },
+          ].map(tab => {
+            const active = viewMode === tab.id;
+            return (
+              <button key={tab.id} onClick={() => setViewMode(tab.id)}
+                style={{ padding: "7px 14px", fontSize: 11, fontWeight: active ? 700 : 500, background: active ? plat.colorSoft : "transparent", color: active ? col : T.textDim, border: "none", borderBottom: `2px solid ${active ? col : "transparent"}`, marginBottom: -1, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* NO SALARY WARNING */}
+      {allProjections.length > 0 && !hasSalary && (
+        <div style={{ padding: "16px 20px", background: `${T.gold}10`, border: `1px solid ${T.gold}30`, borderRadius: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.gold, fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6, letterSpacing: 1 }}>SALARY DATA REQUIRED</div>
+          <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+            Upload {plat.name} salary CSV in the Admin Panel to unlock lineup optimization. Projections below are preview only.
+          </div>
+        </div>
+      )}
+
+      {/* LINEUP CARDS */}
+      {viewMode !== "all" && lineups.length > 0 && (() => {
+        const displayLineups = viewMode === "best" ? lineups.slice(0, 1) : lineups;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {displayLineups.map((lu, idx) => (
+              <div key={idx} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                {/* Header */}
+                <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: `${col}08` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>#{idx + 1}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{lu.strategy}</div>
+                      <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                        {lu.drivers.length} drivers · {fmtSalary(lu.totalSalary)} used · {fmtSalary(lu.remaining)} left
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif", lineHeight: 1 }}>{fmtPts(lu.totalPts)}</div>
+                    <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>PROJ PTS</div>
+                  </div>
+                </div>
+                {/* Salary cap bar */}
+                <div style={{ padding: "8px 16px", borderBottom: `1px solid ${T.border}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 4, letterSpacing: 1 }}>
+                    <span>SALARY CAP</span>
+                    <span>{pctBar(lu.totalSalary, plat.salaryCap)}% used</span>
+                  </div>
+                  <div style={{ height: 6, background: T.surface3, borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pctBar(lu.totalSalary, plat.salaryCap)}%`, background: `linear-gradient(90deg, ${col}, ${col}88)`, borderRadius: 3, transition: "width 0.3s ease" }} />
+                  </div>
+                </div>
+                {/* Driver rows */}
+                <div>
+                  {lu.drivers.map((d, di) => {
+                    const tierColor = di === 0 ? T.gold : di < 3 ? col : T.textMid;
+                    return (
+                      <div key={d.num} style={{ padding: "10px 16px", borderBottom: di < lu.drivers.length - 1 ? `1px solid ${T.border}` : "none", display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${tierColor}18`, border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, color: tierColor, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif" }}>{di + 1}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>#{d.num} {d.driver}</span>
+                            {d.rookie && <span style={{ fontSize: 8, fontWeight: 700, color: "#4ade80", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 3, padding: "1px 5px", letterSpacing: 0.8 }}>ROOKIE</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: T.textDim, marginTop: 1 }}>{d.team} · {d.mfg}</div>
+                          <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
+                            {[
+                              ["Proj Fin", d.projFinish, col],
+                              ["Trk Avg", d.trackAvg, TC[race?.type] || T.accent],
+                              ["Recent", d.recentAvg, T.accentText],
+                              ["Laps Led", d.projLapsLed, T.gold],
+                            ].map(([l, v, c]) => (
+                              <div key={l} style={{ fontSize: 10 }}>
+                                <span style={{ color: T.textDim }}>{l}: </span>
+                                <span style={{ color: c, fontWeight: 700 }}>{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {d.tags?.length > 0 && (
+                            <div style={{ marginTop: 4, display: "flex", gap: 3, flexWrap: "wrap" }}>
+                              {d.tags.map(t => (
+                                <span key={t} style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${col}18`, color: col, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 0.5 }}>{t}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>{fmtPts(d.projectedPts)}</div>
+                          <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>{fmtSalary(d.salary)}</div>
+                          <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{d.value.toFixed(1)} pts/$K</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* ALL DRIVERS TABLE */}
+      {(viewMode === "all" || (allProjections.length > 0 && !hasSalary)) && allProjections.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 10, color: col, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, marginBottom: 4 }}>
+            {plat.abbr} PROJECTIONS — {allProjections.length} drivers
+          </div>
+          {allProjections.map((d, i) => {
+            const tierColor = i === 0 ? T.gold : i < 3 ? col : i < 10 ? T.accentText : T.textMid;
+            return (
+              <div key={d.num} style={{ background: i < 3 ? `${col}08` : T.surface, border: `1px solid ${i < 3 ? `${col}40` : T.border}`, borderLeft: `3px solid ${tierColor}`, borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${tierColor}18`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, color: tierColor, flexShrink: 0 }}>{i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>#{d.num} {d.driver}{d.rookie && <span style={{ fontSize: 8, color: "#4ade80", marginLeft: 5 }}>ROOKIE</span>}</div>
+                    <div style={{ fontSize: 10, color: T.textDim }}>{d.team} · {d.mfg}</div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
+                      {[
+                        ["Proj Fin", d.projFinish],
+                        ["Trk Avg", d.trackAvg],
+                        ["Type Avg", d.typeAvg],
+                        ["Recent", d.recentAvg],
+                        ["Led", d.projLapsLed],
+                      ].map(([l, v]) => (
+                        <span key={l} style={{ fontSize: 10 }}><span style={{ color: T.textDim }}>{l}: </span><span style={{ fontWeight: 700, color: T.text }}>{v}</span></span>
+                      ))}
+                    </div>
+                    {d.tags?.length > 0 && (
+                      <div style={{ marginTop: 3, display: "flex", gap: 3, flexWrap: "wrap" }}>
+                        {d.tags.map(t => (
+                          <span key={t} style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${col}18`, color: col, fontFamily: "'IBM Plex Mono',monospace" }}>{t}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>{fmtPts(d.projectedPts)}</div>
+                    <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>PROJ PTS</div>
+                    {d.salary > 0 && (
+                      <>
+                        <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 2 }}>{fmtSalary(d.salary)}</div>
+                        <div style={{ fontSize: 9, color: T.green, fontFamily: "'IBM Plex Mono',monospace" }}>{d.value.toFixed(1)} pts/$K</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* EMPTY STATE */}
+      {allProjections.length === 0 && (
+        <div style={{ padding: 40, textAlign: "center", color: T.textDim, fontSize: 13, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, fontFamily: "'IBM Plex Mono',monospace" }}>
+          Select a race and click "{hasSalary ? "Optimize Lineups" : "Preview Projections"}" to generate {plat.name} DFS lineups
+        </div>
+      )}
+    </div>
+  );
+}
+
+// §6 DFS ADMIN SECTION
+function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave }) {
+  const [activePlatform, setActivePlatform] = useState("dk");
+  const [uploadMsg, setUploadMsg]           = useState("");
+  const [disableDriverName, setDisableDriverName] = useState("");
+  const [disableReason, setDisableReason]   = useState("");
+  const [manualName, setManualName]         = useState("");
+  const [manualSalary, setManualSalary]     = useState("");
+
+  const inputStyle = { width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", fontFamily: "'Barlow',sans-serif" };
+  const btnStyle = (c) => ({ padding: "8px 18px", background: c, border: "none", color: "#fff", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" });
+
+  const plat = DFS_PLATFORMS[activePlatform];
+
+  const handleSalaryUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target.result;
+        const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
+        if (lines.length < 2) { setUploadMsg("❌ CSV appears empty"); return; }
+        const cols = lines[0].toLowerCase().split(",").map(c => c.trim().replace(/"/g, ""));
+        const nameIdx = cols.findIndex(c => c === "name" || c === "nickname" || c === "player" || c === "driver");
+        const salaryIdx = cols.findIndex(c => c === "salary" || c === "sal" || c === "price");
+        if (nameIdx < 0 || salaryIdx < 0) { setUploadMsg("❌ Could not find Name and Salary columns"); return; }
+        const salaries = {};
+        let matched = 0;
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const fields = [];
+          let current = "", inQuotes = false;
+          for (let c = 0; c < lines[i].length; c++) {
+            const ch = lines[i][c];
+            if (inQuotes) {
+              if (ch === '"') { if (c + 1 < lines[i].length && lines[i][c + 1] === '"') { current += '"'; c++; } else inQuotes = false; }
+              else current += ch;
+            } else {
+              if (ch === '"') inQuotes = true;
+              else if (ch === ',') { fields.push(current.trim()); current = ""; }
+              else current += ch;
+            }
+          }
+          fields.push(current.trim());
+          const rawName = (fields[nameIdx] || "").replace(/"/g, "").trim();
+          const rawSal  = parseInt((fields[salaryIdx] || "").replace(/[^0-9]/g, "")) || 0;
+          if (!rawName || rawSal <= 0) continue;
+          const matchedDriver = FULL_TIMER_NAMES.find(d => {
+            const dn = d.toLowerCase();
+            const rn = rawName.toLowerCase();
+            return dn === rn || rn.includes(dn) || dn.includes(rn);
+          });
+          if (matchedDriver) { salaries[matchedDriver] = rawSal; matched++; }
+        }
+        if (matched === 0) { setUploadMsg("❌ No drivers matched"); return; }
+        const updated = {
+          ...dfsSalaries,
+          [activePlatform]: salaries,
+          [`${activePlatform}_updated`]: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
+        };
+        onDfsSalariesSave(updated);
+        setUploadMsg(`✓ Imported ${matched} ${plat.abbr} salaries`);
+        e.target.value = "";
+      } catch (err) { setUploadMsg(`❌ Parse error: ${err.message}`); }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleManualAdd = () => {
+    const match = FULL_TIMER_NAMES.find(d => d.toLowerCase() === manualName.trim().toLowerCase());
+    if (!match) { setUploadMsg("❌ Driver not found"); return; }
+    const sal = parseInt(manualSalary.replace(/[^0-9]/g, "")) || 0;
+    if (sal <= 0) { setUploadMsg("❌ Enter a valid salary"); return; }
+    const current = dfsSalaries?.[activePlatform] || {};
+    const updated = {
+      ...dfsSalaries,
+      [activePlatform]: { ...current, [match]: sal },
+      [`${activePlatform}_updated`]: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
+    };
+    onDfsSalariesSave(updated);
+    setManualName(""); setManualSalary("");
+    setUploadMsg(`✓ Set ${match} → $${sal.toLocaleString()}`);
+  };
+
+  const handleDisableDriver = () => {
+    const match = FULL_TIMER_NAMES.find(d => d.toLowerCase() === disableDriverName.trim().toLowerCase());
+    if (!match) { setUploadMsg("❌ Driver not found"); return; }
+    if ((dfsDisabled || []).find(d => d.name === match)) { setUploadMsg("⚠ Already disabled"); return; }
+    const updated = [...(dfsDisabled || []), { name: match, reason: disableReason.trim() || "" }];
+    onDfsDisabledSave(updated);
+    setDisableDriverName(""); setDisableReason("");
+    setUploadMsg(`✓ Disabled ${match}`);
+  };
+
+  const handleEnableDriver = (name) => {
+    onDfsDisabledSave((dfsDisabled || []).filter(d => d.name !== name));
+    setUploadMsg(`✓ Re-enabled ${name}`);
+  };
+
+  const currentSalaries = dfsSalaries?.[activePlatform] || {};
+  const salaryCount = Object.keys(currentSalaries).length;
+  const updatedAt = dfsSalaries?.[`${activePlatform}_updated`] || null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Platform toggle */}
+      <div style={{ display: "flex", gap: 8 }}>
+        {Object.values(DFS_PLATFORMS).map(p => {
+          const active = activePlatform === p.id;
+          return (
+            <button key={p.id} onClick={() => { setActivePlatform(p.id); setUploadMsg(""); }}
+              style={{ flex: 1, padding: "8px 14px", borderRadius: 8, cursor: "pointer", background: active ? p.colorSoft : T.surface3, border: `1px solid ${active ? p.color : T.border}`, color: active ? p.color : T.textDim, fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+              {p.name}
+            </button>
+          );
+        })}
+      </div>
+      {/* Status */}
+      <div style={{ padding: "10px 14px", background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+        <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 }}>{plat.abbr} Salary Status</div>
+        <div style={{ fontSize: 12, color: salaryCount > 0 ? T.green : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+          {salaryCount > 0 ? `✓ ${salaryCount} drivers` : "No salaries yet"}
+          {updatedAt && <span style={{ color: T.textDim }}> · Updated: {updatedAt}</span>}
+        </div>
+      </div>
+      {/* CSV Upload */}
+      <div>
+        <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Upload {plat.name} Salary CSV</label>
+        <div style={{ fontSize: 10, color: T.textDim, marginBottom: 8, fontFamily: "'IBM Plex Mono',monospace" }}>
+          Export CSV from {plat.name} contest page. Needs: Name (or Nickname/Driver), Salary columns.
+        </div>
+        <input type="file" accept=".csv" onChange={handleSalaryUpload}
+          style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }} />
+      </div>
+      {/* Manual entry */}
+      <div>
+        <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Manual Salary Entry</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={manualName} onChange={e => setManualName(e.target.value)} placeholder="Driver name" style={{ ...inputStyle, flex: 2 }} />
+          <input value={manualSalary} onChange={e => setManualSalary(e.target.value)} placeholder="Salary (e.g. 10200)" style={{ ...inputStyle, flex: 1 }} />
+          <button onClick={handleManualAdd} style={btnStyle(plat.color)}>Set</button>
+        </div>
+      </div>
+      {/* View current salaries */}
+      {salaryCount > 0 && (
+        <details style={{ background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px" }}>
+          <summary style={{ cursor: "pointer", fontSize: 11, color: T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+            View {plat.abbr} Salaries ({salaryCount})
+          </summary>
+          <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px", maxHeight: 300, overflowY: "auto" }}>
+            {Object.entries(currentSalaries).sort((a, b) => b[1] - a[1]).map(([name, sal]) => (
+              <div key={name} style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid, padding: "2px 0", display: "flex", justifyContent: "space-between" }}>
+                <span>{name}</span>
+                <span style={{ color: plat.color, fontWeight: 700 }}>${sal.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+      {/* Clear */}
+      {salaryCount > 0 && (
+        <button onClick={() => {
+          if (!window.confirm(`Clear all ${plat.abbr} salaries?`)) return;
+          const updated = { ...dfsSalaries };
+          delete updated[activePlatform];
+          delete updated[`${activePlatform}_updated`];
+          onDfsSalariesSave(updated);
+          setUploadMsg(`✓ Cleared`);
+        }} style={{ ...btnStyle("#334155"), alignSelf: "flex-start" }}>
+          Clear {plat.abbr} Salaries
+        </button>
+      )}
+      {/* DRIVER AVAILABILITY */}
+      <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Driver Availability</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input value={disableDriverName} onChange={e => setDisableDriverName(e.target.value)} placeholder="Driver name" style={{ ...inputStyle, flex: 2 }} />
+          <input value={disableReason} onChange={e => setDisableReason(e.target.value)} placeholder="Reason (optional)" style={{ ...inputStyle, flex: 2 }} />
+          <button onClick={handleDisableDriver} style={btnStyle(T.red)}>Disable</button>
+        </div>
+        {(dfsDisabled || []).length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 }}>Currently Disabled</div>
+            {dfsDisabled.map(d => (
+              <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: T.redBg, border: `1px solid ${T.red}30`, borderRadius: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: T.red, flex: 1 }}>{d.name}</span>
+                {d.reason && <span style={{ fontSize: 10, color: T.textDim, fontStyle: "italic" }}>{d.reason}</span>}
+                <button onClick={() => handleEnableDriver(d.name)} style={{ background: "none", border: `1px solid ${T.green}40`, color: T.green, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 10, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif" }}>
+                  Re-enable
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>All drivers active</div>
+        )}
+      </div>
+      {/* Status msg */}
+      {uploadMsg && (
+        <div style={{ fontSize: 12, color: uploadMsg.startsWith("✓") ? T.green : uploadMsg.startsWith("⚠") ? T.gold : T.red, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 0" }}>
+          {uploadMsg}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────
@@ -6021,6 +6836,10 @@ export default function NASCARHub() {
 
   // Season Points — manually entered NASCAR official points, keyed by "driverName__year"
   const [seasonPoints, setSeasonPoints] = useState({});
+
+  // DFS Optimizer state — persisted via Supabase
+  const [dfsSalaries, setDfsSalaries] = useState({});
+  const [dfsDisabled, setDfsDisabled] = useState([]);
 
   // Tool Usage — per-tool counters, persisted via Supabase
   const [toolUsage, setToolUsage] = useState({});
@@ -6117,6 +6936,20 @@ export default function NASCARHub() {
     } catch (e) { console.error("Season points save error:", e); }
   }, []);
 
+  const saveDfsSalaries = useCallback(async (updated) => {
+    setDfsSalaries(updated);
+    try {
+      await sb.from("app_state").upsert({ key:"dfsSalaries", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("DFS salary save:", e); }
+  }, []);
+
+  const saveDfsDisabled = useCallback(async (updated) => {
+    setDfsDisabled(updated);
+    try {
+      await sb.from("app_state").upsert({ key:"dfsDisabled", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("DFS disabled save:", e); }
+  }, []);
+
   // Increment a tool usage counter — queues if Supabase hasn't loaded yet
   // Uses read-merge-write so concurrent visitors don't overwrite each other's counts
   const toolUsageSaveTimer = useRef(null);
@@ -6174,7 +7007,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     loadFromSupabase().then(data => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -6184,6 +7017,8 @@ export default function NASCARHub() {
       if (raRows?.[0]) setRaceArchive(raRows[0].value||[]);
       if (spRows?.[0]) setSeasonPoints(spRows[0].value||{});
       if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
+      if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
+      if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
       setSbStatus("live");
     });
     // Load tool usage separately (it's also in app_state)
@@ -6382,6 +7217,7 @@ export default function NASCARHub() {
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
+              {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} incrementTool={incrementTool} />}
             </div>
           </main>
 
@@ -6411,12 +7247,16 @@ export default function NASCARHub() {
           seasonPoints={seasonPoints}
           onSeasonPointsSave={saveSeasonPoints}
           toolUsage={toolUsage}
+          dfsSalaries={dfsSalaries}
+          onDfsSalariesSave={saveDfsSalaries}
+          dfsDisabled={dfsDisabled}
+          onDfsDisabledSave={saveDfsDisabled}
         />
 
         {/* FOOTER */}
         <footer style={{ borderTop:`1px solid ${T.border}`, padding:"7px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", background:T.footerBg }}>
           <span>NASCAR HUB v2.5 · Vanboni Sports</span>
-          <span>{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {drivers.length} drivers</span>
+          <span>{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {Object.keys(dfsSalaries?.dk||{}).length + Object.keys(dfsSalaries?.fd||{}).length > 0 ? `${Object.keys(dfsSalaries?.dk||{}).length}DK/${Object.keys(dfsSalaries?.fd||{}).length}FD salaries` : "no DFS salaries"} · {drivers.length} drivers</span>
           <span style={{ display:"flex", alignItems:"center", gap:10 }}>
             <span>2026 Cup Series</span>
             <a
