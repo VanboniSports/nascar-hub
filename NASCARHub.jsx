@@ -5799,11 +5799,19 @@ function ComingSoon({ title, items=[] }) {
 function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementTool }) {
   const [subTab, setSubTab] = useState("rankings");
 
-  useEffect(() => { incrementTool?.("power_rankings"); }, []);
+  // Power Rankings is the default landing tab, so we do NOT auto-increment on
+  // mount (that would inflate counts on every page load). Instead we count a
+  // "use" when the visitor actively interacts — clicking any sub-tab counts.
+  const prCounted = useRef(false);
 
-  // Track sub-tab views for Compare and Trends
   const handleSubTab = (id) => {
     setSubTab(id);
+    // Count one Power Rankings "use" on the first interaction per session
+    if (!prCounted.current) {
+      incrementTool?.("power_rankings");
+      prCounted.current = true;
+    }
+    // Also track specific sub-tool views
     if (id === "compare") incrementTool?.("pr_compare");
     if (id === "trends") incrementTool?.("pr_trends");
   };
