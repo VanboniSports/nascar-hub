@@ -6294,6 +6294,14 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* DISCLAIMER */}
+      <div style={{ padding: "10px 14px", background: "rgba(255,193,7,0.06)", border: `1px solid ${T.gold}25`, borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>⚠</span>
+        <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.6 }}>
+          <span style={{ fontWeight: 700, color: T.gold }}>For entertainment purposes only.</span> This tool is not gambling or betting advice. Projections are based on historical statistics and carry no guarantee of accuracy. Daily fantasy sports involve financial risk — never play with money you cannot afford to lose. Please play responsibly.
+        </div>
+      </div>
+
       {/* PLATFORM TOGGLE */}
       <div style={{ display: "flex", gap: 8 }}>
         {Object.values(DFS_PLATFORMS).map(p => {
