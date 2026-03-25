@@ -6249,29 +6249,31 @@ const DFS_MIN_TOP_TIER = 1;
 // Upgrade a lineup by swapping cheaper drivers for more expensive ones to meet salary floor
 function dfsUpgradeLineup(lineup, eligible, salaryCap) {
   if (!lineup || lineup.length === 0) return lineup;
-  const salaryFloor = Math.round(salaryCap * DFS_SALARY_FLOOR_PCT);
   let current = [...lineup];
   let totalSalary = current.reduce((s, d) => s + d.salary, 0);
   const usedNums = () => new Set(current.map(d => d.num));
 
-  // Sort lineup by salary ascending so we try upgrading cheapest first
+  // Candidate pool sorted by projected points (best first)
   const byPtsDesc = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
 
+  // Keep upgrading: swap cheapest lineup slot for a more expensive + better driver
+  // Continue until we can't find any more beneficial swaps (not just until floor is met)
   let passes = 0;
-  while (totalSalary < salaryFloor && passes < 10) {
+  while (passes < 15) {
     passes++;
     let upgraded = false;
-    // Try upgrading cheapest roster slot with a more expensive (higher pts) driver
+    // Try upgrading cheapest roster slot first
     const sorted = [...current].sort((a, b) => a.salary - b.salary);
     for (const slot of sorted) {
       const used = usedNums();
       const budget = salaryCap - (totalSalary - slot.salary);
-      // Find a better driver: higher salary, higher pts, within budget, not already in lineup
+      // Find a candidate: more expensive, better projected pts, within budget
       for (const candidate of byPtsDesc) {
         if (used.has(candidate.num)) continue;
         if (candidate.salary <= slot.salary) continue;
         if (candidate.salary > budget) continue;
-        if (candidate.projectedPts < slot.projectedPts * 0.85) continue; // don't massively downgrade pts
+        // Only require the candidate to project higher points (strict improvement)
+        if (candidate.projectedPts <= slot.projectedPts) continue;
         // Swap
         const idx = current.findIndex(d => d.num === slot.num);
         totalSalary = totalSalary - slot.salary + candidate.salary;
