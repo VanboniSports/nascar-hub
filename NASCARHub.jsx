@@ -6239,6 +6239,108 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
 }
 
 // §4 LINEUP OPTIMIZER
+// Salary floor: lineups must use at least this % of the cap
+const DFS_SALARY_FLOOR_PCT = 0.90;
+// Top-tier threshold: drivers at or above this salary are "studs"
+const DFS_TOP_TIER_THRESHOLD = 9000;
+// Minimum number of top-tier drivers required per lineup
+const DFS_MIN_TOP_TIER = 1;
+
+// Upgrade a lineup by swapping cheaper drivers for more expensive ones to meet salary floor
+function dfsUpgradeLineup(lineup, eligible, salaryCap) {
+  if (!lineup || lineup.length === 0) return lineup;
+  const salaryFloor = Math.round(salaryCap * DFS_SALARY_FLOOR_PCT);
+  let current = [...lineup];
+  let totalSalary = current.reduce((s, d) => s + d.salary, 0);
+  const usedNums = () => new Set(current.map(d => d.num));
+
+  // Sort lineup by salary ascending so we try upgrading cheapest first
+  const byPtsDesc = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
+
+  let passes = 0;
+  while (totalSalary < salaryFloor && passes < 10) {
+    passes++;
+    let upgraded = false;
+    // Try upgrading cheapest roster slot with a more expensive (higher pts) driver
+    const sorted = [...current].sort((a, b) => a.salary - b.salary);
+    for (const slot of sorted) {
+      const used = usedNums();
+      const budget = salaryCap - (totalSalary - slot.salary);
+      // Find a better driver: higher salary, higher pts, within budget, not already in lineup
+      for (const candidate of byPtsDesc) {
+        if (used.has(candidate.num)) continue;
+        if (candidate.salary <= slot.salary) continue;
+        if (candidate.salary > budget) continue;
+        if (candidate.projectedPts < slot.projectedPts * 0.85) continue; // don't massively downgrade pts
+        // Swap
+        const idx = current.findIndex(d => d.num === slot.num);
+        totalSalary = totalSalary - slot.salary + candidate.salary;
+        current[idx] = candidate;
+        upgraded = true;
+        break;
+      }
+      if (upgraded) break;
+    }
+    if (!upgraded) break;
+  }
+  return current;
+}
+
+// Check if lineup meets top-tier requirement
+function dfsHasTopTier(lineup, minCount, threshold) {
+  return lineup.filter(d => d.salary >= threshold).length >= minCount;
+}
+
+// Force top-tier drivers into a lineup
+function dfsForceTopTier(lineup, eligible, rosterSize, salaryCap, minTopTier, threshold) {
+  if (!lineup) return null;
+  const topTierCount = lineup.filter(d => d.salary >= threshold).length;
+  if (topTierCount >= minTopTier) return lineup;
+
+  const current = [...lineup];
+  let totalSalary = current.reduce((s, d) => s + d.salary, 0);
+  const usedNums = () => new Set(current.map(d => d.num));
+
+  // Get top-tier drivers not in lineup, sorted by projected pts
+  const topTierPool = [...eligible]
+    .filter(d => d.salary >= threshold)
+    .sort((a, b) => b.projectedPts - a.projectedPts);
+
+  // Sort current lineup by salary ascending (swap out cheapest)
+  let needed = minTopTier - topTierCount;
+  const nonTopTier = current.filter(d => d.salary < threshold).sort((a, b) => a.projectedPts - b.projectedPts);
+
+  for (const slot of nonTopTier) {
+    if (needed <= 0) break;
+    const used = usedNums();
+    const budget = salaryCap - (totalSalary - slot.salary);
+    for (const candidate of topTierPool) {
+      if (used.has(candidate.num)) continue;
+      if (candidate.salary > budget) continue;
+      const idx = current.findIndex(d => d.num === slot.num);
+      totalSalary = totalSalary - slot.salary + candidate.salary;
+      current[idx] = candidate;
+      needed--;
+      break;
+    }
+  }
+  return current.length === rosterSize ? current : null;
+}
+
+// Validate and enhance a lineup: enforce salary floor + top-tier requirement
+function dfsValidateLineup(lineup, eligible, rosterSize, salaryCap) {
+  if (!lineup || lineup.length !== rosterSize) return null;
+  // Step 1: Force top-tier drivers
+  let enhanced = dfsForceTopTier(lineup, eligible, rosterSize, salaryCap, DFS_MIN_TOP_TIER, DFS_TOP_TIER_THRESHOLD);
+  if (!enhanced || enhanced.length !== rosterSize) return null;
+  // Step 2: Upgrade to meet salary floor
+  enhanced = dfsUpgradeLineup(enhanced, eligible, salaryCap);
+  if (!enhanced || enhanced.length !== rosterSize) return null;
+  const totalSalary = enhanced.reduce((s, d) => s + d.salary, 0);
+  if (totalSalary > salaryCap) return null;
+  return enhanced;
+}
+
 function dfsGreedyLineup(pool, rosterSize, salaryCap) {
   const lineup = [];
   let remaining = salaryCap;
@@ -6255,13 +6357,23 @@ function dfsGreedyLineup(pool, rosterSize, salaryCap) {
   return lineup.length === rosterSize ? lineup : null;
 }
 
+// Stars & Scrubs: Lock top 2-3 highest-projected studs, fill rest with best value bargains
 function dfsStarsAndScrubs(eligible, rosterSize, salaryCap) {
   const byPts   = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
-  const byValue = [...eligible].sort((a, b) => b.value - a.value);
-  const stars = byPts.slice(0, 2).filter(d => d.salary > 0);
-  if (stars.length < 2) return null;
+  const highSalary = eligible.filter(d => d.salary >= DFS_TOP_TIER_THRESHOLD).sort((a, b) => b.projectedPts - a.projectedPts);
+  // Pick top 2 studs (must be high salary)
+  const stars = highSalary.slice(0, 2);
+  if (stars.length < 2) {
+    // Fallback: top 2 by pts regardless of salary
+    const fallbackStars = byPts.slice(0, 2).filter(d => d.salary > 0);
+    if (fallbackStars.length < 2) return null;
+    stars.length = 0;
+    stars.push(...fallbackStars);
+  }
   const starNums = new Set(stars.map(d => d.num));
   let remaining  = salaryCap - stars.reduce((s, d) => s + d.salary, 0);
+  // Fill rest with best value (cheapest good drivers)
+  const byValue = [...eligible].sort((a, b) => b.value - a.value);
   const scrubs = [];
   for (const d of byValue) {
     if (starNums.has(d.num)) continue;
@@ -6274,8 +6386,10 @@ function dfsStarsAndScrubs(eligible, rosterSize, salaryCap) {
   return lineup.length === rosterSize ? lineup : null;
 }
 
+// Balanced: One driver from each salary tier, picking best value within each tier
 function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
   const bySalary = [...eligible].filter(d => d.salary > 0).sort((a, b) => b.salary - a.salary);
+  if (bySalary.length < rosterSize) return null;
   const tierSize = Math.ceil(bySalary.length / rosterSize);
   const tiers = [];
   for (let i = 0; i < rosterSize; i++) {
@@ -6284,10 +6398,11 @@ function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
   const lineup = [];
   let remaining = salaryCap;
   const used = new Set();
+  // First pass: pick best pts from each tier
   for (const tier of tiers) {
-    const tierByValue = [...tier].sort((a, b) => b.value - a.value);
+    const tierByPts = [...tier].sort((a, b) => b.projectedPts - a.projectedPts);
     let picked = false;
-    for (const d of tierByValue) {
+    for (const d of tierByPts) {
       if (used.has(d.num) || d.salary > remaining) continue;
       lineup.push(d);
       remaining -= d.salary;
@@ -6296,7 +6411,8 @@ function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
       break;
     }
     if (!picked) {
-      for (const d of [...eligible].sort((a, b) => b.value - a.value)) {
+      // Fallback: any eligible driver
+      for (const d of [...eligible].sort((a, b) => b.projectedPts - a.projectedPts)) {
         if (used.has(d.num) || d.salary <= 0 || d.salary > remaining) continue;
         lineup.push(d);
         remaining -= d.salary;
@@ -6308,11 +6424,20 @@ function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
   return lineup.length === rosterSize ? lineup : null;
 }
 
+// Contrarian: Skip top 5 chalk picks, build from mid-tier for low-ownership upside
 function dfsContrarianLineup(eligible, rosterSize, salaryCap) {
   const byPts = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
-  const topNums = new Set(byPts.slice(0, 3).map(d => d.num));
-  const pool = [...eligible].filter(d => !topNums.has(d.num)).sort((a, b) => b.value - a.value);
-  return dfsGreedyLineup(pool, rosterSize, salaryCap);
+  const topNums = new Set(byPts.slice(0, 5).map(d => d.num));
+  const pool = [...eligible].filter(d => !topNums.has(d.num));
+  // Pick by value among non-chalk
+  const byValue = [...pool].sort((a, b) => b.value - a.value);
+  return dfsGreedyLineup(byValue, rosterSize, salaryCap);
+}
+
+// Max Points: Simply take highest projected pts drivers that fit under cap
+function dfsMaxPointsLineup(eligible, rosterSize, salaryCap) {
+  const byPts = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
+  return dfsGreedyLineup(byPts, rosterSize, salaryCap);
 }
 
 function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
@@ -6320,7 +6445,9 @@ function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
   if (eligible.length < rosterSize) return [];
   const lineups = [];
   const seen    = new Set();
-  const tryAdd = (lineup, strategy) => {
+  const tryAdd = (rawLineup, strategy) => {
+    // Validate & enhance: enforce salary floor + top-tier requirement
+    const lineup = dfsValidateLineup(rawLineup, eligible, rosterSize, salaryCap);
     if (!lineup) return;
     const key = lineup.map(d => d.num).sort().join(",");
     if (seen.has(key)) return;
@@ -6328,18 +6455,36 @@ function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
     const totalSalary = lineup.reduce((s, d) => s + d.salary, 0);
     const totalPts    = lineup.reduce((s, d) => s + d.projectedPts, 0);
     lineups.push({
-      drivers: lineup, strategy, totalSalary,
+      drivers: lineup.sort((a, b) => b.projectedPts - a.projectedPts),
+      strategy,
+      totalSalary,
       totalPts: Math.round(totalPts * 10) / 10,
       remaining: salaryCap - totalSalary,
     });
   };
-  const byValue = [...eligible].sort((a, b) => b.value - a.value);
-  tryAdd(dfsGreedyLineup(byValue, rosterSize, salaryCap), "Best Value");
-  const byPts = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
-  tryAdd(dfsGreedyLineup(byPts, rosterSize, salaryCap), "Max Points");
+  // Generate diverse strategies
+  tryAdd(dfsMaxPointsLineup(eligible, rosterSize, salaryCap), "Max Points");
   tryAdd(dfsStarsAndScrubs(eligible, rosterSize, salaryCap), "Stars & Scrubs");
   tryAdd(dfsBalancedLineup(eligible, rosterSize, salaryCap), "Balanced");
   tryAdd(dfsContrarianLineup(eligible, rosterSize, salaryCap), "Contrarian");
+  // Best Value last (most likely to overlap with others after upgrade)
+  const byValue = [...eligible].sort((a, b) => b.value - a.value);
+  tryAdd(dfsGreedyLineup(byValue, rosterSize, salaryCap), "Best Value");
+
+  // If we still have few lineups, try variations with different stud anchors
+  if (lineups.length < 3) {
+    const topDrivers = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts).slice(0, 6);
+    for (let i = 0; i < topDrivers.length && lineups.length < 5; i++) {
+      const anchor = topDrivers[i];
+      const rest = eligible.filter(d => d.num !== anchor.num);
+      const byVal = [...rest].sort((a, b) => b.value - a.value);
+      const fill = dfsGreedyLineup(byVal, rosterSize - 1, salaryCap - anchor.salary);
+      if (fill) {
+        tryAdd([anchor, ...fill], `Anchor: ${anchor.driver.split(" ").pop()}`);
+      }
+    }
+  }
+
   lineups.sort((a, b) => b.totalPts - a.totalPts);
   return lineups.slice(0, count || 5);
 }
@@ -6428,13 +6573,23 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
           <div style={{ fontWeight: 700, color: T.text, marginBottom: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 1 }}>LINEUP STRATEGIES</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
             {[
-              ["Best Value", "Fills roster by highest points-per-$1K salary"],
               ["Max Points", "Prioritizes highest raw projected points"],
-              ["Stars & Scrubs", "Locks in top-2 studs, fills rest with bargains"],
+              ["Stars & Scrubs", "Locks in 2 top-salary studs, fills rest with bargains"],
               ["Balanced", "Picks one driver from each salary tier"],
-              ["Contrarian", "Skips the top-3 chalk picks for low-ownership upside"],
+              ["Contrarian", "Skips the top-5 chalk picks for low-ownership upside"],
+              ["Best Value", "Fills roster by highest points-per-$1K salary"],
             ].map(([l, d]) => (
               <div key={l}><span style={{ fontWeight: 700, color: col }}>{l}</span> — {d}</div>
+            ))}
+          </div>
+          <div style={{ fontWeight: 700, color: T.text, marginBottom: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 1 }}>LINEUP CONSTRAINTS</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+            {[
+              ["Salary Floor", "Lineups must use 90%+ of the salary cap — no wasted budget"],
+              ["Top-Tier Stud", "Every lineup requires at least 1 driver from the $9,000+ salary tier"],
+              ["Auto-Upgrade", "Cheap slots are swapped for better drivers until salary floor is met"],
+            ].map(([l, d]) => (
+              <div key={l}><span style={{ fontWeight: 700, color: T.gold }}>{l}</span> — {d}</div>
             ))}
           </div>
           <div style={{ fontWeight: 700, color: T.text, marginBottom: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 1 }}>DRIVER VALUE TAGS</div>
@@ -6583,11 +6738,11 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
                 {/* Salary cap bar */}
                 <div style={{ padding: "8px 16px", borderBottom: `1px solid ${T.border}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 4, letterSpacing: 1 }}>
-                    <span>SALARY CAP</span>
+                    <span>SALARY CAP {pctBar(lu.totalSalary, plat.salaryCap) >= 90 ? "" : "⚠ BELOW FLOOR"}</span>
                     <span>{pctBar(lu.totalSalary, plat.salaryCap)}% used</span>
                   </div>
                   <div style={{ height: 6, background: T.surface3, borderRadius: 3, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pctBar(lu.totalSalary, plat.salaryCap)}%`, background: `linear-gradient(90deg, ${col}, ${col}88)`, borderRadius: 3, transition: "width 0.3s ease" }} />
+                    <div style={{ height: "100%", width: `${pctBar(lu.totalSalary, plat.salaryCap)}%`, background: pctBar(lu.totalSalary, plat.salaryCap) >= 90 ? `linear-gradient(90deg, ${T.green}, ${T.green}88)` : `linear-gradient(90deg, ${col}, ${col}88)`, borderRadius: 3, transition: "width 0.3s ease" }} />
                   </div>
                 </div>
                 {/* Driver rows */}
