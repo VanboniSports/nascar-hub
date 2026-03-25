@@ -4762,8 +4762,17 @@ function DaExpandedRow({ row }) {
 // ─────────────────────────────────────────────────────────────
 function DaHeadToHead({ csvData, incrementTool }) {
   const [selectedDrivers, setSelectedDrivers] = useState(["","","",""]);
+  const [h2hTrackFilter, setH2hTrackFilter] = useState("All");
 
-  const byDriver = useMemo(() => {
+  // All tracks from CSV for the filter dropdown
+  const h2hAllTracks = useMemo(() => {
+    const ts = new Set();
+    for (const r of csvData) { if (r[1]) ts.add(r[1]); }
+    return [...ts].sort();
+  }, [csvData]);
+
+  // Full (unfiltered) byDriver for driver list availability
+  const byDriverFull = useMemo(() => {
     const bd = {};
     for (const r of csvData) {
       const d = r[0]; if (!d) continue;
@@ -4773,7 +4782,20 @@ function DaHeadToHead({ csvData, incrementTool }) {
     return bd;
   }, [csvData]);
 
-  const driverList = useMemo(() => FULL_TIMER_NAMES.filter(n => byDriver[n]).sort(), [byDriver]);
+  // Filtered byDriver (applies track filter)
+  const byDriver = useMemo(() => {
+    if (h2hTrackFilter === "All") return byDriverFull;
+    const bd = {};
+    for (const r of csvData) {
+      const d = r[0]; if (!d) continue;
+      if (r[1] !== h2hTrackFilter) continue;
+      if (!bd[d]) bd[d] = [];
+      bd[d].push(r);
+    }
+    return bd;
+  }, [csvData, h2hTrackFilter, byDriverFull]);
+
+  const driverList = useMemo(() => FULL_TIMER_NAMES.filter(n => byDriverFull[n]).sort(), [byDriverFull]);
 
   const setDriver = (idx, val) => {
     setSelectedDrivers(prev => { const next = [...prev]; next[idx] = val; return next; });
@@ -4798,6 +4820,7 @@ function DaHeadToHead({ csvData, incrementTool }) {
     function driverStats(races) {
       const finishes = races.map(r => r[3]).filter(v => v > 0);
       return {
+        noData: races.length === 0,
         wins: finishes.filter(f => f === 1).length,
         top5: finishes.filter(f => f <= 5).length,
         top10: finishes.filter(f => f <= 10).length,
@@ -4861,13 +4884,30 @@ function DaHeadToHead({ csvData, incrementTool }) {
     }
 
     return { drivers, stats, pairwise, pairByType, yearlyTrend: Object.values(yearlyTrend) };
-  }, [ready, uniqueActive.join(","), byDriver, csvData]);
+  }, [ready, uniqueActive.join(","), byDriver, csvData, h2hTrackFilter]);
 
   const selStyle = { width:"100%", padding:"10px 14px", background:T.surface2, color:T.text, border:`1px solid ${T.border2}`, borderRadius:8, fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" };
   const labelStyle = { fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* Track filter */}
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
+        <div style={{ flex:1, minWidth:180, maxWidth:360 }}>
+          <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6 }}>Filter by Track</div>
+          <select value={h2hTrackFilter} onChange={e=>{setH2hTrackFilter(e.target.value);}}
+            style={{ width:"100%", padding:"7px 12px", background:T.surface2, color:T.text, border:`1px solid ${h2hTrackFilter!=="All"?T.accent:T.border}`, borderRadius:8, fontSize:12, fontWeight:600, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" }}>
+            <option value="All">All Tracks</option>
+            {h2hAllTracks.map(t => <option key={t} value={t}>{t.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}</option>)}
+          </select>
+        </div>
+        {h2hTrackFilter !== "All" && (
+          <div style={{ fontSize:10, color:CSV_TYPE_COLORS[CSV_TRACK_TYPES[h2hTrackFilter]||"Unknown"]||T.textDim, fontFamily:"'IBM Plex Mono',monospace", padding:"8px 0" }}>
+            {CSV_TRACK_TYPES[h2hTrackFilter] || "Unknown"} — {h2hTrackFilter}
+          </div>
+        )}
+      </div>
+
       {/* Driver selectors — 2 to 4 */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:12 }}>
         {[0,1,2,3].map(idx => {
@@ -4889,7 +4929,7 @@ function DaHeadToHead({ csvData, incrementTool }) {
         <>
           {/* Stat comparison table */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, overflowX:"auto" }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Category Comparison</div>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Category Comparison{h2hTrackFilter !== "All" ? ` — ${h2hTrackFilter.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}` : ""}</div>
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }}>
               <thead>
                 <tr>
@@ -4917,10 +4957,11 @@ function DaHeadToHead({ csvData, incrementTool }) {
                       <td style={{ padding:"8px", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>{cat.label}</td>
                       {h2hData.drivers.map((d, i) => {
                         const v = h2hData.stats[d][cat.key];
-                        const isBest = v === best && vals.filter(x=>x===best).length < vals.length;
-                        const display = v == null ? "—" : cat.fmt ? v.toFixed(cat.fmt) : v;
+                        const nd = h2hData.stats[d].noData;
+                        const isBest = !nd && v === best && vals.filter(x=>x===best).length < vals.length;
+                        const display = nd ? "No data" : v == null ? "—" : cat.fmt ? v.toFixed(cat.fmt) : v;
                         return (
-                          <td key={d} style={{ textAlign:"center", padding:"8px", fontWeight:isBest?800:500, color:isBest?T.green:T.textMid }}>
+                          <td key={d} style={{ textAlign:"center", padding:"8px", fontWeight:isBest?800:500, color:nd?T.textDim:isBest?T.green:T.textMid, fontStyle:nd?"italic":"normal", fontSize:nd?10:12 }}>
                             {display}
                           </td>
                         );
@@ -4934,7 +4975,7 @@ function DaHeadToHead({ csvData, incrementTool }) {
 
           {/* Pairwise head-to-head records */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Pairwise Head-to-Head Records</div>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Pairwise Head-to-Head Records{h2hTrackFilter !== "All" ? ` — ${h2hTrackFilter.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}` : ""}</div>
             <div style={{ display:"grid", gridTemplateColumns:`repeat(auto-fit, minmax(${h2hData.drivers.length > 2 ? 220 : 280}px, 1fr))`, gap:12 }}>
               {Object.entries(h2hData.pairwise).map(([pk, rec]) => {
                 const [d1, d2] = pk.split("|");
@@ -4973,7 +5014,7 @@ function DaHeadToHead({ csvData, incrementTool }) {
 
           {/* Avg Finish Trend chart */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Avg Finish by Season</div>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Avg Finish by Season{h2hTrackFilter !== "All" ? ` — ${h2hTrackFilter.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}` : ""}</div>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={h2hData.yearlyTrend} margin={{ top:5, right:20, left:0, bottom:5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
@@ -5005,8 +5046,17 @@ function DaHeadToHead({ csvData, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 function DaTeamH2H({ csvData, incrementTool }) {
   const [selectedTeams, setSelectedTeams] = useState(["","","",""]);
+  const [teamH2hTrackFilter, setTeamH2hTrackFilter] = useState("All");
 
-  const byDriver = useMemo(() => {
+  // All tracks from CSV for the filter dropdown
+  const teamH2hAllTracks = useMemo(() => {
+    const ts = new Set();
+    for (const r of csvData) { if (r[1]) ts.add(r[1]); }
+    return [...ts].sort();
+  }, [csvData]);
+
+  // Full (unfiltered) byDriver for checking driver existence in rosters
+  const byDriverFull = useMemo(() => {
     const bd = {};
     for (const r of csvData) {
       const d = r[0]; if (!d) continue;
@@ -5015,6 +5065,19 @@ function DaTeamH2H({ csvData, incrementTool }) {
     }
     return bd;
   }, [csvData]);
+
+  // Filtered byDriver (applies track filter)
+  const byDriver = useMemo(() => {
+    if (teamH2hTrackFilter === "All") return byDriverFull;
+    const bd = {};
+    for (const r of csvData) {
+      const d = r[0]; if (!d) continue;
+      if (r[1] !== teamH2hTrackFilter) continue;
+      if (!bd[d]) bd[d] = [];
+      bd[d].push(r);
+    }
+    return bd;
+  }, [csvData, teamH2hTrackFilter, byDriverFull]);
 
   const setTeam = (idx, val) => {
     setSelectedTeams(prev => { const next = [...prev]; next[idx] = val; return next; });
@@ -5043,6 +5106,7 @@ function DaTeamH2H({ csvData, incrementTool }) {
       return {
         teamName,
         drivers,
+        noData: allRaces.length === 0,
         driverCount: drivers.length,
         totalRaces: allRaces.length,
         wins: finishes.filter(f => f === 1).length,
@@ -5080,13 +5144,30 @@ function DaTeamH2H({ csvData, incrementTool }) {
     });
 
     return { teams, stats, yearlyTrend, winsPerYear };
-  }, [ready, uniqueActive.join(","), byDriver, csvData]);
+  }, [ready, uniqueActive.join(","), byDriver, csvData, teamH2hTrackFilter]);
 
   const selStyle = { width:"100%", padding:"10px 14px", background:T.surface2, color:T.text, border:`1px solid ${T.border2}`, borderRadius:8, fontSize:13, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" };
   const labelStyle = { fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* Track filter */}
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
+        <div style={{ flex:1, minWidth:180, maxWidth:360 }}>
+          <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6 }}>Filter by Track</div>
+          <select value={teamH2hTrackFilter} onChange={e=>{setTeamH2hTrackFilter(e.target.value);}}
+            style={{ width:"100%", padding:"7px 12px", background:T.surface2, color:T.text, border:`1px solid ${teamH2hTrackFilter!=="All"?T.accent:T.border}`, borderRadius:8, fontSize:12, fontWeight:600, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" }}>
+            <option value="All">All Tracks</option>
+            {teamH2hAllTracks.map(t => <option key={t} value={t}>{t.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}</option>)}
+          </select>
+        </div>
+        {teamH2hTrackFilter !== "All" && (
+          <div style={{ fontSize:10, color:CSV_TYPE_COLORS[CSV_TRACK_TYPES[teamH2hTrackFilter]||"Unknown"]||T.textDim, fontFamily:"'IBM Plex Mono',monospace", padding:"8px 0" }}>
+            {CSV_TRACK_TYPES[teamH2hTrackFilter] || "Unknown"} — {teamH2hTrackFilter}
+          </div>
+        )}
+      </div>
+
       {/* Team selectors */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:12 }}>
         {[0,1,2,3].map(idx => {
@@ -5113,7 +5194,7 @@ function DaTeamH2H({ csvData, incrementTool }) {
         <>
           {/* Stat comparison table */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20, overflowX:"auto" }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Team Comparison (All Drivers Combined)</div>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Team Comparison (All Drivers Combined){teamH2hTrackFilter !== "All" ? ` — ${teamH2hTrackFilter.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}` : ""}</div>
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }}>
               <thead>
                 <tr>
@@ -5141,10 +5222,11 @@ function DaTeamH2H({ csvData, incrementTool }) {
                       <td style={{ padding:"8px", fontSize:10, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>{cat.label}</td>
                       {teamData.teams.map(t => {
                         const v = teamData.stats[t][cat.key];
-                        const isBest = v === best && vals.filter(x=>x===best).length < vals.length;
-                        const display = v == null ? "—" : cat.fmt ? v.toFixed(cat.fmt) : v;
+                        const nd = teamData.stats[t].noData;
+                        const isBest = !nd && v === best && vals.filter(x=>x===best).length < vals.length;
+                        const display = nd ? "No data" : v == null ? "—" : cat.fmt ? v.toFixed(cat.fmt) : v;
                         return (
-                          <td key={t} style={{ textAlign:"center", padding:"8px", fontWeight:isBest?800:500, color:isBest?T.green:T.textMid }}>
+                          <td key={t} style={{ textAlign:"center", padding:"8px", fontWeight:isBest?800:500, color:nd?T.textDim:isBest?T.green:T.textMid, fontStyle:nd?"italic":"normal", fontSize:nd?10:12 }}>
                             {display}
                           </td>
                         );
@@ -5158,7 +5240,7 @@ function DaTeamH2H({ csvData, incrementTool }) {
 
           {/* Avg Finish trend */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Team Avg Finish by Season</div>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Team Avg Finish by Season{teamH2hTrackFilter !== "All" ? ` — ${teamH2hTrackFilter.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}` : ""}</div>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={teamData.yearlyTrend} margin={{ top:5, right:20, left:0, bottom:5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
@@ -5174,7 +5256,7 @@ function DaTeamH2H({ csvData, incrementTool }) {
 
           {/* Wins per year bar chart */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Wins by Season</div>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Wins by Season{teamH2hTrackFilter !== "All" ? ` — ${teamH2hTrackFilter.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}` : ""}</div>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={teamData.winsPerYear} margin={{ top:5, right:20, left:0, bottom:5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
@@ -5190,7 +5272,7 @@ function DaTeamH2H({ csvData, incrementTool }) {
 
           {/* Per-driver breakdown within each team */}
           <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Individual Driver Breakdown</div>
+            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14, textAlign:"center" }}>Individual Driver Breakdown{teamH2hTrackFilter !== "All" ? ` — ${teamH2hTrackFilter.replace(/ (Motor |International )?(Speedway|Raceway|International)/g,"")}` : ""}</div>
             <div style={{ display:"grid", gridTemplateColumns:`repeat(auto-fit, minmax(200px, 1fr))`, gap:12 }}>
               {teamData.teams.map(t => {
                 const color = H2H_COLORS[selectedTeams.indexOf(t)];
@@ -5213,7 +5295,7 @@ function DaTeamH2H({ csvData, incrementTool }) {
                         </div>
                       );
                     })}
-                    {drivers.length === 0 && <div style={{ fontSize:10, color:T.textDim, fontStyle:"italic" }}>No CSV data</div>}
+                    {drivers.length === 0 && <div style={{ fontSize:10, color:T.textDim, fontStyle:"italic" }}>{teamH2hTrackFilter !== "All" ? "No data at this track" : "No CSV data"}</div>}
                   </div>
                 );
               })}
