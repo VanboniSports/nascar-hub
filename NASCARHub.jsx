@@ -1004,19 +1004,31 @@ function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
   // Recent winners at this track from CSV
   const recentWinners = useMemo(() => {
     if (!csvData.length || !race) return [];
+    // Parse either ISO "YYYY-MM-DD" or US "M/D/YYYY" (Excel re-save artifact) into a sortable number.
+    const parseRaceDate = (s, fallbackYear) => {
+      if (!s) return (fallbackYear || 0) * 10000;
+      if (s.includes("-")) {
+        // ISO: "2025-09-28"
+        return parseInt(s.replace(/-/g, ""), 10) || (fallbackYear || 0) * 10000;
+      }
+      if (s.includes("/")) {
+        // US: "9/28/2025" -> 20250928
+        const [m, d, y] = s.split("/").map(n => parseInt(n, 10));
+        if (y && m && d) return y * 10000 + m * 100 + d;
+      }
+      return (fallbackYear || 0) * 10000;
+    };
     const wins = [];
     for (const r of csvData) {
       if (r[3] === 1 && predMatchTrack(race.track, r[1])) {
-        wins.push({ driver: r[0], year: r[2] || 0, date: r[9] || "" });
+        wins.push({
+          driver: r[0],
+          year: r[2] || 0,
+          sortKey: parseRaceDate(r[9], r[2]),
+        });
       }
     }
-    // Sort by date DESC (ISO YYYY-MM-DD strings compare correctly).
-    // Fall back to year if date missing (older cached rows pre-raceDate column).
-    wins.sort((a, b) => {
-      if (a.date && b.date) return b.date.localeCompare(a.date);
-      if (b.year !== a.year) return b.year - a.year;
-      return b.date.localeCompare(a.date);
-    });
+    wins.sort((a, b) => b.sortKey - a.sortKey);
     return wins.slice(0, 3);
   }, [csvData, race]);
 
