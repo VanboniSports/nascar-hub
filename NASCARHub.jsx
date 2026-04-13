@@ -1007,11 +1007,16 @@ function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
     const wins = [];
     for (const r of csvData) {
       if (r[3] === 1 && predMatchTrack(race.track, r[1])) {
-        wins.push({ driver: r[0], year: r[2], date: r[9] });
+        wins.push({ driver: r[0], year: r[2] || 0, date: r[9] || "" });
       }
     }
-    // Sort by date descending, take last 3
-    wins.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    // Sort by date DESC (ISO YYYY-MM-DD strings compare correctly).
+    // Fall back to year if date missing (older cached rows pre-raceDate column).
+    wins.sort((a, b) => {
+      if (a.date && b.date) return b.date.localeCompare(a.date);
+      if (b.year !== a.year) return b.year - a.year;
+      return b.date.localeCompare(a.date);
+    });
     return wins.slice(0, 3);
   }, [csvData, race]);
 
