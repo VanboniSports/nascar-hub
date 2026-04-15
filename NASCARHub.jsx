@@ -6168,7 +6168,7 @@ const DFS_PLATFORMS = {
 };
 
 // §2 SCORING ENGINES
-function dfsScoreDK(fin, start, lapsLed, totalLaps, isMostLapsLed) {
+function dfsScoreDK(fin, start, lapsLed, totalLaps, isMostLapsLed, projectedFL) {
   let finPts = 0;
   if (fin === 1)       finPts = 45;
   else if (fin === 2)  finPts = 42;
@@ -6176,7 +6176,7 @@ function dfsScoreDK(fin, start, lapsLed, totalLaps, isMostLapsLed) {
   else                 finPts = 1;
   const placeDiff  = (start - fin) * 0.5;
   const ledPts     = lapsLed * 0.25;
-  const fastLapPts = Math.round(lapsLed * 0.30) * 0.45;
+  const fastLapPts = (projectedFL || 0) * 0.45;
   const mostBonus  = isMostLapsLed ? 5 : 0;
   return finPts + placeDiff + ledPts + fastLapPts + mostBonus;
 }
@@ -6244,10 +6244,21 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
     else if (trackWins >= 1) projFinish *= 0.93;
     projFinish = Math.max(1, Math.min(40, Math.round(projFinish * 10) / 10));
     const projStart = Math.max(1, Math.min(40, Math.round(avgStart)));
+
+    // Project fastest laps (DK only awards this; FD doesn't have FL points)
+    // Every lap of the race awards 1 fastest lap (0.45 pts on DK), so totalLaps × share is the model.
+    // Drivers who lead laps tend to also turn fast laps (clean air, best car).
+    // Top finishers also grab a meaningful share even if they didn't lead the most.
+    const lapsLedPct      = totalLaps > 0 ? projLapsLed / totalLaps : 0;
+    const finishStrength  = Math.max(0, (15 - Math.min(40, projFinish)) / 15); // 1.0 for P1, 0 for P15+
+    let flShare           = (lapsLedPct * 0.6) + (finishStrength * 0.4 * 0.20); // top finishers split ~20% baseline
+    flShare               = Math.max(0, Math.min(0.40, flShare)); // cap at 40% — no driver realistically gets more
+    const projectedFL     = Math.round(totalLaps * flShare);
+
     let projectedPts;
     if (platformId === "dk") {
       const isMostLaps = projLapsLed > totalLaps * 0.25;
-      projectedPts = dfsScoreDK(Math.round(projFinish), projStart, projLapsLed, totalLaps, isMostLaps);
+      projectedPts = dfsScoreDK(Math.round(projFinish), projStart, projLapsLed, totalLaps, isMostLaps, projectedFL);
     } else {
       projectedPts = dfsScoreFD(Math.round(projFinish), projStart, projLapsLed, totalLaps, totalLaps);
     }
@@ -6260,6 +6271,7 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
     if (projLapsLed > totalLaps * 0.10) tags.push("Dominator");
     if (projStart >= 25 && Math.round(projFinish) <= 15) tags.push("PD Play");
     if (recentTypeAvg <= 10 && typeRows.length >= 5) tags.push("Type Specialist");
+    if (platformId === "dk" && projectedFL >= totalLaps * 0.15) tags.push("Speed Demon");
     projections.push({
       driver: driverName,
       num: dInfo?.num || "?",
@@ -6270,6 +6282,7 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
       projFinish: Math.round(projFinish * 10) / 10,
       projStart,
       projLapsLed,
+      projectedFL,
       trackAvg: trackAvg.toFixed(1),
       trackRaces,
       trackWins,
@@ -6652,6 +6665,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
               ["Dominator", "Projected 10%+ laps led"],
               ["PD Play", "Place diff upside"],
               ["Type Specialist", "Strong recent type avg"],
+              ...(platform === "dk" ? [["Speed Demon", "Projected 15%+ fastest laps (DK only)"]] : []),
             ].map(([tag, desc]) => (
               <span key={tag} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 4, background: `${col}15`, border: `1px solid ${col}30`, color: col }}>
                 <span style={{ fontWeight: 700 }}>{tag}</span> = {desc}
@@ -6814,6 +6828,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
                               ["Trk Avg", d.trackAvg, TC[race?.type] || T.accent],
                               ["Recent", d.recentAvg, T.accentText],
                               ["Laps Led", d.projLapsLed, T.gold],
+                              ...(platform === "dk" ? [["Fast Laps", d.projectedFL || 0, T.green]] : []),
                             ].map(([l, v, c]) => (
                               <div key={l} style={{ fontSize: 10 }}>
                                 <span style={{ color: T.textDim }}>{l}: </span>
@@ -6866,6 +6881,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
                         ["Type Avg", d.typeAvg],
                         ["Recent", d.recentAvg],
                         ["Led", d.projLapsLed],
+                        ...(platform === "dk" ? [["FL", d.projectedFL || 0]] : []),
                       ].map(([l, v]) => (
                         <span key={l} style={{ fontSize: 10 }}><span style={{ color: T.textDim }}>{l}: </span><span style={{ fontWeight: 700, color: T.text }}>{v}</span></span>
                       ))}
