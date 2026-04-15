@@ -217,29 +217,46 @@ const LB_SORT_CONFIGS = {
 // Full-time 2026 driver names for filtering the leaderboard
 const FULL_TIMER_NAMES = INITIAL_DRIVERS.map(d => d.name);
 
-// CSV name aliases — maps quirky CSV names to canonical INITIAL_DRIVERS names
-// The CSV has scraping artifacts: trailing commas, truncated names, doubled names
+// CSV name aliases — maps quirky CSV names to canonical INITIAL_DRIVERS names.
+// Canonical form: juniors end with "Jr" (no period). Run name through
+// normalizeCsvDriverName before any lookup against INITIAL_DRIVERS.
 const CSV_NAME_ALIASES = {
-  "Ricky Stenhouse,": "Ricky Stenhouse Jr",
-  "Ricky Stenhouse": "Ricky Stenhouse Jr",
-  "John H.": "John Hunter Nemechek",
-  "John H. Nemechek": "John Hunter Nemechek",
-  "Shane Van": "Shane van Gisbergen",
+  "Ricky Stenhouse,":    "Ricky Stenhouse Jr",
+  "Ricky Stenhouse":     "Ricky Stenhouse Jr",
+  "Ricky Stenhouse Jr.": "Ricky Stenhouse Jr",
+  "Martin Truex,":       "Martin Truex Jr",
+  "Martin Truex":        "Martin Truex Jr",
+  "Martin Truex Jr.":    "Martin Truex Jr",
+  "Dale Earnhardt Jr.":  "Dale Earnhardt Jr",
+  "John H.":             "John Hunter Nemechek",
+  "John H. Nemechek":    "John Hunter Nemechek",
+  "Shane Van":           "Shane van Gisbergen",
+  "Shane Van Gisbergen": "Shane van Gisbergen",
   "Shane van Gisbergen": "Shane van Gisbergen",
-  "Martin Truex,": "Martin Truex Jr",
-  "Martin Truex": "Martin Truex Jr",
-  "B.J. McLeod": "BJ McLeod",
-  "BJ McLeod": "BJ McLeod",
+  "B.J. McLeod":         "BJ McLeod",
+  "BJ McLeod":           "BJ McLeod",
 };
 
-// Normalize a CSV driver name: strip doubled-name artifacts, apply aliases
-function normalizeCsvDriverName(raw) {
-  let name = raw.trim();
+// Tracks names we've already warned about so the console doesn't flood
+const _unknownDriverWarned = new Set();
 
-  // Strip " (I)" indicator tags early
+// Normalize a CSV driver name:
+//  1. Trim + strip "(I)" tags and stray trailing punctuation (excluding period)
+//  2. Repair doubled-name scraping artifacts ("Kyle LarsonKyle Larson")
+//  3. Strip trailing period after Jr / Sr  ("Jr." -> "Jr")
+//  4. Apply explicit aliases for known CSV quirks
+//  5. Warn once per unknown full-timer-looking name so new issues surface early
+function normalizeCsvDriverName(raw) {
+  let name = (raw || "").trim();
+  if (!name) return name;
+
+  // Strip " (I)" / "(I)" indicator tags
   name = name.replace(/\s*\(I\)\s*/g, "").trim();
 
-  // Fix fully doubled names like "Kyle LarsonKyle Larson" or "John H. NemechekJohn H. Nemechek"
+  // Strip stray trailing punctuation EXCEPT a period (period may belong to Jr./Sr.)
+  name = name.replace(/[,;:(\s]+$/g, "").trim();
+
+  // Repair fully doubled names like "Kyle LarsonKyle Larson"
   const len = name.length;
   if (len >= 4) {
     for (let i = Math.floor(len / 3); i <= Math.ceil(len * 2 / 3); i++) {
@@ -247,16 +264,16 @@ function normalizeCsvDriverName(raw) {
       const right = name.substring(i);
       if (left === right) { name = left; break; }
     }
-    // Also handle partial doubles like "Tyler ReddickTyler" (first name appended)
+    // Partial doubles like "Tyler ReddickTyler"
     if (name.length === len) {
       const parts = name.split(" ");
       if (parts.length >= 2) {
         const last = parts[parts.length - 1];
-        const match = last.match(/^([A-Z][a-z]+)([A-Z].*)$/);
-        if (match) {
+        const m = last.match(/^([A-Z][a-z]+)([A-Z].*)$/);
+        if (m) {
           const firstName = parts[0];
-          if (match[2] === firstName || last.endsWith(firstName)) {
-            parts[parts.length - 1] = match[1];
+          if (m[2] === firstName || last.endsWith(firstName)) {
+            parts[parts.length - 1] = m[1];
             name = parts.join(" ");
           }
         }
@@ -264,8 +281,22 @@ function normalizeCsvDriverName(raw) {
     }
   }
 
-  // Apply explicit aliases
+  // Normalize Jr./Sr. -> Jr/Sr (canonical form has no trailing period)
+  name = name.replace(/\b(Jr|Sr)\.\s*$/i, (_, suf) => suf.charAt(0).toUpperCase() + suf.slice(1).toLowerCase());
+
+  // Apply explicit alias map
   if (CSV_NAME_ALIASES[name]) return CSV_NAME_ALIASES[name];
+
+  // Warn once if a name looks like a full-timer but doesn't match INITIAL_DRIVERS.
+  // Only flag normal "First Last" / "First Last Jr" patterns to avoid one-off spam.
+  if (typeof FULL_TIMER_NAMES !== "undefined"
+      && !FULL_TIMER_NAMES.includes(name)
+      && !_unknownDriverWarned.has(name)
+      && /^[A-Z][a-zA-Z'\-]+ [A-Z][a-zA-Z'\-]+( (Jr|Sr|II|III|IV))?$/.test(name)) {
+    _unknownDriverWarned.add(name);
+    console.warn("[normalizeCsvDriverName] Unknown driver name (no INITIAL_DRIVERS match, no alias):", name);
+  }
+
   return name;
 }
 
