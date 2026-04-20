@@ -7560,6 +7560,40 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
             </span>
           )}
         </div>
+
+        {/* View imported qualifying data */}
+        {qualCount > 0 && (
+          <details style={{ background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", marginTop: 12 }}>
+            <summary style={{ cursor: "pointer", fontSize: 11, color: T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+              View Qualifying Data ({qualCount} drivers)
+            </summary>
+            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px", maxHeight: 300, overflowY: "auto" }}>
+              {Object.entries(qualPractice.qualifying).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
+                <div key={name} style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid, padding: "2px 0", display: "flex", justifyContent: "space-between" }}>
+                  <span>{name}</span>
+                  <span style={{ color: T.accent, fontWeight: 700 }}>P{pos}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        {/* View imported practice data */}
+        {practiceCount > 0 && (
+          <details style={{ background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
+            <summary style={{ cursor: "pointer", fontSize: 11, color: T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+              View Practice Data ({practiceCount} drivers)
+            </summary>
+            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px", maxHeight: 300, overflowY: "auto" }}>
+              {Object.entries(qualPractice.practice).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
+                <div key={name} style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid, padding: "2px 0", display: "flex", justifyContent: "space-between" }}>
+                  <span>{name}</span>
+                  <span style={{ color: T.green, fontWeight: 700 }}>P{pos}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
     </div>
   );
