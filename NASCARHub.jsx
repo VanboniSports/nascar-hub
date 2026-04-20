@@ -3102,7 +3102,7 @@ function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
 // ─────────────────────────────────────────────────────────────
 // GLOBAL ADMIN PANEL — lives at the bottom of the app
 // ─────────────────────────────────────────────────────────────
-function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave }) {
+function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -3627,6 +3627,8 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
                   onDfsSalariesSave={onDfsSalariesSave}
                   dfsDisabled={dfsDisabled}
                   onDfsDisabledSave={onDfsDisabledSave}
+                  qualPractice={qualPractice}
+                  onQualPracticeSave={onQualPracticeSave}
                 />
               )}
 
@@ -6007,7 +6009,8 @@ async function loadFromSupabase() {
     const { data:btRows }   = await sb.from("app_state").select("*").eq("key","battleRaces");
     const { data:dsRows }   = await sb.from("app_state").select("*").eq("key","dfsSalaries");
     const { data:ddRows }   = await sb.from("app_state").select("*").eq("key","dfsDisabled");
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows };
+    const { data:qpRows }   = await sb.from("app_state").select("*").eq("key","dfsQualifying");
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 
@@ -6196,12 +6199,16 @@ function dfsScoreFD(fin, start, lapsLed, totalLaps, lapsCompleted) {
 }
 
 // §3 PROJECT DFS POINTS
-function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
+function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracticeData) {
   if (!csvData?.length || !race) return [];
   const disabledSet = new Set((disabledDrivers || []).map(d => d.name));
   const driverIdx   = predBuildDriverIndex(csvData);
   const trackType   = predGetTrackType(race.track);
   const totalLaps   = race.laps || 200;
+  // Extract qualifying/practice data if it matches the current race week
+  const raceWeek = race.allStar ? "allstar" : race.week;
+  const qualifyingData = (qualPracticeData && qualPracticeData.week === raceWeek) ? qualPracticeData.qualifying : null;
+  const practiceData = (qualPracticeData && qualPracticeData.week === raceWeek) ? qualPracticeData.practice : null;
   const projections = [];
   for (const driverName of FULL_TIMER_NAMES) {
     if (disabledSet.has(driverName)) continue;
@@ -6243,8 +6250,18 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
     else                      projFinish = typeAvg  * 0.50 + recentTypeAvg * 0.25 + recentAvg * 0.25;
     if (trackWins >= 3)      projFinish *= 0.88;
     else if (trackWins >= 1) projFinish *= 0.93;
+    // Practice adjustment: light 8% blend if practice data diverges from projection
+    if (practiceData && practiceData[driverName]) {
+      const practiceRank = practiceData[driverName];
+      const practiceFinish = Math.max(1, Math.min(40, practiceRank));
+      projFinish = projFinish * 0.92 + practiceFinish * 0.08;
+    }
     projFinish = Math.max(1, Math.min(40, Math.round(projFinish * 10) / 10));
-    const projStart = Math.max(1, Math.min(40, Math.round(avgStart)));
+    let projStart = Math.max(1, Math.min(40, Math.round(avgStart)));
+    // Override projStart with actual qualifying position when available
+    if (qualifyingData && qualifyingData[driverName]) {
+      projStart = qualifyingData[driverName];
+    }
 
     // Project fastest laps (DK only awards this; FD doesn't have FL points)
     // Every lap of the race awards 1 fastest lap (0.45 pts on DK), so totalLaps × share is the model.
@@ -6561,7 +6578,7 @@ function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
 }
 
 // §5 DFS TAB — Public-facing component
-function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
+function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool }) {
   const [platform, setPlatform]         = useState("dk");
   const [selectedWeek, setSelectedWeek] = useState("");
   const [viewMode, setViewMode]         = useState("top");
@@ -6584,7 +6601,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
 
   const runOptimizer = () => {
     if (!race || !hasCsv) return;
-    let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled);
+    let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled, qualPractice);
     projections = projections.map(p => {
       const sal = salaryData[p.driver] || 0;
       return { ...p, salary: sal, value: sal > 0 ? Math.round((p.diffPts / (sal / 1000)) * 100) / 100 : 0 };
@@ -6716,6 +6733,23 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
             }
           </div>
         </div>
+        {(() => {
+          const raceWeek = race ? (race.allStar ? "allstar" : race.week) : null;
+          const qpMatch = qualPractice && raceWeek != null && qualPractice.week === raceWeek;
+          const qpQualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
+          const qpPracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
+          return (
+            <div style={{ flex: "1 1 200px", padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 }}>🏁 Qualifying</div>
+              <div style={{ fontSize: 12, color: qpMatch && qpQualCount > 0 ? T.green : T.gold, fontFamily: "'IBM Plex Mono',monospace" }}>
+                {qpMatch && qpQualCount > 0
+                  ? `✓ ${raceWeek === "allstar" ? "All-Star" : `Wk ${raceWeek}`} · ${qpQualCount} drivers${qpPracCount > 0 ? ` + Practice` : ""}`
+                  : "⚠ No data — using historical estimates"
+                }
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* EXCLUDED DRIVERS */}
@@ -7128,13 +7162,17 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
 }
 
 // §6 DFS ADMIN SECTION
-function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave }) {
+function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave }) {
   const [activePlatform, setActivePlatform] = useState("dk");
   const [uploadMsg, setUploadMsg]           = useState("");
   const [disableDriverName, setDisableDriverName] = useState("");
   const [disableReason, setDisableReason]   = useState("");
   const [manualName, setManualName]         = useState("");
   const [manualSalary, setManualSalary]     = useState("");
+  const [qualText, setQualText]             = useState("");
+  const [practiceText, setPracticeText]     = useState("");
+  const [qualWeek, setQualWeek]             = useState("");
+  const [qualMsg, setQualMsg]               = useState("");
 
   const inputStyle = { width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", fontFamily: "'Barlow',sans-serif" };
   const btnStyle = (c) => ({ padding: "8px 18px", background: c, border: "none", color: "#fff", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" });
@@ -7226,6 +7264,127 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
     onDfsDisabledSave((dfsDisabled || []).filter(d => d.name !== name));
     setUploadMsg(`✓ Re-enabled ${name}`);
   };
+
+  // Parse qualifying/practice text into { driverName: position } map
+  const parseQualPracticeText = (text) => {
+    if (!text || !text.trim()) return { results: {}, unmatched: [] };
+    const lines = text.trim().split("\n").filter(l => l.trim());
+    const results = {};
+    const unmatched = [];
+    let position = 1;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      // Try tab-separated format first (NASCAR.com copy-paste)
+      const tabParts = trimmed.split("\t").map(s => s.trim()).filter(Boolean);
+      // Try 2+ space separated format
+      const spaceParts = trimmed.split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+      const parts = tabParts.length >= 2 ? tabParts : spaceParts.length >= 2 ? spaceParts : null;
+      let driverName = null;
+      let pos = position;
+      if (parts && parts.length >= 2) {
+        // Check if first column is numeric (position)
+        const firstNum = parseInt(parts[0]);
+        if (!isNaN(firstNum) && firstNum >= 1 && firstNum <= 50) {
+          pos = firstNum;
+          // Find the driver name column — match against known drivers
+          for (let c = 1; c < parts.length; c++) {
+            const normalized = normalizeCsvDriverName(parts[c]);
+            if (FULL_TIMER_NAMES.includes(normalized)) { driverName = normalized; break; }
+            // Try fuzzy match
+            const fuzzy = FULL_TIMER_NAMES.find(d => {
+              const dl = d.toLowerCase(), pl = parts[c].toLowerCase();
+              return dl === pl || pl.includes(dl) || dl.includes(pl);
+            });
+            if (fuzzy) { driverName = fuzzy; break; }
+          }
+          // If no match found in multi-col, try column 1 raw
+          if (!driverName) {
+            const normalized = normalizeCsvDriverName(parts[1]);
+            if (FULL_TIMER_NAMES.includes(normalized)) driverName = normalized;
+            else unmatched.push(parts[1]);
+          }
+        } else {
+          // No position column — try to find driver name in any column
+          for (let c = 0; c < parts.length; c++) {
+            const normalized = normalizeCsvDriverName(parts[c]);
+            if (FULL_TIMER_NAMES.includes(normalized)) { driverName = normalized; break; }
+            const fuzzy = FULL_TIMER_NAMES.find(d => {
+              const dl = d.toLowerCase(), pl = parts[c].toLowerCase();
+              return dl === pl || pl.includes(dl) || dl.includes(pl);
+            });
+            if (fuzzy) { driverName = fuzzy; break; }
+          }
+          if (!driverName) {
+            const normalized = normalizeCsvDriverName(parts[0]);
+            if (FULL_TIMER_NAMES.includes(normalized)) driverName = normalized;
+            else unmatched.push(parts[0]);
+          }
+        }
+      } else {
+        // Single-column: "1. Kyle Larson" or "1 Kyle Larson" or just "Kyle Larson"
+        const numbered = trimmed.match(/^(\d+)[.\s)\-]+\s*(.+)$/);
+        if (numbered) {
+          pos = parseInt(numbered[1]);
+          const normalized = normalizeCsvDriverName(numbered[2].trim());
+          if (FULL_TIMER_NAMES.includes(normalized)) driverName = normalized;
+          else {
+            const fuzzy = FULL_TIMER_NAMES.find(d => { const dl = d.toLowerCase(), nl = numbered[2].trim().toLowerCase(); return dl === nl || nl.includes(dl) || dl.includes(nl); });
+            if (fuzzy) driverName = fuzzy;
+            else unmatched.push(numbered[2].trim());
+          }
+        } else {
+          const normalized = normalizeCsvDriverName(trimmed);
+          if (FULL_TIMER_NAMES.includes(normalized)) driverName = normalized;
+          else {
+            const fuzzy = FULL_TIMER_NAMES.find(d => { const dl = d.toLowerCase(), tl = trimmed.toLowerCase(); return dl === tl || tl.includes(dl) || dl.includes(tl); });
+            if (fuzzy) driverName = fuzzy;
+            else unmatched.push(trimmed);
+          }
+        }
+      }
+      if (driverName && !results[driverName]) {
+        results[driverName] = pos;
+      }
+      position++;
+    }
+    return { results, unmatched };
+  };
+
+  const handleQualImport = () => {
+    if (!qualWeek) { setQualMsg("❌ Select a race week first"); return; }
+    const { results: qualResults, unmatched: qualUnmatched } = parseQualPracticeText(qualText);
+    const { results: practiceResults, unmatched: practiceUnmatched } = parseQualPracticeText(practiceText);
+    if (Object.keys(qualResults).length === 0 && Object.keys(practiceResults).length === 0) {
+      setQualMsg("❌ No drivers matched from either text area");
+      return;
+    }
+    const weekVal = qualWeek === "allstar" ? "allstar" : parseInt(qualWeek);
+    const updated = {
+      week: weekVal,
+      qualifying: qualResults,
+      practice: practiceResults,
+      updated: new Date().toISOString(),
+    };
+    onQualPracticeSave(updated);
+    const allUnmatched = [...new Set([...qualUnmatched, ...practiceUnmatched])];
+    const qCount = Object.keys(qualResults).length;
+    const pCount = Object.keys(practiceResults).length;
+    let msg = `✓ Imported ${qCount} qualifying`;
+    if (pCount > 0) msg += ` + ${pCount} practice`;
+    msg += " drivers";
+    if (allUnmatched.length > 0) msg += ` · Unmatched: ${allUnmatched.join(", ")}`;
+    setQualMsg(msg);
+    setQualText("");
+    setPracticeText("");
+  };
+
+  // Current qualifying status
+  const qualWeekLabel = qualPractice?.week != null
+    ? (qualPractice.week === "allstar" ? "All-Star" : `Week ${qualPractice.week}`)
+    : null;
+  const qualCount = qualPractice?.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
+  const practiceCount = qualPractice?.practice ? Object.keys(qualPractice.practice).length : 0;
 
   const currentSalaries = dfsSalaries?.[activePlatform] || {};
   const salaryCount = Object.keys(currentSalaries).length;
@@ -7331,6 +7490,74 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
           {uploadMsg}
         </div>
       )}
+
+      {/* ─── QUALIFYING & PRACTICE DATA ─── */}
+      <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: T.accent, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>🏁 Qualifying & Practice Data</div>
+          <div style={{ fontSize: 11, color: T.textDim, marginTop: 2 }}>Paste from NASCAR.com. Practice results are optional.</div>
+        </div>
+
+        {/* Current status */}
+        <div style={{ padding: "8px 12px", background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 }}>Current Data</div>
+          <div style={{ fontSize: 12, color: qualCount > 0 ? T.green : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+            {qualCount > 0
+              ? `✓ ${qualWeekLabel} qualifying: ${qualCount} drivers${practiceCount > 0 ? ` + ${practiceCount} practice` : ""}${qualPractice?.updated ? ` · ${new Date(qualPractice.updated).toLocaleString()}` : ""}`
+              : "No qualifying data saved"
+            }
+          </div>
+        </div>
+
+        {/* Race week selector */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Race Week</label>
+          <select value={qualWeek} onChange={e => setQualWeek(e.target.value)}
+            style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none" }}>
+            <option value="">Choose a race…</option>
+            {SCHEDULE.map(r => (
+              <option key={r.allStar ? "allstar" : r.week} value={r.allStar ? "allstar" : r.week}>
+                {r.allStar ? "★" : `Wk ${r.week}`} · {r.date} · {r.name}{r.allStar ? " (Non-Points)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Qualifying text area */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Qualifying Results (paste from qualifying tab)</label>
+          <textarea value={qualText} onChange={e => setQualText(e.target.value)} rows={7}
+            placeholder="Paste qualifying results here…"
+            style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "10px 12px", fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", outline: "none", resize: "vertical", lineHeight: 1.6 }} />
+        </div>
+
+        {/* Practice text area */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Practice Results (optional)</label>
+          <textarea value={practiceText} onChange={e => setPracticeText(e.target.value)} rows={5}
+            placeholder="Paste practice results…"
+            style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "10px 12px", fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", outline: "none", resize: "vertical", lineHeight: 1.6 }} />
+        </div>
+
+        {/* Import button + status */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={handleQualImport}
+            style={{ padding: "9px 22px", background: "linear-gradient(135deg, #06b6d4, #1e90ff)", border: "none", color: "#fff", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", boxShadow: "0 4px 14px rgba(6,182,212,0.3)" }}>
+            Import & Save
+          </button>
+          {qualCount > 0 && (
+            <button onClick={() => { if (window.confirm("Clear qualifying & practice data?")) { onQualPracticeSave(null); setQualMsg("✓ Cleared"); } }}
+              style={{ ...btnStyle("#334155"), padding: "9px 16px" }}>
+              Clear Data
+            </button>
+          )}
+          {qualMsg && (
+            <span style={{ fontSize: 12, color: qualMsg.startsWith("✓") ? T.green : qualMsg.includes("Unmatched") ? T.gold : T.red, fontFamily: "'IBM Plex Mono',monospace" }}>
+              {qualMsg}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -7365,6 +7592,7 @@ export default function NASCARHub() {
   // DFS Optimizer state — persisted via Supabase
   const [dfsSalaries, setDfsSalaries] = useState({});
   const [dfsDisabled, setDfsDisabled] = useState([]);
+  const [qualPractice, setQualPractice] = useState(null);
 
   // Tool Usage — per-tool counters, persisted via Supabase
   const [toolUsage, setToolUsage] = useState({});
@@ -7475,6 +7703,13 @@ export default function NASCARHub() {
     } catch (e) { console.error("DFS disabled save:", e); }
   }, []);
 
+  const saveQualPractice = useCallback(async (updated) => {
+    setQualPractice(updated);
+    try {
+      await sb.from("app_state").upsert({ key:"dfsQualifying", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("DFS qualifying save:", e); }
+  }, []);
+
   // Increment a tool usage counter — queues if Supabase hasn't loaded yet
   // Uses read-merge-write so concurrent visitors don't overwrite each other's counts
   const toolUsageSaveTimer = useRef(null);
@@ -7541,7 +7776,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     loadFromSupabase().then(data => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -7553,6 +7788,7 @@ export default function NASCARHub() {
       if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
       if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
       if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
+      if (qpRows?.[0]) setQualPractice(qpRows[0].value||null);
       setSbStatus("live");
     });
     // Load tool usage separately (it's also in app_state)
@@ -7753,7 +7989,7 @@ export default function NASCARHub() {
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
-              {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} incrementTool={incrementTool} />}
+              {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} qualPractice={qualPractice} incrementTool={incrementTool} />}
             </div>
           </main>
 
@@ -7787,6 +8023,8 @@ export default function NASCARHub() {
           onDfsSalariesSave={saveDfsSalaries}
           dfsDisabled={dfsDisabled}
           onDfsDisabledSave={saveDfsDisabled}
+          qualPractice={qualPractice}
+          onQualPracticeSave={saveQualPractice}
         />
 
         {/* FOOTER */}
