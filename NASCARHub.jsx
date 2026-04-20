@@ -6170,11 +6170,12 @@ const DFS_PLATFORMS = {
 // §2 SCORING ENGINES
 function dfsScoreDK(fin, start, lapsLed, totalLaps, isMostLapsLed, projectedFL) {
   let finPts = 0;
-  if (fin === 1)       finPts = 45;
+  if (fin === 1)       finPts = 46;
   else if (fin === 2)  finPts = 42;
-  else if (fin <= 43)  finPts = 43 - fin;
+  else if (fin === 3)  finPts = 41;
+  else if (fin <= 43)  finPts = 44 - fin;
   else                 finPts = 1;
-  const placeDiff  = (start - fin) * 0.5;
+  const placeDiff  = (start - fin) * 1.0;
   const ledPts     = lapsLed * 0.25;
   const fastLapPts = (projectedFL || 0) * 0.45;
   const mostBonus  = isMostLapsLed ? 5 : 0;
@@ -6262,6 +6263,9 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
     } else {
       projectedPts = dfsScoreFD(Math.round(projFinish), projStart, projLapsLed, totalLaps, totalLaps);
     }
+    // diffPts: strip laps-completed floor for FD so value calc isn't inflated
+    const lapsCompletedFloor = (platformId === "fd") ? (totalLaps * 0.1) : 0;
+    const diffPts = Math.round((projectedPts - lapsCompletedFloor) * 10) / 10;
     const dInfo = INITIAL_DRIVERS.find(d => d.name === driverName);
     const tags = [];
     if (trackWins >= 2) tags.push("Track Ace");
@@ -6279,6 +6283,7 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
       mfg: dInfo?.mfg || "",
       rookie: dInfo?.rookie || false,
       projectedPts: Math.round(projectedPts * 10) / 10,
+      diffPts,
       projFinish: Math.round(projFinish * 10) / 10,
       projStart,
       projLapsLed,
@@ -6295,7 +6300,7 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers) {
       value: 0,
     });
   }
-  projections.sort((a, b) => b.projectedPts - a.projectedPts);
+  projections.sort((a, b) => b.diffPts - a.diffPts);
   return projections;
 }
 
@@ -6315,7 +6320,7 @@ function dfsUpgradeLineup(lineup, eligible, salaryCap) {
   const usedNums = () => new Set(current.map(d => d.num));
 
   // Candidate pool sorted by projected points (best first)
-  const byPtsDesc = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
+  const byPtsDesc = [...eligible].sort((a, b) => b.diffPts - a.diffPts);
 
   // Keep upgrading: swap cheapest lineup slot for a more expensive + better driver
   // Continue until we can't find any more beneficial swaps (not just until floor is met)
@@ -6334,7 +6339,7 @@ function dfsUpgradeLineup(lineup, eligible, salaryCap) {
         if (candidate.salary <= slot.salary) continue;
         if (candidate.salary > budget) continue;
         // Only require the candidate to project higher points (strict improvement)
-        if (candidate.projectedPts <= slot.projectedPts) continue;
+        if (candidate.diffPts <= slot.diffPts) continue;
         // Swap
         const idx = current.findIndex(d => d.num === slot.num);
         totalSalary = totalSalary - slot.salary + candidate.salary;
@@ -6367,11 +6372,11 @@ function dfsForceTopTier(lineup, eligible, rosterSize, salaryCap, minTopTier, th
   // Get top-tier drivers not in lineup, sorted by projected pts
   const topTierPool = [...eligible]
     .filter(d => d.salary >= threshold)
-    .sort((a, b) => b.projectedPts - a.projectedPts);
+    .sort((a, b) => b.diffPts - a.diffPts);
 
   // Sort current lineup by salary ascending (swap out cheapest)
   let needed = minTopTier - topTierCount;
-  const nonTopTier = current.filter(d => d.salary < threshold).sort((a, b) => a.projectedPts - b.projectedPts);
+  const nonTopTier = current.filter(d => d.salary < threshold).sort((a, b) => a.diffPts - b.diffPts);
 
   for (const slot of nonTopTier) {
     if (needed <= 0) break;
@@ -6420,16 +6425,16 @@ function dfsGreedyLineup(pool, rosterSize, salaryCap) {
   return lineup.length === rosterSize ? lineup : null;
 }
 
-// Stars & Scrubs: Lock top 2-3 highest-projected studs, fill rest with best value bargains
+// Stars & Scrubs: Lock top studs (3 for FD/5-man, 2 for DK/6-man), fill rest with best value bargains
 function dfsStarsAndScrubs(eligible, rosterSize, salaryCap) {
-  const byPts   = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
-  const highSalary = eligible.filter(d => d.salary >= DFS_TOP_TIER_THRESHOLD).sort((a, b) => b.projectedPts - a.projectedPts);
-  // Pick top 2 studs (must be high salary)
-  const stars = highSalary.slice(0, 2);
-  if (stars.length < 2) {
-    // Fallback: top 2 by pts regardless of salary
-    const fallbackStars = byPts.slice(0, 2).filter(d => d.salary > 0);
-    if (fallbackStars.length < 2) return null;
+  const byPts   = [...eligible].sort((a, b) => b.diffPts - a.diffPts);
+  const highSalary = eligible.filter(d => d.salary >= DFS_TOP_TIER_THRESHOLD).sort((a, b) => b.diffPts - a.diffPts);
+  const starCount = rosterSize <= 5 ? 3 : 2;  // FD: 3 studs of 5, DK: 2 studs of 6
+  const stars = highSalary.slice(0, starCount);
+  if (stars.length < starCount) {
+    // Fallback: top by pts regardless of salary
+    const fallbackStars = byPts.slice(0, starCount).filter(d => d.salary > 0);
+    if (fallbackStars.length < starCount) return null;
     stars.length = 0;
     stars.push(...fallbackStars);
   }
@@ -6463,7 +6468,7 @@ function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
   const used = new Set();
   // First pass: pick best pts from each tier
   for (const tier of tiers) {
-    const tierByPts = [...tier].sort((a, b) => b.projectedPts - a.projectedPts);
+    const tierByPts = [...tier].sort((a, b) => b.diffPts - a.diffPts);
     let picked = false;
     for (const d of tierByPts) {
       if (used.has(d.num) || d.salary > remaining) continue;
@@ -6475,7 +6480,7 @@ function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
     }
     if (!picked) {
       // Fallback: any eligible driver
-      for (const d of [...eligible].sort((a, b) => b.projectedPts - a.projectedPts)) {
+      for (const d of [...eligible].sort((a, b) => b.diffPts - a.diffPts)) {
         if (used.has(d.num) || d.salary <= 0 || d.salary > remaining) continue;
         lineup.push(d);
         remaining -= d.salary;
@@ -6487,10 +6492,11 @@ function dfsBalancedLineup(eligible, rosterSize, salaryCap) {
   return lineup.length === rosterSize ? lineup : null;
 }
 
-// Contrarian: Skip top 5 chalk picks, build from mid-tier for low-ownership upside
+// Contrarian: Skip top chalk picks, build from mid-tier for low-ownership upside
 function dfsContrarianLineup(eligible, rosterSize, salaryCap) {
-  const byPts = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
-  const topNums = new Set(byPts.slice(0, 5).map(d => d.num));
+  const byPts = [...eligible].sort((a, b) => b.diffPts - a.diffPts);
+  const skipCount = rosterSize <= 5 ? 3 : 5;  // FD: skip top 3, DK: skip top 5
+  const topNums = new Set(byPts.slice(0, skipCount).map(d => d.num));
   const pool = [...eligible].filter(d => !topNums.has(d.num));
   // Pick by value among non-chalk
   const byValue = [...pool].sort((a, b) => b.value - a.value);
@@ -6499,12 +6505,12 @@ function dfsContrarianLineup(eligible, rosterSize, salaryCap) {
 
 // Max Points: Simply take highest projected pts drivers that fit under cap
 function dfsMaxPointsLineup(eligible, rosterSize, salaryCap) {
-  const byPts = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts);
+  const byPts = [...eligible].sort((a, b) => b.diffPts - a.diffPts);
   return dfsGreedyLineup(byPts, rosterSize, salaryCap);
 }
 
 function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
-  const eligible = projections.filter(p => p.salary > 0 && p.projectedPts > 0);
+  const eligible = projections.filter(p => p.salary > 0 && p.diffPts > 0);
   if (eligible.length < rosterSize) return [];
   const lineups = [];
   const seen    = new Set();
@@ -6515,13 +6521,15 @@ function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
     const key = lineup.map(d => d.num).sort().join(",");
     if (seen.has(key)) return;
     seen.add(key);
-    const totalSalary = lineup.reduce((s, d) => s + d.salary, 0);
-    const totalPts    = lineup.reduce((s, d) => s + d.projectedPts, 0);
+    const totalSalary  = lineup.reduce((s, d) => s + d.salary, 0);
+    const totalPts     = lineup.reduce((s, d) => s + d.projectedPts, 0);
+    const totalDiffPts = lineup.reduce((s, d) => s + d.diffPts, 0);
     lineups.push({
-      drivers: lineup.sort((a, b) => b.projectedPts - a.projectedPts),
+      drivers: lineup.sort((a, b) => b.diffPts - a.diffPts),
       strategy,
       totalSalary,
       totalPts: Math.round(totalPts * 10) / 10,
+      totalDiffPts: Math.round(totalDiffPts * 10) / 10,
       remaining: salaryCap - totalSalary,
     });
   };
@@ -6536,7 +6544,7 @@ function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
 
   // If we still have few lineups, try variations with different stud anchors
   if (lineups.length < 3) {
-    const topDrivers = [...eligible].sort((a, b) => b.projectedPts - a.projectedPts).slice(0, 6);
+    const topDrivers = [...eligible].sort((a, b) => b.diffPts - a.diffPts).slice(0, 6);
     for (let i = 0; i < topDrivers.length && lineups.length < 5; i++) {
       const anchor = topDrivers[i];
       const rest = eligible.filter(d => d.num !== anchor.num);
@@ -6548,7 +6556,7 @@ function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
     }
   }
 
-  lineups.sort((a, b) => b.totalPts - a.totalPts);
+  lineups.sort((a, b) => b.totalDiffPts - a.totalDiffPts);
   return lineups.slice(0, count || 5);
 }
 
@@ -6559,6 +6567,8 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
   const [viewMode, setViewMode]         = useState("top");
   const [lineups, setLineups]           = useState([]);
   const [allProjections, setAllProjections] = useState([]);
+  const [customLineup, setCustomLineup] = useState([]);
+  const [customSearch, setCustomSearch] = useState("");
 
   useEffect(() => { incrementTool?.("dfs_optimizer"); }, []);
 
@@ -6577,7 +6587,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
     let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled);
     projections = projections.map(p => {
       const sal = salaryData[p.driver] || 0;
-      return { ...p, salary: sal, value: sal > 0 ? Math.round((p.projectedPts / (sal / 1000)) * 100) / 100 : 0 };
+      return { ...p, salary: sal, value: sal > 0 ? Math.round((p.diffPts / (sal / 1000)) * 100) / 100 : 0 };
     });
     setAllProjections(projections);
     if (!hasSalary) { setLineups([]); return; }
@@ -6637,9 +6647,13 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
             {[
               ["Max Points", "Prioritizes highest raw projected points"],
-              ["Stars & Scrubs", "Locks in 2 top-salary studs, fills rest with bargains"],
+              ["Stars & Scrubs", platform === "fd"
+                ? "Locks in 3 top-salary studs, fills rest with best value"
+                : "Locks in 2 top-salary studs, fills rest with bargains"],
               ["Balanced", "Picks one driver from each salary tier"],
-              ["Contrarian", "Skips the top-5 chalk picks for low-ownership upside"],
+              ["Contrarian", platform === "fd"
+                ? "Skips the top-3 chalk picks for low-ownership upside"
+                : "Skips the top-5 chalk picks for low-ownership upside"],
               ["Best Value", "Fills roster by highest points-per-$1K salary"],
             ].map(([l, d]) => (
               <div key={l}><span style={{ fontWeight: 700, color: col }}>{l}</span> — {d}</div>
@@ -6677,7 +6691,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
           </div>
           <div style={{ lineHeight: 1.7, borderTop: `1px solid ${T.border}`, paddingTop: 8 }}>
             {platform === "dk" ? (
-              <>Finish: 1st=45, 2nd=42, 3rd=40…40th=3 · Place Diff: ±0.5/pos · Laps Led: 0.25/lap · Fastest Laps: 0.45/lap · Most Laps Led Bonus: 5pts</>
+              <>Finish: 1st=46, 2nd=42, 3rd=41…40th=4 · Place Diff: ±1.0/pos · Laps Led: 0.25/lap · Fastest Laps: 0.45/lap · Most Laps Led Bonus: 5pts</>
             ) : (
               <>Finish: 1st=43, 2nd=40, 3rd=38, 4th=37…40th=1 · Place Diff: ±0.5/pos · Laps Led: 0.1/lap · Laps Completed: 0.1/lap</>
             )}
@@ -6753,6 +6767,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
           {[
             { id: "top",  label: "Top Lineups" },
             { id: "best", label: "Best Lineup" },
+            { id: "custom", label: "Build Your Own" },
             { id: "all",  label: "All Drivers" },
           ].map(tab => {
             const active = viewMode === tab.id;
@@ -6776,8 +6791,199 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, incrementTool }) {
         </div>
       )}
 
+      {/* BUILD YOUR OWN LINEUP */}
+      {viewMode === "custom" && allProjections.length > 0 && hasSalary && (() => {
+        const customPool = allProjections.filter(d => d.salary > 0);
+        const customNums = new Set(customLineup.map(d => d.num));
+        const totalSalary = customLineup.reduce((s, d) => s + d.salary, 0);
+        const totalPts = customLineup.reduce((s, d) => s + d.projectedPts, 0);
+        const remaining = plat.salaryCap - totalSalary;
+        const isFull = customLineup.length >= plat.rosterSize;
+        const bestPts = lineups.length > 0 ? lineups[0].totalPts : 0;
+        const filtered = customPool.filter(d => {
+          if (customNums.has(d.num)) return false;
+          if (customSearch && !d.driver.toLowerCase().includes(customSearch.toLowerCase())) return false;
+          return true;
+        }).sort((a, b) => b.diffPts - a.diffPts);
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Summary bar */}
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>
+                    {customLineup.length} / {plat.rosterSize}
+                  </span>
+                  <span style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>drivers selected</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {isFull && (
+                    <span style={{ fontSize: 20, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>{fmtPts(totalPts)} pts</span>
+                  )}
+                  {customLineup.length > 0 && (
+                    <button onClick={() => { setCustomLineup([]); setCustomSearch(""); }}
+                      style={{ padding: "4px 10px", fontSize: 10, fontWeight: 700, color: T.red, background: T.redBg, border: `1px solid ${T.red}30`, borderRadius: 6, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 0.5 }}>
+                      Clear All
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 4, letterSpacing: 1 }}>
+                <span>SALARY: {fmtSalary(totalSalary)} / {fmtSalary(plat.salaryCap)}</span>
+                <span>{fmtSalary(remaining)} remaining</span>
+              </div>
+              <div style={{ height: 6, background: T.surface3, borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pctBar(totalSalary, plat.salaryCap)}%`, background: pctBar(totalSalary, plat.salaryCap) >= 90 ? `linear-gradient(90deg, ${T.green}, ${T.green}88)` : `linear-gradient(90deg, ${col}, ${col}88)`, borderRadius: 3, transition: "width 0.3s ease" }} />
+              </div>
+              {/* Selected drivers mini-list */}
+              {customLineup.length > 0 && (
+                <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {[...customLineup].sort((a, b) => b.diffPts - a.diffPts).map(d => (
+                    <div key={d.num} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: `${col}12`, border: `1px solid ${col}30`, borderRadius: 6, fontSize: 11, color: T.text, fontFamily: "'IBM Plex Mono',monospace" }}>
+                      <span style={{ fontWeight: 700, color: col }}>#{d.num}</span> {d.driver.split(" ").pop()}
+                      <span style={{ color: T.textDim, fontSize: 9 }}>{fmtSalary(d.salary)}</span>
+                      <button onClick={() => setCustomLineup(prev => prev.filter(p => p.num !== d.num))}
+                        style={{ background: "none", border: "none", color: T.red, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Completed lineup card */}
+            {isFull && (
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: `${col}08` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>✎</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>Your Lineup</div>
+                      <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                        {customLineup.length} drivers · {fmtSalary(totalSalary)} used · {fmtSalary(remaining)} left
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif", lineHeight: 1 }}>{fmtPts(totalPts)}</div>
+                    <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>PROJ PTS</div>
+                  </div>
+                </div>
+                <div style={{ padding: "8px 16px", borderBottom: `1px solid ${T.border}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 4, letterSpacing: 1 }}>
+                    <span>SALARY CAP {pctBar(totalSalary, plat.salaryCap) >= 90 ? "" : "⚠ BELOW FLOOR"}</span>
+                    <span>{pctBar(totalSalary, plat.salaryCap)}% used</span>
+                  </div>
+                  <div style={{ height: 6, background: T.surface3, borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pctBar(totalSalary, plat.salaryCap)}%`, background: pctBar(totalSalary, plat.salaryCap) >= 90 ? `linear-gradient(90deg, ${T.green}, ${T.green}88)` : `linear-gradient(90deg, ${col}, ${col}88)`, borderRadius: 3, transition: "width 0.3s ease" }} />
+                  </div>
+                </div>
+                <div>
+                  {[...customLineup].sort((a, b) => b.diffPts - a.diffPts).map((d, di) => {
+                    const tierColor = di === 0 ? T.gold : di < 3 ? col : T.textMid;
+                    return (
+                      <div key={d.num} style={{ padding: "10px 16px", borderBottom: di < customLineup.length - 1 ? `1px solid ${T.border}` : "none", display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${tierColor}18`, border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, color: tierColor, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif" }}>{di + 1}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>#{d.num} {d.driver}</span>
+                            {d.rookie && <span style={{ fontSize: 8, fontWeight: 700, color: "#4ade80", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 3, padding: "1px 5px", letterSpacing: 0.8 }}>ROOKIE</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: T.textDim, marginTop: 1 }}>{d.team} · {d.mfg}</div>
+                          <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
+                            {[
+                              ["Proj Fin", d.projFinish, col],
+                              ["Trk Avg", d.trackAvg, TC[race?.type] || T.accent],
+                              ["Recent", d.recentAvg, T.accentText],
+                              ["Laps Led", d.projLapsLed, T.gold],
+                              ...(platform === "dk" ? [["Fast Laps", d.projectedFL || 0, T.green]] : []),
+                            ].map(([l, v, c]) => (
+                              <div key={l} style={{ fontSize: 10 }}>
+                                <span style={{ color: T.textDim }}>{l}: </span>
+                                <span style={{ color: c, fontWeight: 700 }}>{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {d.tags?.length > 0 && (
+                            <div style={{ marginTop: 4, display: "flex", gap: 3, flexWrap: "wrap" }}>
+                              {d.tags.map(t => (
+                                <span key={t} style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: `${col}18`, color: col, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 0.5 }}>{t}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>{fmtPts(d.projectedPts)}</div>
+                          <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>{fmtSalary(d.salary)}</div>
+                          <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{d.value.toFixed(1)} pts/$K</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Comparison line */}
+            {isFull && bestPts > 0 && (
+              <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "10px 0", fontSize: 12, fontFamily: "'IBM Plex Mono',monospace" }}>
+                <span style={{ color: T.textDim }}>Optimizer Best: <span style={{ fontWeight: 700, color: T.text }}>{fmtPts(bestPts)}</span></span>
+                <span style={{ color: T.textDim }}>Your Lineup: <span style={{ fontWeight: 700, color: col }}>{fmtPts(totalPts)}</span></span>
+                <span style={{ color: totalPts >= bestPts ? T.green : T.red, fontWeight: 700 }}>
+                  {totalPts >= bestPts ? "+" : ""}{fmtPts(totalPts - bestPts)}
+                </span>
+              </div>
+            )}
+
+            {/* Driver picker */}
+            {!isFull && (
+              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "10px 16px", borderBottom: `1px solid ${T.border}` }}>
+                  <input
+                    type="text" placeholder="Search drivers…" value={customSearch} onChange={e => setCustomSearch(e.target.value)}
+                    style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "8px 12px", fontSize: 12, outline: "none", fontFamily: "'IBM Plex Mono',monospace", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                  {filtered.map(d => {
+                    const tooExpensive = d.salary > remaining;
+                    return (
+                      <div key={d.num} style={{ padding: "8px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, opacity: tooExpensive ? 0.4 : 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>#{d.num} {d.driver}{d.rookie && <span style={{ fontSize: 8, color: "#4ade80", marginLeft: 5 }}>ROOKIE</span>}</div>
+                          <div style={{ fontSize: 10, color: T.textDim }}>{d.team} · {d.mfg}</div>
+                          <div style={{ display: "flex", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 9, color: T.textDim }}>Proj: <span style={{ color: col, fontWeight: 700 }}>{fmtPts(d.projectedPts)}</span></span>
+                            <span style={{ fontSize: 9, color: T.textDim }}>Fin: <span style={{ fontWeight: 700, color: T.text }}>{d.projFinish}</span></span>
+                            <span style={{ fontSize: 9, color: T.textDim }}>Val: <span style={{ fontWeight: 700, color: T.text }}>{d.value.toFixed(1)}</span></span>
+                          </div>
+                          {d.tags?.length > 0 && (
+                            <div style={{ marginTop: 3, display: "flex", gap: 3, flexWrap: "wrap" }}>
+                              {d.tags.map(t => (
+                                <span key={t} style={{ fontSize: 7, fontWeight: 700, padding: "1px 4px", borderRadius: 3, background: `${col}18`, color: col, fontFamily: "'IBM Plex Mono',monospace" }}>{t}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0, marginRight: 6 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>{fmtSalary(d.salary)}</div>
+                        </div>
+                        <button onClick={() => { if (!tooExpensive) setCustomLineup(prev => [...prev, d]); }}
+                          disabled={tooExpensive}
+                          style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, color: tooExpensive ? T.textDim : "#fff", background: tooExpensive ? T.surface2 : col, border: "none", borderRadius: 6, cursor: tooExpensive ? "default" : "pointer", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", flexShrink: 0 }}>
+                          Add
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* LINEUP CARDS */}
-      {viewMode !== "all" && lineups.length > 0 && (() => {
+      {viewMode !== "all" && viewMode !== "custom" && lineups.length > 0 && (() => {
         const displayLineups = viewMode === "best" ? lineups.slice(0, 1) : lineups;
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
