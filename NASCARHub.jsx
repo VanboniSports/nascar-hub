@@ -83,6 +83,17 @@ const BATTLE_TRACK_COLORS = {
 };
 
 // ─────────────────────────────────────────────────────────────
+// BLOG CATEGORIES & COLORS
+// ─────────────────────────────────────────────────────────────
+const BLOG_CATEGORIES = ["Race Recaps", "DFS Picks & Strategy", "Weekly Predictions", "General"];
+const BLOG_CAT_COLORS = {
+  "Race Recaps": "#3b82f6",
+  "DFS Picks & Strategy": "#22c55e",
+  "Weekly Predictions": "#f97316",
+  "General": "#6b7280",
+};
+
+// ─────────────────────────────────────────────────────────────
 // SUPABASE
 // ─────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://xhywifoacvdwkrzunzpg.supabase.co";
@@ -387,6 +398,15 @@ const Ic = {
   Alert:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
   Users:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   Refresh: ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  Edit:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  Trash:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  Image:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+  Bold:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>,
+  Italic:  ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>,
+  Link:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  List:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
+  ArrowLeft:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+  Eye:     ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -617,6 +637,7 @@ const TABS = [
   { id:"analytics", label:"Driver Analytics",icon:"Trend"  },
   { id:"season",    label:"Season Stats",   icon:"Chart"   },
   { id:"dfs",       label:"DFS Optimizer",  icon:"Trophy"  },
+  { id:"blog",      label:"Blog",           icon:"Edit"    },
 ];
 
 const PR_SUBTABS = [
@@ -3102,7 +3123,7 @@ function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
 // ─────────────────────────────────────────────────────────────
 // GLOBAL ADMIN PANEL — lives at the bottom of the app
 // ─────────────────────────────────────────────────────────────
-function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave }) {
+function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -3296,7 +3317,7 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
               {/* Admin sub-nav */}
               <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, paddingBottom:0 }}>
-                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"},{id:"dfs",label:"DFS Salaries",icon:"Flag"},{id:"usage",label:"Tool Usage",icon:"Trend"}].map(tab => {
+                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"},{id:"dfs",label:"DFS Salaries",icon:"Flag"},{id:"blog",label:"Blog",icon:"Edit"},{id:"usage",label:"Tool Usage",icon:"Trend"}].map(tab => {
                   const active = adminSection === tab.id;
                   return (
                     <button key={tab.id} onClick={()=>setAdminSection(tab.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
@@ -3676,6 +3697,10 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
                   </div>
                 );
               })()}
+
+              {adminSection === "blog" && (
+                <BlogAdminSection blogPosts={blogPosts} onBlogSave={onBlogSave} />
+              )}
 
             </div>
           )}
@@ -6010,7 +6035,8 @@ async function loadFromSupabase() {
     const { data:dsRows }   = await sb.from("app_state").select("*").eq("key","dfsSalaries");
     const { data:ddRows }   = await sb.from("app_state").select("*").eq("key","dfsDisabled");
     const { data:qpRows }   = await sb.from("app_state").select("*").eq("key","dfsQualifying");
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows };
+    const { data:bpRows }   = await sb.from("app_state").select("*").eq("key","blogPosts");
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 
@@ -7602,6 +7628,457 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
 }
 
 // ─────────────────────────────────────────────────────────────
+// BLOG TAB — Public blog reader
+// ─────────────────────────────────────────────────────────────
+function BlogTab({ blogPosts }) {
+  const [catFilter, setCatFilter] = useState("All");
+  const [viewingPost, setViewingPost] = useState(null);
+
+  const published = useMemo(() =>
+    (blogPosts || [])
+      .filter(p => p.status === "published")
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+    [blogPosts]
+  );
+
+  const filtered = useMemo(() =>
+    catFilter === "All" ? published : published.filter(p => p.category === catFilter),
+    [published, catFilter]
+  );
+
+  const formatDate = (d) => {
+    try { return new Date(d).toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" }); }
+    catch { return d; }
+  };
+
+  const getSnippet = (html) => {
+    if (!html) return "";
+    const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+    return text.length > 150 ? text.slice(0, 150) + "…" : text;
+  };
+
+  // Full article view
+  if (viewingPost) {
+    return (
+      <div style={{ maxWidth:780, margin:"0 auto", animation:"fadeIn 0.2s ease" }}>
+        <button onClick={() => setViewingPost(null)} style={{
+          display:"flex", alignItems:"center", gap:6, padding:"8px 0", marginBottom:16,
+          background:"none", border:"none", color:T.accent, cursor:"pointer",
+          fontSize:13, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase",
+        }}><Ic.ArrowLeft /> Back to Blog</button>
+
+        {viewingPost.featured_image && (
+          <div style={{ borderRadius:12, overflow:"hidden", marginBottom:24, border:`1px solid ${T.border}` }}>
+            <img src={viewingPost.featured_image} alt="" style={{ width:"100%", maxHeight:400, objectFit:"cover", display:"block" }} />
+          </div>
+        )}
+
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+          <span style={{
+            padding:"3px 10px", borderRadius:4, fontSize:10, fontWeight:700,
+            fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase",
+            background:`${BLOG_CAT_COLORS[viewingPost.category] || T.textDim}20`,
+            color: BLOG_CAT_COLORS[viewingPost.category] || T.textDim,
+            border:`1px solid ${BLOG_CAT_COLORS[viewingPost.category] || T.textDim}40`,
+          }}>{viewingPost.category}</span>
+          <span style={{ fontSize:12, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{formatDate(viewingPost.created_at)}</span>
+        </div>
+
+        <h1 style={{
+          fontSize:32, fontWeight:900, fontFamily:"'Barlow Condensed',sans-serif",
+          letterSpacing:1, lineHeight:1.2, color:T.text, margin:"0 0 24px",
+        }}>{viewingPost.title}</h1>
+
+        <div
+          className="blog-article-body"
+          dangerouslySetInnerHTML={{ __html: viewingPost.body || "" }}
+          style={{
+            fontSize:16, lineHeight:1.8, color:T.textMid,
+            fontFamily:"'Barlow',sans-serif",
+          }}
+        />
+
+        <style>{`
+          .blog-article-body h1,.blog-article-body h2,.blog-article-body h3{color:${T.text};font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;margin:28px 0 12px;font-weight:800;}
+          .blog-article-body h1{font-size:26px} .blog-article-body h2{font-size:22px} .blog-article-body h3{font-size:18px}
+          .blog-article-body p{margin:0 0 16px}
+          .blog-article-body a{color:${T.accent};text-decoration:underline}
+          .blog-article-body img{max-width:100%;border-radius:8px;margin:16px 0;border:1px solid ${T.border}}
+          .blog-article-body ul,.blog-article-body ol{margin:0 0 16px 24px;color:${T.textMid}}
+          .blog-article-body li{margin-bottom:6px}
+          .blog-article-body blockquote{border-left:3px solid ${T.accent};padding:8px 16px;margin:16px 0;color:${T.textMid};background:${T.accentSoft};border-radius:0 8px 8px 0}
+          .blog-article-body strong,.blog-article-body b{color:${T.text};font-weight:700}
+        `}</style>
+      </div>
+    );
+  }
+
+  // Feed view
+  return (
+    <div style={{ maxWidth:780, margin:"0 auto" }}>
+      <div style={{ marginBottom:24 }}>
+        <h2 style={{ fontSize:24, fontWeight:900, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:3, textTransform:"uppercase", color:T.text, margin:"0 0 6px" }}>
+          VBS <span style={{ color:T.accent }}>Blog</span>
+        </h2>
+        <p style={{ fontSize:12, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", margin:0 }}>Race analysis, DFS strategy, predictions & more</p>
+      </div>
+
+      {/* Category filter */}
+      <div style={{ display:"flex", gap:6, marginBottom:24, flexWrap:"wrap" }}>
+        {["All", ...BLOG_CATEGORIES].map(cat => {
+          const active = catFilter === cat;
+          const col = cat === "All" ? T.accent : (BLOG_CAT_COLORS[cat] || T.textDim);
+          return (
+            <button key={cat} onClick={() => setCatFilter(cat)} style={{
+              padding:"6px 14px", fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif",
+              letterSpacing:1.5, textTransform:"uppercase", cursor:"pointer", borderRadius:6,
+              background: active ? col : T.surface2,
+              color: active ? "#fff" : T.textMid,
+              border:`1px solid ${active ? col : T.border}`,
+              transition:"all 0.15s",
+            }}>{cat}</button>
+          );
+        })}
+      </div>
+
+      {/* Posts feed */}
+      {filtered.length === 0 ? (
+        <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>
+          {published.length === 0 ? "No posts yet — check back soon!" : "No posts in this category."}
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {filtered.map(post => (
+            <button key={post.id} onClick={() => setViewingPost(post)} style={{
+              display:"flex", gap:16, padding:0, background:T.surface, border:`1px solid ${T.border}`,
+              borderRadius:12, cursor:"pointer", textAlign:"left", overflow:"hidden",
+              transition:"border-color 0.15s, box-shadow 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = T.accent; e.currentTarget.style.boxShadow = `0 4px 20px ${T.accentGlow}`; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              {post.featured_image && (
+                <div style={{ flex:"0 0 160px", minHeight:120 }}>
+                  <img src={post.featured_image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                </div>
+              )}
+              <div style={{ flex:1, padding:"16px 20px", display:"flex", flexDirection:"column", gap:8 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{
+                    padding:"2px 8px", borderRadius:4, fontSize:9, fontWeight:700,
+                    fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase",
+                    background:`${BLOG_CAT_COLORS[post.category] || T.textDim}20`,
+                    color: BLOG_CAT_COLORS[post.category] || T.textDim,
+                  }}>{post.category}</span>
+                  <span style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{formatDate(post.created_at)}</span>
+                </div>
+                <h3 style={{ fontSize:18, fontWeight:800, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5, color:T.text, margin:0, lineHeight:1.3 }}>
+                  {post.title}
+                </h3>
+                <p style={{ fontSize:13, color:T.textDim, lineHeight:1.5, margin:0 }}>{getSnippet(post.body)}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// BLOG ADMIN — Rich text editor + post management
+// ─────────────────────────────────────────────────────────────
+function BlogAdminSection({ blogPosts, onBlogSave }) {
+  const [blogView, setBlogView] = useState("list"); // "list" | "editor"
+  const [editingPost, setEditingPost] = useState(null);
+  const [blogTitle, setBlogTitle] = useState("");
+  const [blogCategory, setBlogCategory] = useState("General");
+  const [blogBody, setBlogBody] = useState("");
+  const [blogFeaturedImage, setBlogFeaturedImage] = useState("");
+  const [blogStatus, setBlogStatus] = useState("draft");
+  const [blogSaving, setBlogSaving] = useState(false);
+  const [blogMsg, setBlogMsg] = useState("");
+  const editorRef = useRef(null);
+
+  const inputStyle = { width:"100%", background:T.surface2, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"8px 12px", fontSize:13, outline:"none", fontFamily:"'Barlow',sans-serif" };
+  const btnStyle = (col) => ({ padding:"8px 18px", background:col, border:"none", color:"#fff", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" });
+
+  const sortedPosts = useMemo(() =>
+    [...(blogPosts || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+    [blogPosts]
+  );
+
+  const formatDate = (d) => {
+    try { return new Date(d).toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }); }
+    catch { return d; }
+  };
+
+  const resetEditor = () => {
+    setBlogTitle(""); setBlogCategory("General"); setBlogBody(""); setBlogFeaturedImage(""); setBlogStatus("draft"); setEditingPost(null); setBlogMsg("");
+    if (editorRef.current) editorRef.current.innerHTML = "";
+  };
+
+  const openEditor = (post) => {
+    if (post) {
+      setEditingPost(post);
+      setBlogTitle(post.title || "");
+      setBlogCategory(post.category || "General");
+      setBlogBody(post.body || "");
+      setBlogFeaturedImage(post.featured_image || "");
+      setBlogStatus(post.status || "draft");
+      setTimeout(() => { if (editorRef.current) editorRef.current.innerHTML = post.body || ""; }, 50);
+    } else {
+      resetEditor();
+    }
+    setBlogView("editor");
+  };
+
+  const execCmd = (cmd, val) => {
+    document.execCommand(cmd, false, val || null);
+    editorRef.current?.focus();
+  };
+
+  const handleInsertLink = () => {
+    const url = window.prompt("Enter URL:");
+    if (url) execCmd("createLink", url);
+  };
+
+  const handleInsertImage = () => {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        execCmd("insertImage", ev.target.result);
+      };
+      reader.readAsDataURL(file);
+    };
+    fileInput.click();
+  };
+
+  const handleFeaturedImage = () => {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 4 * 1024 * 1024) { setBlogMsg("⚠ Image too large — max 4MB."); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => { setBlogFeaturedImage(ev.target.result); };
+      reader.readAsDataURL(file);
+    };
+    fileInput.click();
+  };
+
+  const handleSavePost = async () => {
+    const body = editorRef.current?.innerHTML || "";
+    if (!blogTitle.trim()) { setBlogMsg("⚠ Title is required."); return; }
+    if (!body.trim() || body === "<br>") { setBlogMsg("⚠ Post body is required."); return; }
+    setBlogSaving(true);
+    const now = new Date().toISOString();
+    const post = {
+      id: editingPost?.id || Date.now().toString(),
+      title: blogTitle.trim(),
+      category: blogCategory,
+      body: body,
+      featured_image: blogFeaturedImage || "",
+      status: blogStatus,
+      created_at: editingPost?.created_at || now,
+      updated_at: now,
+    };
+    let updated;
+    if (editingPost) {
+      updated = (blogPosts || []).map(p => p.id === editingPost.id ? post : p);
+    } else {
+      updated = [...(blogPosts || []), post];
+    }
+    await onBlogSave(updated);
+    setBlogSaving(false);
+    setBlogMsg(`✓ Post ${editingPost ? "updated" : "created"} as ${blogStatus}.`);
+    resetEditor();
+    setBlogView("list");
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm("Delete this blog post?")) return;
+    const updated = (blogPosts || []).filter(p => p.id !== postId);
+    await onBlogSave(updated);
+  };
+
+  // Posts list view
+  if (blogView === "list") {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>
+            Blog Posts ({(blogPosts || []).length})
+          </div>
+          <button onClick={() => openEditor(null)} style={{ ...btnStyle(T.accent), boxShadow:`0 4px 16px ${T.accentGlow}` }}>+ New Post</button>
+        </div>
+
+        {blogMsg && <div style={{ padding:"8px 14px", borderRadius:8, fontSize:12, color:blogMsg.startsWith("✓") ? T.green : T.gold, background:blogMsg.startsWith("✓") ? T.greenBg : T.goldBg, fontFamily:"'IBM Plex Mono',monospace" }}>{blogMsg}</div>}
+
+        {sortedPosts.length === 0 ? (
+          <div style={{ padding:30, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface3, border:`1px solid ${T.border}`, borderRadius:10 }}>No blog posts yet. Click "+ New Post" to create your first.</div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {sortedPosts.map(post => (
+              <div key={post.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                    <span style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif" }}>{post.title}</span>
+                    <span style={{
+                      padding:"2px 8px", borderRadius:4, fontSize:9, fontWeight:700,
+                      fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase",
+                      background: post.status === "published" ? T.greenBg : T.goldBg,
+                      color: post.status === "published" ? T.green : T.gold,
+                    }}>{post.status}</span>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
+                    <span style={{ color: BLOG_CAT_COLORS[post.category] || T.textDim }}>{post.category}</span>
+                    <span>{formatDate(post.created_at)}</span>
+                  </div>
+                </div>
+                <button onClick={() => openEditor(post)} style={{ ...btnStyle(T.accent), padding:"5px 12px", fontSize:10 }}>Edit</button>
+                <button onClick={() => handleDeletePost(post.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>Delete</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Editor view
+  const toolbarBtnStyle = (active) => ({
+    padding:"6px 8px", background: active ? T.accentSoft : "transparent", border:`1px solid ${active ? T.accent : T.border}`,
+    color: active ? T.accent : T.textMid, borderRadius:6, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+  });
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16, animation:"fadeIn 0.2s ease" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <button onClick={() => { resetEditor(); setBlogView("list"); }} style={{
+          display:"flex", alignItems:"center", gap:5, background:"none", border:"none",
+          color:T.accent, cursor:"pointer", fontSize:12, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase",
+        }}><Ic.ArrowLeft /> Back to Posts</button>
+        <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>
+          {editingPost ? "Edit Post" : "New Post"}
+        </div>
+      </div>
+
+      {blogMsg && <div style={{ padding:"8px 14px", borderRadius:8, fontSize:12, color:blogMsg.startsWith("✓") ? T.green : T.gold, background:blogMsg.startsWith("✓") ? T.greenBg : T.goldBg, fontFamily:"'IBM Plex Mono',monospace" }}>{blogMsg}</div>}
+
+      {/* Title */}
+      <div>
+        <label style={{ fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Title</label>
+        <input value={blogTitle} onChange={e => setBlogTitle(e.target.value)} placeholder="Enter post title…" style={inputStyle} />
+      </div>
+
+      {/* Category & Status */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+        <div>
+          <label style={{ fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Category</label>
+          <select value={blogCategory} onChange={e => setBlogCategory(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
+            {BLOG_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Status</label>
+          <select value={blogStatus} onChange={e => setBlogStatus(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Featured Image */}
+      <div>
+        <label style={{ fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Featured Image</label>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <button onClick={handleFeaturedImage} style={btnStyle("#334155")}>
+            <span style={{ display:"flex", alignItems:"center", gap:5 }}><Ic.Image /> {blogFeaturedImage ? "Change Image" : "Upload Image"}</span>
+          </button>
+          {blogFeaturedImage && (
+            <>
+              <img src={blogFeaturedImage} alt="" style={{ height:48, borderRadius:6, border:`1px solid ${T.border}` }} />
+              <button onClick={() => setBlogFeaturedImage("")} style={{ background:"none", border:"none", color:T.red, cursor:"pointer", fontSize:11 }}>Remove</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Rich Text Editor */}
+      <div>
+        <label style={{ fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Body</label>
+
+        {/* Toolbar */}
+        <div style={{ display:"flex", gap:4, padding:"6px 8px", background:T.surface3, border:`1px solid ${T.border}`, borderRadius:"8px 8px 0 0", borderBottom:"none", flexWrap:"wrap" }}>
+          <button onClick={() => execCmd("bold")} style={toolbarBtnStyle(false)} title="Bold"><Ic.Bold /></button>
+          <button onClick={() => execCmd("italic")} style={toolbarBtnStyle(false)} title="Italic"><Ic.Italic /></button>
+          <div style={{ width:1, background:T.border, margin:"0 4px" }} />
+          <button onClick={() => execCmd("formatBlock", "h2")} style={toolbarBtnStyle(false)} title="Heading 2">
+            <span style={{ fontSize:12, fontWeight:900, fontFamily:"'Barlow Condensed',sans-serif" }}>H2</span>
+          </button>
+          <button onClick={() => execCmd("formatBlock", "h3")} style={toolbarBtnStyle(false)} title="Heading 3">
+            <span style={{ fontSize:12, fontWeight:900, fontFamily:"'Barlow Condensed',sans-serif" }}>H3</span>
+          </button>
+          <button onClick={() => execCmd("formatBlock", "p")} style={toolbarBtnStyle(false)} title="Paragraph">
+            <span style={{ fontSize:12, fontFamily:"'Barlow Condensed',sans-serif" }}>P</span>
+          </button>
+          <div style={{ width:1, background:T.border, margin:"0 4px" }} />
+          <button onClick={() => execCmd("insertUnorderedList")} style={toolbarBtnStyle(false)} title="Bullet List"><Ic.List /></button>
+          <button onClick={() => execCmd("insertOrderedList")} style={toolbarBtnStyle(false)} title="Numbered List">
+            <span style={{ fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif" }}>1.</span>
+          </button>
+          <div style={{ width:1, background:T.border, margin:"0 4px" }} />
+          <button onClick={handleInsertLink} style={toolbarBtnStyle(false)} title="Insert Link"><Ic.Link /></button>
+          <button onClick={handleInsertImage} style={toolbarBtnStyle(false)} title="Insert Image"><Ic.Image /></button>
+          <button onClick={() => execCmd("formatBlock", "blockquote")} style={toolbarBtnStyle(false)} title="Quote">
+            <span style={{ fontSize:14, fontWeight:700, fontFamily:"serif" }}>"</span>
+          </button>
+        </div>
+
+        {/* Editable area */}
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={() => setBlogBody(editorRef.current?.innerHTML || "")}
+          style={{
+            minHeight:300, background:T.surface2, border:`1px solid ${T.border}`, borderRadius:"0 0 8px 8px",
+            padding:"16px 18px", fontSize:15, lineHeight:1.8, color:T.text,
+            fontFamily:"'Barlow',sans-serif", outline:"none", overflowY:"auto", maxHeight:500,
+          }}
+        />
+
+        <style>{`
+          [contenteditable] h2,[contenteditable] h3{font-family:'Barlow Condensed',sans-serif;font-weight:800;letter-spacing:1px;margin:12px 0 8px}
+          [contenteditable] h2{font-size:22px} [contenteditable] h3{font-size:18px}
+          [contenteditable] p{margin:0 0 8px}
+          [contenteditable] a{color:${T.accent}}
+          [contenteditable] img{max-width:100%;border-radius:8px;margin:8px 0}
+          [contenteditable] blockquote{border-left:3px solid ${T.accent};padding:4px 12px;margin:8px 0;color:${T.textMid}}
+          [contenteditable]:empty:before{content:attr(data-placeholder);color:${T.textDim}}
+        `}</style>
+      </div>
+
+      {/* Save buttons */}
+      <div style={{ display:"flex", gap:10 }}>
+        <button onClick={handleSavePost} disabled={blogSaving} style={{ ...btnStyle(T.accent), flex:1, boxShadow:`0 4px 16px ${T.accentGlow}`, opacity:blogSaving ? 0.6 : 1 }}>
+          {blogSaving ? "Saving…" : (editingPost ? "Update Post" : "Save Post")}
+        </button>
+        <button onClick={() => { resetEditor(); setBlogView("list"); }} style={btnStyle("#334155")}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────
 export default function NASCARHub() {
@@ -7632,6 +8109,9 @@ export default function NASCARHub() {
   const [dfsSalaries, setDfsSalaries] = useState({});
   const [dfsDisabled, setDfsDisabled] = useState([]);
   const [qualPractice, setQualPractice] = useState(null);
+
+  // Blog state — persisted via Supabase
+  const [blogPosts, setBlogPosts] = useState([]);
 
   // Tool Usage — per-tool counters, persisted via Supabase
   const [toolUsage, setToolUsage] = useState({});
@@ -7749,6 +8229,13 @@ export default function NASCARHub() {
     } catch (e) { console.error("DFS qualifying save:", e); }
   }, []);
 
+  const saveBlogPosts = useCallback(async (updated) => {
+    setBlogPosts(updated);
+    try {
+      await sb.from("app_state").upsert({ key:"blogPosts", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("Blog posts save:", e); }
+  }, []);
+
   // Increment a tool usage counter — queues if Supabase hasn't loaded yet
   // Uses read-merge-write so concurrent visitors don't overwrite each other's counts
   const toolUsageSaveTimer = useRef(null);
@@ -7815,7 +8302,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     loadFromSupabase().then(data => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -7828,6 +8315,7 @@ export default function NASCARHub() {
       if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
       if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
       if (qpRows?.[0]) setQualPractice(qpRows[0].value||null);
+      if (bpRows?.[0]) setBlogPosts(bpRows[0].value||[]);
       setSbStatus("live");
     });
     // Load tool usage separately (it's also in app_state)
@@ -8029,6 +8517,7 @@ export default function NASCARHub() {
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
               {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} qualPractice={qualPractice} incrementTool={incrementTool} />}
+              {activeTab === "blog"      && <BlogTab blogPosts={blogPosts} />}
             </div>
           </main>
 
@@ -8064,12 +8553,14 @@ export default function NASCARHub() {
           onDfsDisabledSave={saveDfsDisabled}
           qualPractice={qualPractice}
           onQualPracticeSave={saveQualPractice}
+          blogPosts={blogPosts}
+          onBlogSave={saveBlogPosts}
         />
 
         {/* FOOTER */}
         <footer style={{ borderTop:`1px solid ${T.border}`, padding:"7px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", background:T.footerBg }}>
-          <span>NASCAR HUB v2.5 · Vanboni Sports</span>
-          <span>{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {Object.keys(dfsSalaries?.dk||{}).length + Object.keys(dfsSalaries?.fd||{}).length > 0 ? `${Object.keys(dfsSalaries?.dk||{}).length}DK/${Object.keys(dfsSalaries?.fd||{}).length}FD salaries` : "no DFS salaries"} · {drivers.length} drivers</span>
+          <span>NASCAR HUB v2.6 · Vanboni Sports</span>
+          <span>{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {(blogPosts||[]).filter(p=>p.status==="published").length} blog post{(blogPosts||[]).filter(p=>p.status==="published").length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {Object.keys(dfsSalaries?.dk||{}).length + Object.keys(dfsSalaries?.fd||{}).length > 0 ? `${Object.keys(dfsSalaries?.dk||{}).length}DK/${Object.keys(dfsSalaries?.fd||{}).length}FD salaries` : "no DFS salaries"} · {drivers.length} drivers</span>
           <span style={{ display:"flex", alignItems:"center", gap:10 }}>
             <span>2026 Cup Series</span>
             <a
