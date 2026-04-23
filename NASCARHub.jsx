@@ -101,6 +101,14 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Log a timestamped usage event to the usage_events table (for date-range filtering)
+function logUsageEvent(toolName) {
+  if (!sb) return;
+  sb.from("usage_events").insert({ tool_name: toolName }).then(({ error }) => {
+    if (error) console.warn("Usage event log error:", error);
+  });
+}
+
 // ─────────────────────────────────────────────────────────────
 // ADMIN PASSWORD
 // ─────────────────────────────────────────────────────────────
@@ -3123,6 +3131,211 @@ function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
 // ─────────────────────────────────────────────────────────────
 // GLOBAL ADMIN PANEL — lives at the bottom of the app
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// USAGE ADMIN — date range filtering with timestamped events
+// ─────────────────────────────────────────────────────────────
+const USAGE_RANGES = [
+  { id:"today",   label:"Today" },
+  { id:"yesterday", label:"Yesterday" },
+  { id:"7d",      label:"Last 7 Days" },
+  { id:"30d",     label:"Last 30 Days" },
+  { id:"custom",  label:"Custom Range" },
+  { id:"all",     label:"All Time" },
+];
+
+function UsageAdminSection({ toolUsage }) {
+  const [range, setRange] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [eventData, setEventData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Compute date boundaries for the selected range
+  const getDateBounds = useCallback(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    switch (range) {
+      case "today":
+        return { from: todayStart.toISOString(), to: new Date(todayStart.getTime() + 86400000).toISOString() };
+      case "yesterday": {
+        const yd = new Date(todayStart.getTime() - 86400000);
+        return { from: yd.toISOString(), to: todayStart.toISOString() };
+      }
+      case "7d":
+        return { from: new Date(todayStart.getTime() - 7 * 86400000).toISOString(), to: now.toISOString() };
+      case "30d":
+        return { from: new Date(todayStart.getTime() - 30 * 86400000).toISOString(), to: now.toISOString() };
+      case "custom": {
+        if (!customFrom || !customTo) return null;
+        const f = new Date(customFrom);
+        const t = new Date(customTo);
+        t.setDate(t.getDate() + 1);
+        return { from: f.toISOString(), to: t.toISOString() };
+      }
+      default: return null;
+    }
+  }, [range, customFrom, customTo]);
+
+  // Fetch events from usage_events table for the selected date range
+  useEffect(() => {
+    if (range === "all") { setEventData(null); return; }
+    const bounds = getDateBounds();
+    if (!bounds) { setEventData(null); return; }
+    setLoading(true);
+    (async () => {
+      try {
+        const { data: rows, error } = await sb.from("usage_events")
+          .select("tool_name, created_at")
+          .gte("created_at", bounds.from)
+          .lt("created_at", bounds.to)
+          .order("created_at", { ascending: true });
+        if (error) throw error;
+
+        // Aggregate counts per tool
+        const counts = {};
+        const dayMap = {};
+        (rows || []).forEach(r => {
+          counts[r.tool_name] = (counts[r.tool_name] || 0) + 1;
+          const day = r.created_at.slice(0, 10);
+          if (!dayMap[day]) dayMap[day] = {};
+          dayMap[day][r.tool_name] = (dayMap[day][r.tool_name] || 0) + 1;
+        });
+
+        // Build timeline for chart
+        const timeline = Object.entries(dayMap)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([date, tools]) => ({
+            date: new Date(date).toLocaleDateString("en-US", { month:"short", day:"numeric" }),
+            total: Object.values(tools).reduce((a, b) => a + b, 0),
+            ...tools,
+          }));
+
+        setEventData({ counts, timeline, total: (rows || []).length });
+      } catch (e) {
+        console.error("Usage events fetch error:", e);
+        setEventData({ counts: {}, timeline: [], total: 0 });
+      }
+      setLoading(false);
+    })();
+  }, [range, customFrom, customTo, getDateBounds]);
+
+  // Determine which data to show
+  const isAllTime = range === "all";
+  const displayCounts = isAllTime ? (toolUsage || {}) : (eventData?.counts || {});
+  const displayTotal = isAllTime
+    ? Object.values(toolUsage || {}).reduce((a, b) => a + b, 0)
+    : (eventData?.total || 0);
+  const maxUses = Math.max(1, ...Object.values(displayCounts).map(v => v || 0));
+  const timeline = eventData?.timeline || [];
+  const showTimeline = !isAllTime && timeline.length > 1;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+
+      {/* ── Date Range Selector ── */}
+      <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+        {USAGE_RANGES.map(r => (
+          <button key={r.id} onClick={() => setRange(r.id)} style={{
+            padding:"6px 14px", borderRadius:8, border:`1px solid ${range === r.id ? T.accent : T.border}`,
+            background: range === r.id ? T.accentSoft : T.surface, color: range === r.id ? T.accent : T.textMid,
+            fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.8,
+            cursor:"pointer", transition:"all 0.15s ease",
+          }}>{r.label}</button>
+        ))}
+      </div>
+
+      {/* ── Custom Date Inputs ── */}
+      {range === "custom" && (
+        <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+          <label style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>From</label>
+          <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+            style={{ padding:"6px 10px", borderRadius:6, border:`1px solid ${T.border}`, background:T.surface2, color:T.text, fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }} />
+          <label style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>To</label>
+          <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+            style={{ padding:"6px 10px", borderRadius:6, border:`1px solid ${T.border}`, background:T.surface2, color:T.text, fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }} />
+        </div>
+      )}
+
+      {/* ── Total Header ── */}
+      <div style={{ display:"flex", alignItems:"center", gap:16, padding:"16px 20px", background:T.accentSoft, border:`1px solid ${T.accent}30`, borderRadius:12 }}>
+        {loading ? (
+          <div style={{ fontSize:14, color:T.textMid, fontFamily:"'IBM Plex Mono',monospace" }}>Loading events…</div>
+        ) : (
+          <>
+            <div style={{ fontSize:36, fontWeight:900, color:T.accent, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:-1 }}>{displayTotal.toLocaleString()}</div>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>
+                {isAllTime ? "Total Tool Uses (All Time)" : `Tool Uses — ${USAGE_RANGES.find(r=>r.id===range)?.label}`}
+              </div>
+              <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
+                {isAllTime ? "Cumulative counter · Across all visitors" : "From timestamped events log"}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Timeline Chart ── */}
+      {showTimeline && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 12px 8px 0" }}>
+          <div style={{ fontSize:11, fontWeight:700, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", marginBottom:8, paddingLeft:16 }}>
+            Usage Over Time
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={timeline}>
+              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
+              <XAxis dataKey="date" tick={{ fill:T.textDim, fontSize:9, fontFamily:"'IBM Plex Mono',monospace" }} axisLine={{ stroke:T.border }} tickLine={false} />
+              <YAxis tick={{ fill:T.textDim, fontSize:9, fontFamily:"'IBM Plex Mono',monospace" }} axisLine={{ stroke:T.border }} tickLine={false} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:8, fontFamily:"'Barlow Condensed',sans-serif", fontSize:12 }}
+                labelStyle={{ color:T.text, fontWeight:700 }}
+                itemStyle={{ color:T.textMid }}
+              />
+              <Bar dataKey="total" fill={T.accent} radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Per-Tool Breakdown ── */}
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>
+          Breakdown by Tool {!isAllTime && !loading && `(${USAGE_RANGES.find(r=>r.id===range)?.label})`}
+        </div>
+        {TOOL_USAGE_KEYS.map(({ key, label, type }) => {
+          const count = displayCounts[key] || 0;
+          const pct = maxUses > 0 ? (count / maxUses) * 100 : 0;
+          return (
+            <div key={key} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10 }}>
+              <div style={{ flex:"0 0 160px", display:"flex", flexDirection:"column" }}>
+                <span style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5 }}>{label}</span>
+                <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>{type === "action" ? "on submit" : "on tab open"}</span>
+              </div>
+              <div style={{ flex:1, height:8, background:T.surface3, borderRadius:4, overflow:"hidden" }}>
+                <div style={{ width:`${pct}%`, height:"100%", background: type === "action" ? T.accent : T.green, borderRadius:4, transition:"width 0.3s ease" }} />
+              </div>
+              <div style={{ flex:"0 0 60px", textAlign:"right", fontSize:15, fontWeight:900, color: count > 0 ? T.text : T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>{count.toLocaleString()}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display:"flex", gap:16, fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
+        <span style={{ display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:2, background:T.accent }} /> Action-based (on submit/run)</span>
+        <span style={{ display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:2, background:T.green }} /> View-based (on tab open)</span>
+      </div>
+
+      {/* Footnote for non-All-Time ranges */}
+      {!isAllTime && (
+        <div style={{ fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", fontStyle:"italic", borderTop:`1px solid ${T.border}`, paddingTop:10 }}>
+          Note: Date-filtered data is from timestamped event logging (started when this feature was added). "All Time" uses the original cumulative counter which includes all historical usage.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -3654,49 +3867,7 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
               )}
 
               {/* ─── TOOL USAGE ADMIN ─── */}
-              {adminSection === "usage" && (() => {
-                const totalUses = Object.values(toolUsage || {}).reduce((a,b)=>a+b,0);
-                const maxUses = Math.max(1, ...Object.values(toolUsage || {}).map(v=>v||0));
-                return (
-                  <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-                    {/* Total header */}
-                    <div style={{ display:"flex", alignItems:"center", gap:16, padding:"16px 20px", background:T.accentSoft, border:`1px solid ${T.accent}30`, borderRadius:12 }}>
-                      <div style={{ fontSize:36, fontWeight:900, color:T.accent, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:-1 }}>{totalUses.toLocaleString()}</div>
-                      <div>
-                        <div style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1.5, textTransform:"uppercase" }}>Total Tool Uses</div>
-                        <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Across all visitors · Persisted via Supabase</div>
-                      </div>
-                    </div>
-
-                    {/* Per-tool breakdown */}
-                    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>Breakdown by Tool</div>
-                      {TOOL_USAGE_KEYS.map(({ key, label, type }) => {
-                        const count = toolUsage?.[key] || 0;
-                        const pct = maxUses > 0 ? (count / maxUses) * 100 : 0;
-                        return (
-                          <div key={key} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10 }}>
-                            <div style={{ flex:"0 0 160px", display:"flex", flexDirection:"column" }}>
-                              <span style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5 }}>{label}</span>
-                              <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>{type === "action" ? "on submit" : "on tab open"}</span>
-                            </div>
-                            <div style={{ flex:1, height:8, background:T.surface3, borderRadius:4, overflow:"hidden" }}>
-                              <div style={{ width:`${pct}%`, height:"100%", background: type === "action" ? T.accent : T.green, borderRadius:4, transition:"width 0.3s ease" }} />
-                            </div>
-                            <div style={{ flex:"0 0 60px", textAlign:"right", fontSize:15, fontWeight:900, color: count > 0 ? T.text : T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>{count.toLocaleString()}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Legend */}
-                    <div style={{ display:"flex", gap:16, fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
-                      <span style={{ display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:2, background:T.accent }} /> Action-based (on submit/run)</span>
-                      <span style={{ display:"flex", alignItems:"center", gap:5 }}><span style={{ width:8, height:8, borderRadius:2, background:T.green }} /> View-based (on tab open)</span>
-                    </div>
-                  </div>
-                );
-              })()}
+              {adminSection === "usage" && <UsageAdminSection toolUsage={toolUsage} />}
 
               {adminSection === "blog" && (
                 <BlogAdminSection blogPosts={blogPosts} onBlogSave={onBlogSave} />
@@ -8288,6 +8459,8 @@ export default function NASCARHub() {
   }, []);
 
   const incrementTool = useCallback((toolKey) => {
+    // Always log the timestamped event (even if cumulative counter is still loading)
+    logUsageEvent(toolKey);
     if (!toolUsageLoaded.current) {
       // Supabase data not yet loaded — queue this increment
       toolUsageQueue.current.push(toolKey);
