@@ -7213,9 +7213,11 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
           const rawName = (fields[nameIdx] || "").replace(/"/g, "").trim();
           const rawSal  = parseInt((fields[salaryIdx] || "").replace(/[^0-9]/g, "")) || 0;
           if (!rawName || rawSal <= 0) continue;
+          // Normalize through alias map first (handles "John H. Nemechek" → "John Hunter Nemechek", etc.)
+          const normalizedRaw = normalizeCsvDriverName(rawName);
           const matchedDriver = FULL_TIMER_NAMES.find(d => {
             const dn = d.toLowerCase();
-            const rn = rawName.toLowerCase();
+            const rn = normalizedRaw.toLowerCase();
             return dn === rn || rn.includes(dn) || dn.includes(rn);
           });
           if (matchedDriver) { salaries[matchedDriver] = rawSal; matched++; }
