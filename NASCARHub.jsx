@@ -65,6 +65,8 @@ const TOOL_USAGE_KEYS = [
   { key:"driver_analytics",  label:"Driver Analytics",     type:"view"   },
   { key:"mfg_trends",        label:"Manufacturer Trends",  type:"view"   },
   { key:"dfs_optimizer",     label:"DFS Optimizer",        type:"action" },
+  { key:"blog",              label:"Blog",                 type:"view"   },
+  { key:"blog_post",         label:"Blog Post View",       type:"view",  hidden:true },
 ];
 
 const PREDICTOR_COLORS = {
@@ -102,9 +104,11 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Log a timestamped usage event to the usage_events table (for date-range filtering)
-function logUsageEvent(toolName) {
+function logUsageEvent(toolName, metadata) {
   if (!sb) return;
-  sb.from("usage_events").insert({ tool_name: toolName }).then(({ error }) => {
+  const row = { tool_name: toolName };
+  if (metadata) row.metadata = metadata;
+  sb.from("usage_events").insert(row).then(({ error }) => {
     if (error) console.warn("Usage event log error:", error);
   });
 }
@@ -3149,6 +3153,7 @@ function UsageAdminSection({ toolUsage }) {
   const [customTo, setCustomTo] = useState("");
   const [eventData, setEventData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [blogExpanded, setBlogExpanded] = useState(false);
 
   // Compute date boundaries for the selected range
   const getDateBounds = useCallback(() => {
@@ -3185,7 +3190,7 @@ function UsageAdminSection({ toolUsage }) {
     (async () => {
       try {
         const { data: rows, error } = await sb.from("usage_events")
-          .select("tool_name, created_at")
+          .select("tool_name, created_at, metadata")
           .gte("created_at", bounds.from)
           .lt("created_at", bounds.to)
           .order("created_at", { ascending: true });
@@ -3194,11 +3199,17 @@ function UsageAdminSection({ toolUsage }) {
         // Aggregate counts per tool
         const counts = {};
         const dayMap = {};
+        const blogPostCounts = {};
         (rows || []).forEach(r => {
           counts[r.tool_name] = (counts[r.tool_name] || 0) + 1;
           const day = r.created_at.slice(0, 10);
           if (!dayMap[day]) dayMap[day] = {};
           dayMap[day][r.tool_name] = (dayMap[day][r.tool_name] || 0) + 1;
+          // Track individual blog post views
+          if (r.tool_name === "blog_post" && r.metadata?.post_title) {
+            const title = r.metadata.post_title;
+            blogPostCounts[title] = (blogPostCounts[title] || 0) + 1;
+          }
         });
 
         // Build timeline for chart
@@ -3210,7 +3221,7 @@ function UsageAdminSection({ toolUsage }) {
             ...tools,
           }));
 
-        setEventData({ counts, timeline, total: (rows || []).length });
+        setEventData({ counts, timeline, total: (rows || []).length, blogPostCounts });
       } catch (e) {
         console.error("Usage events fetch error:", e);
         setEventData({ counts: {}, timeline: [], total: 0 });
@@ -3218,6 +3229,28 @@ function UsageAdminSection({ toolUsage }) {
       setLoading(false);
     })();
   }, [range, customFrom, customTo, getDateBounds]);
+
+  // Fetch all-time blog post breakdown (only when on All Time range and blog expanded)
+  const [allTimeBlogPosts, setAllTimeBlogPosts] = useState(null);
+  useEffect(() => {
+    if (!blogExpanded || range !== "all" || allTimeBlogPosts) return;
+    (async () => {
+      try {
+        const { data: rows, error } = await sb.from("usage_events")
+          .select("metadata")
+          .eq("tool_name", "blog_post");
+        if (error) throw error;
+        const bpc = {};
+        (rows || []).forEach(r => {
+          if (r.metadata?.post_title) bpc[r.metadata.post_title] = (bpc[r.metadata.post_title] || 0) + 1;
+        });
+        setAllTimeBlogPosts(bpc);
+      } catch (e) {
+        console.error("Blog post counts fetch error:", e);
+        setAllTimeBlogPosts({});
+      }
+    })();
+  }, [blogExpanded, range, allTimeBlogPosts]);
 
   // Determine which data to show
   const isAllTime = range === "all";
@@ -3228,6 +3261,8 @@ function UsageAdminSection({ toolUsage }) {
   const maxUses = Math.max(1, ...Object.values(displayCounts).map(v => v || 0));
   const timeline = eventData?.timeline || [];
   const showTimeline = !isAllTime && timeline.length > 1;
+  const blogPostDisplay = isAllTime ? (allTimeBlogPosts || {}) : (eventData?.blogPostCounts || {});
+  const blogPostEntries = Object.entries(blogPostDisplay).sort(([,a],[,b]) => b - a);
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
@@ -3302,19 +3337,59 @@ function UsageAdminSection({ toolUsage }) {
         <div style={{ fontSize:11, fontWeight:700, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>
           Breakdown by Tool {!isAllTime && !loading && `(${USAGE_RANGES.find(r=>r.id===range)?.label})`}
         </div>
-        {TOOL_USAGE_KEYS.map(({ key, label, type }) => {
-          const count = displayCounts[key] || 0;
+        {TOOL_USAGE_KEYS.filter(t => !t.hidden).map(({ key, label, type }) => {
+          const count = key === "blog"
+            ? (displayCounts["blog"] || 0) + (displayCounts["blog_post"] || 0)
+            : (displayCounts[key] || 0);
           const pct = maxUses > 0 ? (count / maxUses) * 100 : 0;
+          const isBlog = key === "blog";
           return (
-            <div key={key} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10 }}>
-              <div style={{ flex:"0 0 160px", display:"flex", flexDirection:"column" }}>
-                <span style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5 }}>{label}</span>
-                <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>{type === "action" ? "on submit" : "on tab open"}</span>
+            <div key={key}>
+              <div
+                onClick={isBlog ? () => setBlogExpanded(p => !p) : undefined}
+                style={{
+                  display:"flex", alignItems:"center", gap:12, padding:"10px 14px",
+                  background:T.surface, border:`1px solid ${T.border}`, borderRadius:10,
+                  cursor: isBlog ? "pointer" : "default",
+                }}
+              >
+                <div style={{ flex:"0 0 160px", display:"flex", flexDirection:"column" }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5, display:"flex", alignItems:"center", gap:6 }}>
+                    {label}
+                    {isBlog && <span style={{ fontSize:10, color:T.textDim, transition:"transform 0.2s", display:"inline-block", transform: blogExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>}
+                  </span>
+                  <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>{type === "action" ? "on submit" : "on tab open"}</span>
+                </div>
+                <div style={{ flex:1, height:8, background:T.surface3, borderRadius:4, overflow:"hidden" }}>
+                  <div style={{ width:`${pct}%`, height:"100%", background: type === "action" ? T.accent : T.green, borderRadius:4, transition:"width 0.3s ease" }} />
+                </div>
+                <div style={{ flex:"0 0 60px", textAlign:"right", fontSize:15, fontWeight:900, color: count > 0 ? T.text : T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>{count.toLocaleString()}</div>
               </div>
-              <div style={{ flex:1, height:8, background:T.surface3, borderRadius:4, overflow:"hidden" }}>
-                <div style={{ width:`${pct}%`, height:"100%", background: type === "action" ? T.accent : T.green, borderRadius:4, transition:"width 0.3s ease" }} />
-              </div>
-              <div style={{ flex:"0 0 60px", textAlign:"right", fontSize:15, fontWeight:900, color: count > 0 ? T.text : T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>{count.toLocaleString()}</div>
+
+              {/* Blog post sub-breakdown */}
+              {isBlog && blogExpanded && (
+                <div style={{ marginLeft:24, marginTop:4, display:"flex", flexDirection:"column", gap:4 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 14px", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>
+                    <span>Tab Opens: {(displayCounts["blog"] || 0).toLocaleString()}</span>
+                    <span>Post Views: {(displayCounts["blog_post"] || 0).toLocaleString()}</span>
+                  </div>
+                  {blogPostEntries.length > 0 ? blogPostEntries.map(([title, cnt]) => (
+                    <div key={title} style={{
+                      display:"flex", alignItems:"center", gap:10, padding:"7px 14px",
+                      background:T.surface2, border:`1px solid ${T.border}`, borderRadius:8,
+                    }}>
+                      <div style={{ flex:1, fontSize:12, color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                        {title}
+                      </div>
+                      <div style={{ flex:"0 0 40px", textAlign:"right", fontSize:13, fontWeight:800, color:T.text, fontFamily:"'Barlow Condensed',sans-serif" }}>{cnt}</div>
+                    </div>
+                  )) : (
+                    <div style={{ padding:"8px 14px", fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", fontStyle:"italic" }}>
+                      {isAllTime && !allTimeBlogPosts ? "Loading post breakdown…" : "No individual post views recorded yet."}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -7801,9 +7876,12 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
 // ─────────────────────────────────────────────────────────────
 // BLOG TAB — Public blog reader
 // ─────────────────────────────────────────────────────────────
-function BlogTab({ blogPosts }) {
+function BlogTab({ blogPosts, incrementTool }) {
   const [catFilter, setCatFilter] = useState("All");
   const [viewingPost, setViewingPost] = useState(null);
+
+  // Track blog tab open
+  useEffect(() => { incrementTool?.("blog"); }, []);
 
   const published = useMemo(() =>
     (blogPosts || [])
@@ -7827,6 +7905,12 @@ function BlogTab({ blogPosts }) {
     const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
     return text.length > 150 ? text.slice(0, 150) + "…" : text;
   };
+
+  // Handle clicking into a post — track the individual post view
+  const openPost = useCallback((post) => {
+    setViewingPost(post);
+    incrementTool?.("blog_post", { post_title: post.title, post_id: post.id });
+  }, [incrementTool]);
 
   // Full article view
   if (viewingPost) {
@@ -7920,7 +8004,7 @@ function BlogTab({ blogPosts }) {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
           {filtered.map(post => (
-            <button key={post.id} onClick={() => setViewingPost(post)} style={{
+            <button key={post.id} onClick={() => openPost(post)} style={{
               display:"flex", gap:16, padding:0, background:T.surface, border:`1px solid ${T.border}`,
               borderRadius:12, cursor:"pointer", textAlign:"left", overflow:"hidden",
               transition:"border-color 0.15s, box-shadow 0.15s",
@@ -8458,9 +8542,9 @@ export default function NASCARHub() {
     }, 2000);
   }, []);
 
-  const incrementTool = useCallback((toolKey) => {
+  const incrementTool = useCallback((toolKey, metadata) => {
     // Always log the timestamped event (even if cumulative counter is still loading)
-    logUsageEvent(toolKey);
+    logUsageEvent(toolKey, metadata);
     if (!toolUsageLoaded.current) {
       // Supabase data not yet loaded — queue this increment
       toolUsageQueue.current.push(toolKey);
@@ -8690,7 +8774,7 @@ export default function NASCARHub() {
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
               {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} qualPractice={qualPractice} incrementTool={incrementTool} />}
-              {activeTab === "blog"      && <BlogTab blogPosts={blogPosts} />}
+              {activeTab === "blog"      && <BlogTab blogPosts={blogPosts} incrementTool={incrementTool} />}
             </div>
           </main>
 
