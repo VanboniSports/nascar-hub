@@ -258,6 +258,8 @@ const CSV_NAME_ALIASES = {
   "Shane van Gisbergen": "Shane van Gisbergen",
   "B.J. McLeod":         "BJ McLeod",
   "BJ McLeod":           "BJ McLeod",
+  "Daniel Suárez":       "Daniel Suarez",
+  "Daniel Suarez Jr":    "Daniel Suarez",
 };
 
 // Tracks names we've already warned about so the console doesn't flood
@@ -272,6 +274,9 @@ const _unknownDriverWarned = new Set();
 function normalizeCsvDriverName(raw) {
   let name = (raw || "").trim();
   if (!name) return name;
+
+  // Strip Unicode accents (e.g. "Suárez" → "Suarez", "Müller" → "Muller")
+  name = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   // Strip " (I)" / "(I)" indicator tags
   name = name.replace(/\s*\(I\)\s*/g, "").trim();
@@ -7551,10 +7556,14 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
     const matchDriver = (raw) => {
       const normalized = normalizeCsvDriverName(raw);
       if (FULL_TIMER_NAMES.includes(normalized)) return normalized;
+      const nl = normalized.toLowerCase();
       const fuzzy = FULL_TIMER_NAMES.find(d => {
-        const dl = d.toLowerCase(), rl = raw.toLowerCase();
-        return dl === rl || rl.includes(dl) || dl.includes(rl);
+        const dl = d.toLowerCase();
+        return dl === nl || nl.includes(dl) || dl.includes(nl);
       });
+      if (!fuzzy && /^[A-Za-z]/.test(raw.trim()) && raw.trim().includes(" ")) {
+        console.warn("[QualPractice matchDriver] Unmatched driver name:", raw.trim(), "→ normalized:", normalized);
+      }
       return fuzzy || null;
     };
 
