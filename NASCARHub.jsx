@@ -229,7 +229,7 @@ function getThisWeeksRace() {
 // ─────────────────────────────────────────────────────────────
 // CSV DATA LAYER — shared across Track Stats tools
 // ─────────────────────────────────────────────────────────────
-const CSV_TRACK_TYPES = {"Bristol Motor Speedway":"Short Track","Martinsville Speedway":"Short Track","Richmond Raceway":"Short Track","New Hampshire Motor Speedway":"Short Track","Iowa Speedway":"Short Track","North Wilkesboro Speedway":"Short Track","Circuit Of The Americas":"Road Course","Sonoma Raceway":"Road Course","Road America":"Road Course","Watkins Glen International Raceway":"Road Course","Chicago Street Course":"Road Course","Autodromo Hermanos Rodriguez":"Road Course","Naval Base Coronado Street Course":"Road Course","Charlotte Motor Speedway":"Intermediate","Kansas Speedway":"Intermediate","Las Vegas Motor Speedway":"Intermediate","Michigan International Speedway":"Intermediate","Texas Motor Speedway":"Intermediate","Homestead-Miami Speedway":"Intermediate","Nashville Superspeedway":"Intermediate","Dover International Speedway":"Intermediate","Phoenix Raceway":"Intermediate","Pocono Raceway":"Intermediate","World Wide Technology Raceway":"Intermediate","Darlington Raceway":"Intermediate","Autoclub Speedway":"Intermediate","Echopark Speedway":"Superspeedway","Chicagoland Speedway":"Intermediate","Indianapolis Motor Speedway":"Road Course","Daytona International Speedway":"Superspeedway","Talladega Superspeedway":"Superspeedway","Watkins Glen International":"Road Course","Charlotte Motor Speedway Roval":"Road Course","Bristol Motor Speedway (DIRT)":"Dirt"};
+const CSV_TRACK_TYPES = {"Bristol Motor Speedway":"Short Track","Martinsville Speedway":"Short Track","Richmond Raceway":"Short Track","New Hampshire Motor Speedway":"Short Track","Iowa Speedway":"Short Track","North Wilkesboro Speedway":"Short Track","Circuit Of The Americas":"Road Course","Sonoma Raceway":"Road Course","Road America":"Road Course","Watkins Glen International Raceway":"Road Course","Chicago Street Course":"Road Course","Autodromo Hermanos Rodriguez":"Road Course","Naval Base Coronado Street Course":"Road Course","Charlotte Motor Speedway":"Intermediate","Kansas Speedway":"Intermediate","Las Vegas Motor Speedway":"Intermediate","Michigan International Speedway":"Intermediate","Texas Motor Speedway":"Intermediate","Homestead-Miami Speedway":"Intermediate","Nashville Superspeedway":"Intermediate","Dover International Speedway":"Intermediate","Phoenix Raceway":"Intermediate","Pocono Raceway":"Intermediate","World Wide Technology Raceway":"Intermediate","Darlington Raceway":"Intermediate","Autoclub Speedway":"Intermediate","Echopark Speedway":"Superspeedway","Chicagoland Speedway":"Intermediate","Indianapolis Motor Speedway":"Road Course","Daytona International Speedway":"Superspeedway","Talladega Superspeedway":"Superspeedway","Watkins Glen International":"Road Course","Charlotte Motor Speedway (ROVAL)":"Road Course","Bristol Motor Speedway (DIRT)":"Dirt"};
 const CSV_TYPE_COLORS = {"Road Course":"#a855f7","Short Track":"#ef4444","Intermediate":"#3b82f6","Superspeedway":"#22c55e","Dirt":"#b45309","Unknown":"#555"};
 const LB_RANK_COLORS = { elite:"#ffc107", good:"#4caf50", mid:"#6a9bbf", poor:"#f59e0b", bad:"#f44336" };
 const LB_SORT_CONFIGS = {
@@ -363,7 +363,12 @@ function parseCSVData(csvText) {
     const vals = parseCSVLine(lines[i]);
     if (vals.length < header.length) continue;
     const driverName = normalizeCsvDriverName(vals[colIdx["driver_name"]] || "");
-    const trackName = vals[colIdx["track_name"]] || "";
+    const raceName = vals[colIdx["race_name"]] || "";
+    let trackName = vals[colIdx["track_name"]] || "";
+    // Differentiate Charlotte Roval (October) from Charlotte Oval (May)
+    if (trackName === "Charlotte Motor Speedway" && /october/i.test(raceName)) trackName = "Charlotte Motor Speedway (ROVAL)";
+    // Differentiate Bristol Dirt (April 2022) from regular Bristol
+    if (trackName === "Bristol Motor Speedway" && /dirt/i.test(raceName)) trackName = "Bristol Motor Speedway (DIRT)";
     const year = parseInt(vals[colIdx["year"]]) || 0;
     const finish = parseInt(vals[colIdx["finish_position"]]) || 0;
     const start = parseInt(vals[colIdx["starting_position"]]) || 0;
@@ -789,7 +794,7 @@ const PRED_ROAD_COURSES = [
   'Circuit Of The Americas','Sonoma Raceway','Watkins Glen International Raceway',
   'Watkins Glen International','Road America','Chicago Street Course',
   'Indianapolis Motor Speedway','Autodromo Hermanos Rodriguez',
-  'San Diego Road Course','Charlotte Motor Speedway Roval',
+  'San Diego Road Course','Charlotte Motor Speedway (ROVAL)',
   'Naval Base Coronado Street Course',
 ];
 const PRED_SHORT_TRACKS = ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway','Iowa Speedway','New Hampshire Motor Speedway'];
@@ -4748,7 +4753,7 @@ function TrackStatsTab({ csvData, incrementTool }) {
 // DRIVER ANALYTICS TAB
 // ─────────────────────────────────────────────────────────────
 const DA_TRACKS_2026 = [
-  "Bristol Motor Speedway","Bristol Motor Speedway (DIRT)","Charlotte Motor Speedway","Charlotte Motor Speedway Roval","Chicagoland Speedway","Circuit Of The Americas",
+  "Bristol Motor Speedway","Charlotte Motor Speedway","Charlotte Motor Speedway (ROVAL)","Chicagoland Speedway","Circuit Of The Americas",
   "Darlington Raceway","Daytona International Speedway","Dover International Speedway","Echopark Speedway",
   "Homestead-Miami Speedway","Indianapolis Motor Speedway","Iowa Speedway","Kansas Speedway",
   "Las Vegas Motor Speedway","Martinsville Speedway","Michigan International Speedway",
