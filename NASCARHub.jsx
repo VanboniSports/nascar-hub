@@ -20,11 +20,11 @@ const T = {
 // Track type colors
 const TC = {
   overall:"#1e90ff", superspeedway:"#ef4444",
-  intermediate:"#3b82f6", short:"#22c55e", road:"#a855f7",
+  intermediate:"#3b82f6", short:"#22c55e", road:"#a855f7", dirt:"#b45309",
 };
 const TL = {
   overall:"Overall", superspeedway:"Superspeedway",
-  intermediate:"Intermediate", short:"Short Track", road:"Road Course",
+  intermediate:"Intermediate", short:"Short Track", road:"Road Course", dirt:"Dirt",
 };
 const TRACK_KEYS = ["overall","superspeedway","intermediate","short","road"];
 const CC = ["#1e90ff","#ef4444","#22c55e","#a855f7","#ffc107","#f97316","#06b6d4","#ec4899"];
@@ -82,6 +82,7 @@ const BATTLE_TRACK_COLORS = {
   "Road Course": "#10b981",
   "Short Track": "#ef4444",
   "Superspeedway": "#3b82f6",
+  "Dirt": "#b45309",
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -228,8 +229,8 @@ function getThisWeeksRace() {
 // ─────────────────────────────────────────────────────────────
 // CSV DATA LAYER — shared across Track Stats tools
 // ─────────────────────────────────────────────────────────────
-const CSV_TRACK_TYPES = {"Bristol Motor Speedway":"Short Track","Martinsville Speedway":"Short Track","Richmond Raceway":"Short Track","New Hampshire Motor Speedway":"Short Track","Iowa Speedway":"Short Track","North Wilkesboro Speedway":"Short Track","Circuit Of The Americas":"Road Course","Sonoma Raceway":"Road Course","Road America":"Road Course","Watkins Glen International Raceway":"Road Course","Chicago Street Course":"Road Course","Autodromo Hermanos Rodriguez":"Road Course","Naval Base Coronado Street Course":"Road Course","Charlotte Motor Speedway":"Intermediate","Kansas Speedway":"Intermediate","Las Vegas Motor Speedway":"Intermediate","Michigan International Speedway":"Intermediate","Texas Motor Speedway":"Intermediate","Homestead-Miami Speedway":"Intermediate","Nashville Superspeedway":"Intermediate","Dover International Speedway":"Intermediate","Phoenix Raceway":"Intermediate","Pocono Raceway":"Intermediate","World Wide Technology Raceway":"Intermediate","Darlington Raceway":"Intermediate","Autoclub Speedway":"Intermediate","Echopark Speedway":"Superspeedway","Chicagoland Speedway":"Intermediate","Indianapolis Motor Speedway":"Road Course","Daytona International Speedway":"Superspeedway","Talladega Superspeedway":"Superspeedway","Watkins Glen International":"Road Course"};
-const CSV_TYPE_COLORS = {"Road Course":"#a855f7","Short Track":"#ef4444","Intermediate":"#3b82f6","Superspeedway":"#22c55e","Unknown":"#555"};
+const CSV_TRACK_TYPES = {"Bristol Motor Speedway":"Short Track","Martinsville Speedway":"Short Track","Richmond Raceway":"Short Track","New Hampshire Motor Speedway":"Short Track","Iowa Speedway":"Short Track","North Wilkesboro Speedway":"Short Track","Circuit Of The Americas":"Road Course","Sonoma Raceway":"Road Course","Road America":"Road Course","Watkins Glen International Raceway":"Road Course","Chicago Street Course":"Road Course","Autodromo Hermanos Rodriguez":"Road Course","Naval Base Coronado Street Course":"Road Course","Charlotte Motor Speedway":"Intermediate","Kansas Speedway":"Intermediate","Las Vegas Motor Speedway":"Intermediate","Michigan International Speedway":"Intermediate","Texas Motor Speedway":"Intermediate","Homestead-Miami Speedway":"Intermediate","Nashville Superspeedway":"Intermediate","Dover International Speedway":"Intermediate","Phoenix Raceway":"Intermediate","Pocono Raceway":"Intermediate","World Wide Technology Raceway":"Intermediate","Darlington Raceway":"Intermediate","Autoclub Speedway":"Intermediate","Echopark Speedway":"Superspeedway","Chicagoland Speedway":"Intermediate","Indianapolis Motor Speedway":"Road Course","Daytona International Speedway":"Superspeedway","Talladega Superspeedway":"Superspeedway","Watkins Glen International":"Road Course","Charlotte Motor Speedway Roval":"Road Course","Bristol Motor Speedway (DIRT)":"Dirt"};
+const CSV_TYPE_COLORS = {"Road Course":"#a855f7","Short Track":"#ef4444","Intermediate":"#3b82f6","Superspeedway":"#22c55e","Dirt":"#b45309","Unknown":"#555"};
 const LB_RANK_COLORS = { elite:"#ffc107", good:"#4caf50", mid:"#6a9bbf", poor:"#f59e0b", bad:"#f44336" };
 const LB_SORT_CONFIGS = {
   avgFinish:{lowerBetter:true},avgStart:{lowerBetter:true},wins:{lowerBetter:false},
@@ -445,7 +446,8 @@ function getTier(r) {
   return         { bg:"rgba(20,40,60,0.04)",         border:"#3d6a85" };
 }
 
-function processRace(driversIn, raceName, trackType, totalLaps, results, prevRanksIn, recentFinishesIn) {
+function processRace(driversIn, raceName, trackTypeIn, totalLaps, results, prevRanksIn, recentFinishesIn) {
+  const trackType = trackTypeIn === "dirt" ? "short" : trackTypeIn; // dirt races use short track ratings
   const drivers = JSON.parse(JSON.stringify(driversIn));
   const recentFinishes = JSON.parse(JSON.stringify(recentFinishesIn));
 
@@ -792,9 +794,11 @@ const PRED_ROAD_COURSES = [
 ];
 const PRED_SHORT_TRACKS = ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway','Iowa Speedway','New Hampshire Motor Speedway'];
 const PRED_SUPERSPEEDWAYS = ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway'];
+const PRED_DIRT_TRACKS = ['Bristol Motor Speedway (DIRT)'];
 
 function predGetTrackType(trackName) {
   const tl = (trackName||"").toLowerCase();
+  if (PRED_DIRT_TRACKS.some(r => tl.includes(r.toLowerCase()))) return 'dirt';
   if (PRED_ROAD_COURSES.some(r => tl.includes(r.toLowerCase()))) return 'road_course';
   if (PRED_SHORT_TRACKS.some(r => tl.includes(r.toLowerCase()))) return 'short_track';
   if (PRED_SUPERSPEEDWAYS.some(r => tl.includes(r.toLowerCase()))) return 'superspeedway';
@@ -2228,7 +2232,7 @@ function SSMfgTrendsTab({ csvData, incrementTool }) {
   if (csvData.length === 0) return <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:13, background:T.surface, border:`1px solid ${T.border}`, borderRadius:12 }}>CSV data loads automatically from GitHub. Check Admin Panel if data is missing.</div>;
 
   // Build track type breakdown chart data
-  const trackTypes = ["Intermediate","Short Track","Road Course","Superspeedway"];
+  const trackTypes = ["Intermediate","Short Track","Road Course","Superspeedway","Dirt"];
   const ttChartData = trackTypes.map(tt => {
     const entry = { type: tt };
     ["Chevrolet","Ford","Toyota"].forEach(mfg => {
@@ -3638,6 +3642,7 @@ function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, on
                         <option value="intermediate">Intermediate</option>
                         <option value="short">Short Track</option>
                         <option value="road">Road Course</option>
+                        <option value="dirt">Dirt</option>
                       </select>
                     </div>
                     <div>
@@ -4743,7 +4748,7 @@ function TrackStatsTab({ csvData, incrementTool }) {
 // DRIVER ANALYTICS TAB
 // ─────────────────────────────────────────────────────────────
 const DA_TRACKS_2026 = [
-  "Bristol Motor Speedway","Charlotte Motor Speedway","Chicagoland Speedway","Circuit Of The Americas",
+  "Bristol Motor Speedway","Bristol Motor Speedway (DIRT)","Charlotte Motor Speedway","Charlotte Motor Speedway Roval","Chicagoland Speedway","Circuit Of The Americas",
   "Darlington Raceway","Daytona International Speedway","Dover International Speedway","Echopark Speedway",
   "Homestead-Miami Speedway","Indianapolis Motor Speedway","Iowa Speedway","Kansas Speedway",
   "Las Vegas Motor Speedway","Martinsville Speedway","Michigan International Speedway",
@@ -5240,7 +5245,7 @@ function DaHeadToHead({ csvData, incrementTool }) {
       for (let j = i+1; j < drivers.length; j++) {
         const pk = `${drivers[i]}|${drivers[j]}`;
         pairwise[pk] = { d1:0, d2:0, ties:0 };
-        pairByType[pk] = { Intermediate:{d1:0,d2:0}, "Short Track":{d1:0,d2:0}, "Road Course":{d1:0,d2:0}, Superspeedway:{d1:0,d2:0} };
+        pairByType[pk] = { Intermediate:{d1:0,d2:0}, "Short Track":{d1:0,d2:0}, "Road Course":{d1:0,d2:0}, Superspeedway:{d1:0,d2:0}, Dirt:{d1:0,d2:0} };
       }
     }
     for (const [key, finishMap] of Object.entries(raceIdx)) {
@@ -5989,7 +5994,7 @@ function DaBadDayRisk({ csvData, incrementTool }) {
         <div>
           <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:6 }}>Track Type</div>
           <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
-            {["All","Intermediate","Short Track","Road Course","Superspeedway"].map(type => {
+            {["All","Intermediate","Short Track","Road Course","Superspeedway","Dirt"].map(type => {
               const active = typeFilter === type;
               const color = type === "All" ? T.accent : CSV_TYPE_COLORS[type] || T.textMid;
               return (
