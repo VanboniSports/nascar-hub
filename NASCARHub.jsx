@@ -4784,6 +4784,7 @@ function DaTrackBreakdown({ csvData }) {
   const [sortCol, setSortCol] = useState("avgFinish");
   const [sortAsc, setSortAsc] = useState(true);
   const [expanded, setExpanded] = useState({});
+  const [viewMode, setViewMode] = useState("career_2026"); // "career_all" | "career_2026" | "season"
 
   // Build index: BY_DRIVER[name] = [race rows]
   const byDriver = useMemo(() => {
@@ -4802,10 +4803,42 @@ function DaTrackBreakdown({ csvData }) {
     return FULL_TIMER_NAMES.filter(n => byDriver[n]);
   }, [byDriver]);
 
-  // Compute all track stats for selected driver
+  // Helper: build stats for a set of races at a given track
+  function buildTrackStat(track, tRaces) {
+    const finishes = tRaces.map(r => r[3]).filter(v => v > 0);
+    const starts = tRaces.map(r => r[4]).filter(v => v > 0);
+    const avgFinish = finishes.length ? finishes.reduce((a,b)=>a+b,0)/finishes.length : null;
+    const avgStart = starts.length ? starts.reduce((a,b)=>a+b,0)/starts.length : null;
+    const wins = finishes.filter(f=>f===1).length;
+    const top5 = finishes.filter(f=>f<=5).length;
+    const top10 = finishes.filter(f=>f<=10).length;
+    const bestFinish = finishes.length ? Math.min(...finishes) : null;
+    const lapsLed = tRaces.reduce((a,r)=>a+(r[5]||0),0);
+    const trackType = CSV_TRACK_TYPES[track] || "Unknown";
+
+    // Year breakdown for expansion
+    const byYear = {};
+    for (const r of tRaces) { const yr = r[2]; if (!byYear[yr]) byYear[yr]=[]; byYear[yr].push(r); }
+    const yearData = Object.entries(byYear).sort((a,b)=>Number(a[0])-Number(b[0])).map(([yr,rs]) => ({
+      year: Number(yr),
+      finishes: rs.map(r=>r[3]).filter(v=>v>0),
+      lapsLed: rs.reduce((a,r)=>a+(r[5]||0),0),
+      starts: rs.map(r=>r[4]).filter(v=>v>0),
+    }));
+
+    return { track, trackType, races:tRaces.length, avgFinish, avgStart, wins, top5, top10, bestFinish, lapsLed, yearData };
+  }
+
+  // Compute all track stats for selected driver based on viewMode
   const { trackStats, summary, noHistory } = useMemo(() => {
     if (!selDriver || !byDriver[selDriver]) return { trackStats:[], summary:null, noHistory:[] };
-    const races = byDriver[selDriver];
+    let races = byDriver[selDriver];
+
+    // For "season" mode, filter to only 2026 races
+    if (viewMode === "season") {
+      races = races.filter(r => r[2] === 2026);
+      if (races.length === 0) return { trackStats:[], summary:{ totalRaces:0, totalWins:0, totalTop5:0, totalTop10:0, overallAvg:null, bestTrack:null, worstTrack:null, bestType:null, bestTypeAvg:null }, noHistory:[] };
+    }
 
     // Group by track — normalize aliases
     const byTrack = {};
@@ -4816,39 +4849,40 @@ function DaTrackBreakdown({ csvData }) {
       byTrack[trackName].push(r);
     }
 
-    // Build stats for each 2026 track
     const stats = [];
     const missing = [];
-    for (const track of DA_TRACKS_2026) {
-      const tRaces = byTrack[track] || [];
-      if (tRaces.length === 0) { missing.push(track); continue; }
-      const finishes = tRaces.map(r => r[3]).filter(v => v > 0);
-      const starts = tRaces.map(r => r[4]).filter(v => v > 0);
-      const avgFinish = finishes.length ? finishes.reduce((a,b)=>a+b,0)/finishes.length : null;
-      const avgStart = starts.length ? starts.reduce((a,b)=>a+b,0)/starts.length : null;
-      const wins = finishes.filter(f=>f===1).length;
-      const top5 = finishes.filter(f=>f<=5).length;
-      const top10 = finishes.filter(f=>f<=10).length;
-      const bestFinish = finishes.length ? Math.min(...finishes) : null;
-      const lapsLed = tRaces.reduce((a,r)=>a+(r[5]||0),0);
-      const trackType = CSV_TRACK_TYPES[track] || "Unknown";
 
-      // Year breakdown for expansion
-      const byYear = {};
-      for (const r of tRaces) { const yr = r[2]; if (!byYear[yr]) byYear[yr]=[]; byYear[yr].push(r); }
-      const yearData = Object.entries(byYear).sort((a,b)=>Number(a[0])-Number(b[0])).map(([yr,rs]) => ({
-        year: Number(yr),
-        finishes: rs.map(r=>r[3]).filter(v=>v>0),
-        lapsLed: rs.reduce((a,r)=>a+(r[5]||0),0),
-        starts: rs.map(r=>r[4]).filter(v=>v>0),
-      }));
-
-      stats.push({ track, trackType, races:tRaces.length, avgFinish, avgStart, wins, top5, top10, bestFinish, lapsLed, yearData });
+    if (viewMode === "career_all") {
+      // Show ALL tracks the driver has ever raced at
+      for (const [track, tRaces] of Object.entries(byTrack)) {
+        if (tRaces.length === 0) continue;
+        stats.push(buildTrackStat(track, tRaces));
+      }
+    } else {
+      // "career_2026" or "season" — only show 2026 schedule tracks
+      for (const track of DA_TRACKS_2026) {
+        const tRaces = byTrack[track] || [];
+        if (tRaces.length === 0) { missing.push(track); continue; }
+        stats.push(buildTrackStat(track, tRaces));
+      }
     }
 
-    // Summary
-    const allFinishes = races.map(r=>r[3]).filter(v=>v>0);
-    const totalRaces = races.length;
+    // Summary — computed from the SAME filtered races that produced the stats above
+    // For career_2026 and season: only races at 2026 tracks; for career_all: all races
+    let summaryRaces = races;
+    if (viewMode === "career_2026") {
+      // Only count races at tracks in the 2026 schedule
+      const tracks2026Set = new Set(DA_TRACKS_2026);
+      summaryRaces = races.filter(r => {
+        let tn = r[1];
+        if (DA_TRACK_ALIASES[tn]) tn = DA_TRACK_ALIASES[tn];
+        return tracks2026Set.has(tn);
+      });
+    }
+    // For career_all and season, summaryRaces = races (already correct)
+
+    const allFinishes = summaryRaces.map(r=>r[3]).filter(v=>v>0);
+    const totalRaces = summaryRaces.length;
     const totalWins = allFinishes.filter(f=>f===1).length;
     const totalTop5 = allFinishes.filter(f=>f<=5).length;
     const totalTop10 = allFinishes.filter(f=>f<=10).length;
@@ -4875,7 +4909,7 @@ function DaTrackBreakdown({ csvData }) {
       summary: { totalRaces, totalWins, totalTop5, totalTop10, overallAvg, bestTrack, worstTrack, bestType, bestTypeAvg },
       noHistory: missing,
     };
-  }, [selDriver, byDriver]);
+  }, [selDriver, byDriver, viewMode]);
 
   // Filter & sort
   const displayedTracks = useMemo(() => {
@@ -4930,6 +4964,25 @@ function DaTrackBreakdown({ csvData }) {
 
       {selDriver && summary && (
         <>
+          {/* View mode toggle */}
+          <div style={{ display:"flex", alignItems:"center", gap:2, background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:3, alignSelf:"flex-start" }}>
+            {[
+              { id:"career_all", label:"Career (All Tracks)" },
+              { id:"career_2026", label:"Career (2026 Tracks)" },
+              { id:"season", label:"This Season" },
+            ].map(opt => {
+              const active = viewMode === opt.id;
+              return (
+                <button key={opt.id} onClick={()=>{ setViewMode(opt.id); setExpanded({}); setTypeFilter("All"); }} style={{
+                  padding:"6px 14px", fontSize:11, fontWeight:active?800:600, fontFamily:"'Barlow Condensed',sans-serif",
+                  letterSpacing:1, textTransform:"uppercase", cursor:"pointer", borderRadius:6, border:"none",
+                  background:active ? T.accentSoft : "transparent", color:active ? T.accent : T.textDim,
+                  transition:"all 0.15s", whiteSpace:"nowrap",
+                }}>{opt.label}</button>
+              );
+            })}
+          </div>
+
           {/* Summary cards */}
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
             <StatCard label="Races" value={summary.totalRaces} />
@@ -5025,9 +5078,9 @@ function DaTrackBreakdown({ csvData }) {
           </div>
 
           {/* No history tracks */}
-          {noHistory.length > 0 && typeFilter === "All" && (
+          {noHistory.length > 0 && typeFilter === "All" && viewMode !== "career_all" && (
             <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:16 }}>
-              <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:10 }}>No History at These 2026 Tracks</div>
+              <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:10 }}>{viewMode === "season" ? "No 2026 Results at These Tracks" : "No History at These 2026 Tracks"}</div>
               <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                 {noHistory.map(t => (
                   <span key={t} style={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 10px", fontSize:11, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>
@@ -5035,6 +5088,15 @@ function DaTrackBreakdown({ csvData }) {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Season mode empty state */}
+          {viewMode === "season" && trackStats.length === 0 && summary && summary.totalRaces === 0 && (
+            <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"30px 20px", textAlign:"center" }}>
+              <div style={{ fontSize:20, marginBottom:8 }}>📭</div>
+              <div style={{ fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:2, textTransform:"uppercase", color:T.textMid }}>No 2026 Results Yet</div>
+              <div style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", marginTop:6 }}>Race data will appear here once the season begins.</div>
             </div>
           )}
         </>
