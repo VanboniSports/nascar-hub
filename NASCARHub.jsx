@@ -4753,7 +4753,7 @@ function TrackStatsTab({ csvData, incrementTool }) {
 // DRIVER ANALYTICS TAB
 // ─────────────────────────────────────────────────────────────
 const DA_TRACKS_2026 = [
-  "Bristol Motor Speedway","Charlotte Motor Speedway","Charlotte Motor Speedway (ROVAL)","Chicagoland Speedway","Circuit Of The Americas",
+  "Bristol Motor Speedway","Charlotte Motor Speedway","Chicagoland Speedway","Circuit Of The Americas",
   "Darlington Raceway","Daytona International Speedway","Dover International Speedway","Echopark Speedway",
   "Homestead-Miami Speedway","Indianapolis Motor Speedway","Iowa Speedway","Kansas Speedway",
   "Las Vegas Motor Speedway","Martinsville Speedway","Michigan International Speedway",
