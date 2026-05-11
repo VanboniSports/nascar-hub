@@ -88,11 +88,12 @@ const BATTLE_TRACK_COLORS = {
 // ─────────────────────────────────────────────────────────────
 // BLOG CATEGORIES & COLORS
 // ─────────────────────────────────────────────────────────────
-const BLOG_CATEGORIES = ["Race Recaps", "DFS Picks & Strategy", "Weekly Predictions", "General"];
+const BLOG_CATEGORIES = ["Race Recaps", "DFS Picks & Strategy", "Weekly Predictions", "1/75", "General"];
 const BLOG_CAT_COLORS = {
   "Race Recaps": "#3b82f6",
   "DFS Picks & Strategy": "#22c55e",
   "Weekly Predictions": "#f97316",
+  "1/75": "#d4a017",
   "General": "#6b7280",
 };
 
