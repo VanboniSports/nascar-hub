@@ -6599,11 +6599,38 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     else                      projFinish = typeAvg  * 0.50 + recentTypeAvg * 0.25 + recentAvg * 0.25;
     if (trackWins >= 3)      projFinish *= 0.88;
     else if (trackWins >= 1) projFinish *= 0.93;
-    // Practice adjustment: light 8% blend if practice data diverges from projection
+    // Practice adjustment: multi-component speed boost when practice data available
     if (practiceData && practiceData[driverName]) {
-      const practiceRank = practiceData[driverName];
-      const practiceFinish = Math.max(1, Math.min(40, practiceRank));
-      projFinish = projFinish * 0.92 + practiceFinish * 0.08;
+      const pd = practiceData[driverName];
+      // pd may be a simple rank (legacy) or a rich object { speedRank, longRunRank, deltaRank, speedVsSalaryGap, totalDrivers }
+      if (typeof pd === "object" && pd.speedRank != null) {
+        const N = pd.totalDrivers || 36;
+        const SPEED_WEIGHT = 5.0;
+        const LONG_RUN_WEIGHT = 3.0;
+        const DELTA_WEIGHT = 2.0;
+        const VALUE_GAP_WEIGHT = 0.5;
+        const MAX_VALUE_BOOST = 5.0;
+        const speedPct = 1 - ((pd.speedRank - 1) / (N - 1));
+        let practiceBoost = speedPct * SPEED_WEIGHT;
+        if (pd.longRunRank != null) {
+          const Nlr = pd.longRunTotal || N;
+          practiceBoost += (1 - ((pd.longRunRank - 1) / (Nlr - 1))) * LONG_RUN_WEIGHT;
+        }
+        if (pd.deltaRank != null) {
+          const Nd = pd.deltaTotal || N;
+          practiceBoost += (1 - ((pd.deltaRank - 1) / (Nd - 1))) * DELTA_WEIGHT;
+        }
+        if (pd.speedVsSalaryGap != null && pd.speedVsSalaryGap > 0) {
+          practiceBoost += Math.min(pd.speedVsSalaryGap * VALUE_GAP_WEIGHT, MAX_VALUE_BOOST);
+        }
+        // Convert boost into finish improvement (approx 1pt boost ≈ 0.4 finish improvement)
+        projFinish = Math.max(1, projFinish - practiceBoost * 0.4);
+      } else {
+        // Legacy: simple rank number → light 8% blend
+        const practiceRank = typeof pd === "number" ? pd : pd.speedRank || 20;
+        const practiceFinish = Math.max(1, Math.min(40, practiceRank));
+        projFinish = projFinish * 0.92 + practiceFinish * 0.08;
+      }
     }
     projFinish = Math.max(1, Math.min(40, Math.round(projFinish * 10) / 10));
     let projStart = Math.max(1, Math.min(40, Math.round(avgStart)));
@@ -6611,6 +6638,11 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     if (qualifyingData && qualifyingData[driverName]) {
       projStart = Math.max(1, Math.min(40, qualifyingData[driverName]));
     }
+
+    // Deep starter bonus: driver starting P25+ projected to finish well gets upside boost
+    // (the place differential points themselves are already captured in dfsScoreDK/FD,
+    //  but we add a small projection uplift for the best deep-start scenarios)
+    const isDeepStarter = qualifyingData && qualifyingData[driverName] && projStart >= 25 && projFinish <= 15;
 
     // Project fastest laps (DK only awards this; FD doesn't have FL points)
     // Every lap of the race awards 1 fastest lap (0.45 pts on DK), so totalLaps × share is the model.
@@ -6629,6 +6661,11 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     } else {
       projectedPts = dfsScoreFD(Math.round(projFinish), projStart, projLapsLed, totalLaps, totalLaps);
     }
+    // Apply deep starter bonus after base scoring
+    if (isDeepStarter) {
+      const DEEP_STARTER_WEIGHT = 3.0;
+      projectedPts += DEEP_STARTER_WEIGHT;
+    }
     // diffPts: strip laps-completed floor for FD so value calc isn't inflated
     const lapsCompletedFloor = (platformId === "fd") ? (totalLaps * 0.1) : 0;
     const diffPts = Math.round((projectedPts - lapsCompletedFloor) * 10) / 10;
@@ -6640,6 +6677,7 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     if (recentAvg <= 8) tags.push("Hot Streak");
     if (projLapsLed > totalLaps * 0.10) tags.push("Dominator");
     if (projStart >= 25 && Math.round(projFinish) <= 15) tags.push("PD Play");
+    if (isDeepStarter) tags.push("🚀 Deep Start");
     if (recentTypeAvg <= 10 && typeRows.length >= 5) tags.push("Type Specialist");
     if (platformId === "dk" && projectedFL >= totalLaps * 0.15) tags.push("Speed Demon");
     projections.push({
@@ -6875,14 +6913,73 @@ function dfsMaxPointsLineup(eligible, rosterSize, salaryCap) {
   return dfsGreedyLineup(byPts, rosterSize, salaryCap);
 }
 
-function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
+// Build a lineup enforcing locked drivers, then filling remaining spots from pool
+function dfsLockedLineup(locked, eligible, rosterSize, salaryCap, fillStrategy) {
+  if (!locked || locked.length === 0) return null;
+  const lockedNums = new Set(locked.map(d => d.num));
+  const lockedSal = locked.reduce((s, d) => s + d.salary, 0);
+  const remainingCap = salaryCap - lockedSal;
+  const remainingSpots = rosterSize - locked.length;
+  if (remainingSpots <= 0 || remainingCap < 0) return null;
+  const pool = eligible.filter(d => !lockedNums.has(d.num));
+  let fill = null;
+  if (fillStrategy === "maxPts") {
+    const byPts = [...pool].sort((a, b) => b.diffPts - a.diffPts);
+    fill = dfsGreedyLineup(byPts, remainingSpots, remainingCap);
+  } else if (fillStrategy === "value") {
+    const byVal = [...pool].sort((a, b) => b.value - a.value);
+    fill = dfsGreedyLineup(byVal, remainingSpots, remainingCap);
+  } else if (fillStrategy === "contrarian") {
+    // Skip top chalk among non-locked
+    const byPts = [...pool].sort((a, b) => b.diffPts - a.diffPts);
+    const skipCt = Math.min(3, pool.length - remainingSpots);
+    const topNums = new Set(byPts.slice(0, skipCt).map(d => d.num));
+    const nonChalk = pool.filter(d => !topNums.has(d.num));
+    const byVal = [...nonChalk].sort((a, b) => b.value - a.value);
+    fill = dfsGreedyLineup(byVal, remainingSpots, remainingCap) || dfsGreedyLineup([...pool].sort((a,b)=>b.value-a.value), remainingSpots, remainingCap);
+  } else if (fillStrategy === "balanced") {
+    const withCap = pool.filter(d => d.salary > 0 && d.salary <= remainingCap);
+    withCap.sort((a, b) => b.salary - a.salary);
+    const tierSize = Math.max(1, Math.ceil(withCap.length / remainingSpots));
+    const picks = []; let usedCap = 0; const used = new Set();
+    for (let i = 0; i < remainingSpots; i++) {
+      const tier = withCap.slice(i * tierSize, (i + 1) * tierSize).sort((a, b) => b.diffPts - a.diffPts);
+      for (const d of tier) {
+        if (!used.has(d.num) && d.salary <= remainingCap - usedCap) {
+          picks.push(d); used.add(d.num); usedCap += d.salary; break;
+        }
+      }
+    }
+    fill = picks.length === remainingSpots ? picks : null;
+    if (!fill) { const byVal = [...pool].sort((a,b)=>b.value-a.value); fill = dfsGreedyLineup(byVal, remainingSpots, remainingCap); }
+  } else {
+    // scrubs (stars & scrubs fill)
+    const byVal = [...pool].sort((a, b) => b.value - a.value);
+    fill = dfsGreedyLineup(byVal, remainingSpots, remainingCap);
+  }
+  if (!fill) return null;
+  return [...locked, ...fill];
+}
+
+function dfsOptimizeLineups(projections, rosterSize, salaryCap, count, lockedDrivers) {
   const eligible = projections.filter(p => p.salary > 0 && p.diffPts > 0);
   if (eligible.length < rosterSize) return [];
+  const locked = (lockedDrivers || []).filter(p => eligible.some(e => e.num === p.num));
+  const hasLocks = locked.length > 0;
   const lineups = [];
   const seen    = new Set();
   const tryAdd = (rawLineup, strategy) => {
-    // Validate & enhance: enforce salary floor + top-tier requirement
-    const lineup = dfsValidateLineup(rawLineup, eligible, rosterSize, salaryCap);
+    if (!rawLineup) return;
+    // For locked lineups, skip dfsValidateLineup's top-tier check since locked drivers are user choice
+    let lineup;
+    if (hasLocks) {
+      // Only enforce salary cap and floor; don't force additional studs on top of locks
+      lineup = dfsUpgradeLineup(rawLineup, eligible.filter(d => !locked.some(l => l.num === d.num)), salaryCap);
+      if (!lineup || lineup.length !== rosterSize) lineup = rawLineup.length === rosterSize ? rawLineup : null;
+      if (lineup && lineup.reduce((s, d) => s + d.salary, 0) > salaryCap) lineup = null;
+    } else {
+      lineup = dfsValidateLineup(rawLineup, eligible, rosterSize, salaryCap);
+    }
     if (!lineup) return;
     const key = lineup.map(d => d.num).sort().join(",");
     if (seen.has(key)) return;
@@ -6897,27 +6994,41 @@ function dfsOptimizeLineups(projections, rosterSize, salaryCap, count) {
       totalPts: Math.round(totalPts * 10) / 10,
       totalDiffPts: Math.round(totalDiffPts * 10) / 10,
       remaining: salaryCap - totalSalary,
+      hasLocks,
     });
   };
-  // Generate diverse strategies
-  tryAdd(dfsMaxPointsLineup(eligible, rosterSize, salaryCap), "Max Points");
-  tryAdd(dfsStarsAndScrubs(eligible, rosterSize, salaryCap), "Stars & Scrubs");
-  tryAdd(dfsBalancedLineup(eligible, rosterSize, salaryCap), "Balanced");
-  tryAdd(dfsContrarianLineup(eligible, rosterSize, salaryCap), "Contrarian");
-  // Best Value last (most likely to overlap with others after upgrade)
-  const byValue = [...eligible].sort((a, b) => b.value - a.value);
-  tryAdd(dfsGreedyLineup(byValue, rosterSize, salaryCap), "Best Value");
+
+  if (hasLocks) {
+    // Generate strategies around locked drivers
+    tryAdd(dfsLockedLineup(locked, eligible, rosterSize, salaryCap, "maxPts"), "Max Points 🔒");
+    tryAdd(dfsLockedLineup(locked, eligible, rosterSize, salaryCap, "scrubs"), "Stars & Scrubs 🔒");
+    tryAdd(dfsLockedLineup(locked, eligible, rosterSize, salaryCap, "balanced"), "Balanced 🔒");
+    tryAdd(dfsLockedLineup(locked, eligible, rosterSize, salaryCap, "contrarian"), "Contrarian 🔒");
+    tryAdd(dfsLockedLineup(locked, eligible, rosterSize, salaryCap, "value"), "Best Value 🔒");
+  } else {
+    // Generate diverse strategies
+    tryAdd(dfsMaxPointsLineup(eligible, rosterSize, salaryCap), "Max Points");
+    tryAdd(dfsStarsAndScrubs(eligible, rosterSize, salaryCap), "Stars & Scrubs");
+    tryAdd(dfsBalancedLineup(eligible, rosterSize, salaryCap), "Balanced");
+    tryAdd(dfsContrarianLineup(eligible, rosterSize, salaryCap), "Contrarian");
+    const byValue = [...eligible].sort((a, b) => b.value - a.value);
+    tryAdd(dfsGreedyLineup(byValue, rosterSize, salaryCap), "Best Value");
+  }
 
   // If we still have few lineups, try variations with different stud anchors
   if (lineups.length < 3) {
     const topDrivers = [...eligible].sort((a, b) => b.diffPts - a.diffPts).slice(0, 6);
     for (let i = 0; i < topDrivers.length && lineups.length < 5; i++) {
       const anchor = topDrivers[i];
-      const rest = eligible.filter(d => d.num !== anchor.num);
+      if (hasLocks && locked.some(l => l.num === anchor.num)) continue;
+      const anchorSet = hasLocks ? [...locked, anchor] : [anchor];
+      const anchorSal = anchorSet.reduce((s, d) => s + d.salary, 0);
+      if (anchorSal > salaryCap) continue;
+      const rest = eligible.filter(d => !anchorSet.some(a => a.num === d.num));
       const byVal = [...rest].sort((a, b) => b.value - a.value);
-      const fill = dfsGreedyLineup(byVal, rosterSize - 1, salaryCap - anchor.salary);
+      const fill = dfsGreedyLineup(byVal, rosterSize - anchorSet.length, salaryCap - anchorSal);
       if (fill) {
-        tryAdd([anchor, ...fill], `Anchor: ${anchor.driver.split(" ").pop()}`);
+        tryAdd([...anchorSet, ...fill], `Anchor: ${anchor.driver.split(" ").pop()}${hasLocks ? " 🔒" : ""}`);
       }
     }
   }
@@ -6935,6 +7046,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
   const [allProjections, setAllProjections] = useState([]);
   const [customLineup, setCustomLineup] = useState([]);
   const [customSearch, setCustomSearch] = useState("");
+  const [lockedDrivers, setLockedDrivers] = useState(new Set()); // driver nums (strings)
 
   useEffect(() => { incrementTool?.("dfs_optimizer"); }, []);
 
@@ -6948,6 +7060,18 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
   const hasSalary  = Object.keys(salaryData).length > 0;
   const salaryUpdatedAt = dfsSalaries?.[`${platform}_updated`] || null;
 
+  const maxLocks = plat.rosterSize <= 5 ? 3 : 4; // FD: max 3 of 5, DK: max 4 of 6
+
+  const toggleLock = (num) => {
+    setLockedDrivers(prev => {
+      const next = new Set(prev);
+      if (next.has(num)) { next.delete(num); return next; }
+      if (next.size >= maxLocks) return prev; // enforce max
+      next.add(num);
+      return next;
+    });
+  };
+
   const runOptimizer = () => {
     if (!race || !hasCsv) return;
     let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled, qualPractice);
@@ -6957,7 +7081,8 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
     });
     setAllProjections(projections);
     if (!hasSalary) { setLineups([]); return; }
-    const results = dfsOptimizeLineups(projections, plat.rosterSize, plat.salaryCap, 5);
+    const lockedProjs = projections.filter(p => lockedDrivers.has(p.num) && p.salary > 0);
+    const results = dfsOptimizeLineups(projections, plat.rosterSize, plat.salaryCap, 5, lockedProjs);
     setLineups(results);
   };
 
@@ -7092,7 +7217,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
               <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 }}>🏁 Qualifying</div>
               <div style={{ fontSize: 12, color: qpMatch && qpQualCount > 0 ? T.green : T.gold, fontFamily: "'IBM Plex Mono',monospace" }}>
                 {qpMatch && qpQualCount > 0
-                  ? `✓ ${raceWeek === "allstar" ? "All-Star" : `Wk ${raceWeek}`} · ${qpQualCount} drivers${qpPracCount > 0 ? ` + Practice` : ""}`
+                  ? `✓ ${raceWeek === "allstar" ? "All-Star" : `Wk ${raceWeek}`} · ${qpQualCount} drivers${qpPracCount > 0 ? ` + Practice${qualPractice?.practiceIsTiming ? " 📊" : ""}` : ""}`
                   : "⚠ No data — using historical estimates"
                 }
               </div>
@@ -7110,6 +7235,37 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
           ))}
         </div>
       )}
+
+      {/* LOCKED DRIVERS SUMMARY */}
+      {lockedDrivers.size > 0 && (() => {
+        const lockedList = allProjections.filter(p => lockedDrivers.has(p.num));
+        const lockedSal = lockedList.reduce((s, d) => s + d.salary, 0);
+        const remainingCap = plat.salaryCap - lockedSal;
+        const remainingSpots = plat.rosterSize - lockedDrivers.size;
+        return (
+          <div style={{ padding: "10px 14px", background: "rgba(251,191,36,0.06)", border: `1px solid ${T.gold}40`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 14 }}>🔒</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: T.gold, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1 }}>
+                {lockedDrivers.size} DRIVER{lockedDrivers.size !== 1 ? "S" : ""} LOCKED
+              </span>
+              {lockedList.map(d => (
+                <span key={d.num} style={{ fontSize: 11, color: T.text, background: `${T.gold}15`, border: `1px solid ${T.gold}40`, borderRadius: 4, padding: "2px 7px", fontFamily: "'IBM Plex Mono',monospace" }}>
+                  {d.driver}
+                  <button onClick={() => toggleLock(d.num)} style={{ background: "none", border: "none", color: T.gold, cursor: "pointer", marginLeft: 4, padding: 0, fontSize: 11 }}>✕</button>
+                </span>
+              ))}
+              <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                ${remainingCap.toLocaleString()} remaining for {remainingSpots} spot{remainingSpots !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <button onClick={() => setLockedDrivers(new Set())}
+              style={{ fontSize: 10, padding: "3px 10px", background: "none", border: `1px solid ${T.gold}40`, color: T.gold, borderRadius: 4, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+              Clear All
+            </button>
+          </div>
+        );
+      })()}
 
       {/* RACE SELECTOR + RUN */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -7403,12 +7559,13 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
                   {lu.drivers.map((d, di) => {
                     const tierColor = di === 0 ? T.gold : di < 3 ? col : T.textMid;
                     return (
-                      <div key={d.num} style={{ padding: "10px 16px", borderBottom: di < lu.drivers.length - 1 ? `1px solid ${T.border}` : "none", display: "flex", alignItems: "center", gap: 12 }}>
+                      <div key={d.num} style={{ padding: "10px 16px", borderBottom: di < lu.drivers.length - 1 ? `1px solid ${T.border}` : "none", display: "flex", alignItems: "center", gap: 12, background: lockedDrivers.has(d.num) ? `${T.gold}05` : "transparent" }}>
                         <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${tierColor}18`, border: `1px solid ${tierColor}40`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, color: tierColor, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif" }}>{di + 1}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>#{d.num} {d.driver}</span>
                             {d.rookie && <span style={{ fontSize: 8, fontWeight: 700, color: "#4ade80", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 3, padding: "1px 5px", letterSpacing: 0.8 }}>ROOKIE</span>}
+                            {lockedDrivers.has(d.num) && <span style={{ fontSize: 8, fontWeight: 700, color: T.gold, background: `${T.gold}15`, border: `1px solid ${T.gold}40`, borderRadius: 3, padding: "1px 5px", letterSpacing: 0.8 }}>🔒 LOCKED</span>}
                           </div>
                           <div style={{ fontSize: 10, color: T.textDim, marginTop: 1 }}>{d.team} · {d.mfg}</div>
                           <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
@@ -7451,13 +7608,22 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
       {/* ALL DRIVERS TABLE */}
       {(viewMode === "all" || (allProjections.length > 0 && !hasSalary)) && allProjections.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 10, color: col, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, marginBottom: 4 }}>
-            {plat.abbr} PROJECTIONS — {allProjections.length} drivers
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <div style={{ fontSize: 10, color: col, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700 }}>
+              {plat.abbr} PROJECTIONS — {allProjections.length} drivers
+            </div>
+            {hasSalary && (
+              <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                🔒 Lock up to {maxLocks} drivers · forces inclusion in every lineup
+              </div>
+            )}
           </div>
           {allProjections.map((d, i) => {
             const tierColor = i === 0 ? T.gold : i < 3 ? col : i < 10 ? T.accentText : T.textMid;
+            const isLocked = lockedDrivers.has(d.num);
+            const canLock = hasSalary && (isLocked || lockedDrivers.size < maxLocks);
             return (
-              <div key={d.num} style={{ background: i < 3 ? `${col}08` : T.surface, border: `1px solid ${i < 3 ? `${col}40` : T.border}`, borderLeft: `3px solid ${tierColor}`, borderRadius: 10, padding: "10px 14px" }}>
+              <div key={d.num} style={{ background: isLocked ? `${T.gold}0a` : (i < 3 ? `${col}08` : T.surface), border: `1px solid ${isLocked ? T.gold + "50" : (i < 3 ? `${col}40` : T.border)}`, borderLeft: `3px solid ${isLocked ? T.gold : tierColor}`, borderRadius: 10, padding: "10px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${tierColor}18`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, color: tierColor, flexShrink: 0 }}>{i + 1}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -7483,14 +7649,32 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
                       </div>
                     )}
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>{fmtPts(d.projectedPts)}</div>
-                    <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>PROJ PTS</div>
-                    {d.salary > 0 && (
-                      <>
-                        <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 2 }}>{fmtSalary(d.salary)}</div>
-                        <div style={{ fontSize: 9, color: T.green, fontFamily: "'IBM Plex Mono',monospace" }}>{d.value.toFixed(1)} pts/$K</div>
-                      </>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: col, fontFamily: "'Barlow Condensed',sans-serif" }}>{fmtPts(d.projectedPts)}</div>
+                      <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>PROJ PTS</div>
+                      {d.salary > 0 && (
+                        <>
+                          <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 2 }}>{fmtSalary(d.salary)}</div>
+                          <div style={{ fontSize: 9, color: T.green, fontFamily: "'IBM Plex Mono',monospace" }}>{d.value.toFixed(1)} pts/$K</div>
+                        </>
+                      )}
+                    </div>
+                    {hasSalary && (
+                      <button onClick={() => canLock && toggleLock(d.num)}
+                        disabled={!canLock}
+                        title={isLocked ? "Unlock driver" : (lockedDrivers.size >= maxLocks ? `Max ${maxLocks} locks` : "Lock this driver")}
+                        style={{
+                          padding: "3px 9px", fontSize: 11, fontWeight: 700,
+                          background: isLocked ? `${T.gold}20` : "transparent",
+                          border: `1px solid ${isLocked ? T.gold : (canLock ? T.border2 : T.border)}`,
+                          color: isLocked ? T.gold : (canLock ? T.textMid : T.textDim),
+                          borderRadius: 5, cursor: canLock ? "pointer" : "default",
+                          fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 0.5,
+                          transition: "all 0.15s",
+                        }}>
+                        {isLocked ? "🔒 Locked" : "🔓 Lock"}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -7709,10 +7893,125 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
     return { results, unmatched };
   };
 
+  // Parse NASCAR practice lap-time data (tab-delimited format from NASCAR.com/app)
+  // Format: POS\tOVERALL\t5-LAP\t10-LAP\t15-LAP\t20-LAP\t25-LAP\t30-LAP (header)
+  //         1\tChristopher Bell\t30.20\t29.97\t30.06\t30.11\t...\t-- (data rows)
+  const parsePracticeTimingText = (text, salaryDataForRank) => {
+    if (!text || !text.trim()) return { results: {}, unmatched: [], isParsedTiming: false };
+    const lines = text.trim().split("\n").filter(l => l.trim());
+    if (lines.length < 2) return { results: {}, unmatched: [], isParsedTiming: false };
+
+    // Detect if this looks like tab-delimited timing data (has numbers like 29.xx / 30.xx)
+    const looksLikeTiming = lines.some(l => /\t\d+\.\d+/.test(l) || /\t--/.test(l));
+    if (!looksLikeTiming) return { results: {}, unmatched: [], isParsedTiming: false };
+
+    const matchDriver = (raw) => {
+      if (!raw || !raw.trim()) return null;
+      const normalized = normalizeCsvDriverName(raw.trim());
+      if (FULL_TIMER_NAMES.includes(normalized)) return normalized;
+      const nl = normalized.toLowerCase();
+      const fuzzy = FULL_TIMER_NAMES.find(d => {
+        const dl = d.toLowerCase();
+        return dl === nl || nl.includes(dl) || dl.includes(nl);
+      });
+      if (!fuzzy && /^[A-Za-z]/.test(raw.trim()) && raw.trim().includes(" ")) {
+        console.warn("[PracticeTiming] Unmatched driver:", raw.trim(), "→ normalized:", normalized);
+      }
+      return fuzzy || null;
+    };
+
+    const driverData = []; // { name, overall, lap5, lap10, lap15, lap20, lap25, lap30 }
+    const unmatched = [];
+
+    for (const line of lines) {
+      const parts = line.split("\t").map(p => p.trim());
+      if (parts.length < 3) continue;
+      // Skip header
+      if (/^(POS|POSITION|#)$/i.test(parts[0])) continue;
+      // First field should be position (number), second is driver name
+      let pos = -1, nameIdx = -1;
+      if (/^\d+$/.test(parts[0])) { pos = parseInt(parts[0]); nameIdx = 1; }
+      else if (/^\d+$/.test(parts[1])) { pos = parseInt(parts[1]); nameIdx = 2; }
+      else { nameIdx = 0; } // fallback: first field is name
+
+      const rawName = parts[nameIdx] || "";
+      if (!rawName || !rawName.includes(" ")) continue;
+      const driver = matchDriver(rawName);
+      if (!driver) { if (rawName.length > 3) unmatched.push(rawName); continue; }
+
+      // Extract lap time floats (-- → null)
+      const parseTime = (s) => { if (!s || s === "--" || s === "-") return null; const n = parseFloat(s); return isNaN(n) ? null : n; };
+      const dataStart = nameIdx + 1;
+      const overall = parseTime(parts[dataStart]);
+      const lap5    = parseTime(parts[dataStart + 1]);
+      const lap10   = parseTime(parts[dataStart + 2]);
+      const lap15   = parseTime(parts[dataStart + 3]);
+      const lap20   = parseTime(parts[dataStart + 4]);
+      const lap25   = parseTime(parts[dataStart + 5]);
+      const lap30   = parseTime(parts[dataStart + 6]);
+      driverData.push({ name: driver, overall, lap5, lap10, lap15, lap20, lap25, lap30 });
+    }
+
+    if (driverData.length === 0) return { results: {}, unmatched, isParsedTiming: false };
+
+    // Compute derived metrics
+    const N = driverData.length;
+    // Sort by overall (ascending = faster)
+    const byOverall = [...driverData].filter(d => d.overall != null).sort((a, b) => a.overall - b.overall);
+    // Long-run rank: prefer 30-lap, fall back to 15-lap, then overall
+    const byLongRun = [...driverData].filter(d => d.lap30 != null || d.lap15 != null || d.overall != null)
+      .sort((a, b) => (a.lap30 || a.lap15 || a.overall) - (b.lap30 || b.lap15 || b.overall));
+    // Delta rank: short-long delta (lap5 - lap30); lower = better tire management
+    const withDelta = driverData.filter(d => d.lap5 != null && (d.lap30 != null || d.lap15 != null))
+      .map(d => ({ ...d, delta: d.lap5 - (d.lap30 || d.lap15) }))
+      .sort((a, b) => a.delta - b.delta); // lower delta = better = rank 1
+
+    // Build salary rank map for speed-vs-salary gap
+    const salaryRankMap = {};
+    if (salaryDataForRank && Object.keys(salaryDataForRank).length > 0) {
+      const sorted = driverData
+        .filter(d => (salaryDataForRank[d.name] || 0) > 0)
+        .sort((a, b) => (salaryDataForRank[b.name] || 0) - (salaryDataForRank[a.name] || 0));
+      sorted.forEach((d, i) => { salaryRankMap[d.name] = i + 1; });
+    }
+
+    const results = {};
+    for (const d of driverData) {
+      const speedRank = byOverall.findIndex(x => x.name === d.name) + 1 || N;
+      const longRunRank = byLongRun.findIndex(x => x.name === d.name) + 1 || null;
+      const deltaEntry = withDelta.find(x => x.name === d.name);
+      const deltaRank = deltaEntry ? withDelta.findIndex(x => x.name === d.name) + 1 : null;
+      const salaryRank = salaryRankMap[d.name] || null;
+      const speedVsSalaryGap = (salaryRank != null && speedRank > 0) ? salaryRank - speedRank : null;
+      results[d.name] = {
+        speedRank,
+        longRunRank: longRunRank || null,
+        longRunTotal: byLongRun.length,
+        deltaRank: deltaRank || null,
+        deltaTotal: withDelta.length,
+        speedVsSalaryGap,
+        totalDrivers: N,
+        overall: d.overall,
+        lap5: d.lap5,
+        lap30: d.lap30 || d.lap15,
+      };
+    }
+    return { results, unmatched, isParsedTiming: true, driverCount: N };
+  };
+
   const handleQualImport = () => {
     if (!qualWeek) { setQualMsg("❌ Select a race week first"); return; }
     const { results: qualResults, unmatched: qualUnmatched } = parseQualPracticeText(qualText);
-    const { results: practiceResults, unmatched: practiceUnmatched } = parseQualPracticeText(practiceText);
+    // Try rich timing parser first for practice; fall back to position-only
+    const currentSalaryData = dfsSalaries?.[activePlatform] || {};
+    const { results: practiceRich, unmatched: practiceUnmatched, isParsedTiming } =
+      parsePracticeTimingText(practiceText, currentSalaryData);
+    let practiceResults;
+    if (isParsedTiming) {
+      practiceResults = practiceRich;
+    } else {
+      practiceResults = parseQualPracticeText(practiceText).results;
+    }
     if (Object.keys(qualResults).length === 0 && Object.keys(practiceResults).length === 0) {
       setQualMsg("❌ No drivers matched from either text area");
       return;
@@ -7722,6 +8021,7 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
       week: weekVal,
       qualifying: qualResults,
       practice: practiceResults,
+      practiceIsTiming: isParsedTiming,
       updated: new Date().toISOString(),
     };
     onQualPracticeSave(updated);
@@ -7729,7 +8029,7 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
     const qCount = Object.keys(qualResults).length;
     const pCount = Object.keys(practiceResults).length;
     let msg = `✓ Imported ${qCount} qualifying`;
-    if (pCount > 0) msg += ` + ${pCount} practice`;
+    if (pCount > 0) msg += ` + ${pCount} practice${isParsedTiming ? " (timing data ✓)" : ""}`;
     msg += " drivers";
     if (allUnmatched.length > 0) msg += ` · Unmatched: ${allUnmatched.join(", ")}`;
     setQualMsg(msg);
@@ -7891,9 +8191,9 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
 
         {/* Practice text area */}
         <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Practice Results (optional)</label>
+          <label style={{ fontSize: 10, color: T.textDim, display: "block", marginBottom: 6, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" }}>Practice Results (optional) — paste tab-delimited timing from NASCAR app</label>
           <textarea value={practiceText} onChange={e => setPracticeText(e.target.value)} rows={5}
-            placeholder="Paste practice results…"
+            placeholder={"Paste practice results…\nFormat A (timing): POS\\tDRIVER\\tOVERALL\\t5-LAP\\t10-LAP\\t15-LAP\\t20-LAP\\t25-LAP\\t30-LAP\nFormat B (positions): standard name/position list"}
             style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "10px 12px", fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", outline: "none", resize: "vertical", lineHeight: 1.6 }} />
         </div>
 
@@ -7937,15 +8237,40 @@ function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDis
         {practiceCount > 0 && (
           <details style={{ background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
             <summary style={{ cursor: "pointer", fontSize: 11, color: T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
-              View Practice Data ({practiceCount} drivers)
+              View Practice Data ({practiceCount} drivers){qualPractice?.practiceIsTiming ? " — Timing ✓" : ""}
             </summary>
-            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px", maxHeight: 300, overflowY: "auto" }}>
-              {Object.entries(qualPractice.practice).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
-                <div key={name} style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid, padding: "2px 0", display: "flex", justifyContent: "space-between" }}>
-                  <span>{name}</span>
-                  <span style={{ color: T.green, fontWeight: 700 }}>P{pos}</span>
+            <div style={{ marginTop: 8, maxHeight: 350, overflowY: "auto" }}>
+              {qualPractice.practiceIsTiming ? (
+                // Rich timing data view
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: "2px 8px", padding: "4px 0", borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                    <span>Driver</span><span>Spd Rank</span><span>LR Rank</span><span>Δ Rank</span><span>Sal Gap</span>
+                  </div>
+                  {Object.entries(qualPractice.practice)
+                    .sort((a, b) => (a[1].speedRank || 99) - (b[1].speedRank || 99))
+                    .map(([name, pd]) => (
+                    <div key={name} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: "2px 8px", padding: "3px 0", borderBottom: `1px solid ${T.border}10`, fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid }}>
+                      <span style={{ color: T.text, fontWeight: pd.speedRank <= 5 ? 700 : 400 }}>{name}</span>
+                      <span style={{ color: pd.speedRank <= 3 ? T.green : pd.speedRank <= 10 ? T.accent : T.textDim }}>#{pd.speedRank}</span>
+                      <span style={{ color: pd.longRunRank <= 3 ? T.green : T.textDim }}>{pd.longRunRank ? `#${pd.longRunRank}` : "—"}</span>
+                      <span style={{ color: pd.deltaRank <= 3 ? T.green : T.textDim }}>{pd.deltaRank ? `#${pd.deltaRank}` : "—"}</span>
+                      <span style={{ color: pd.speedVsSalaryGap > 3 ? T.green : pd.speedVsSalaryGap < -3 ? T.red : T.textDim }}>
+                        {pd.speedVsSalaryGap != null ? (pd.speedVsSalaryGap > 0 ? `+${pd.speedVsSalaryGap}` : pd.speedVsSalaryGap) : "—"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                // Legacy position view
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px" }}>
+                  {Object.entries(qualPractice.practice).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
+                    <div key={name} style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid, padding: "2px 0", display: "flex", justifyContent: "space-between" }}>
+                      <span>{name}</span>
+                      <span style={{ color: T.green, fontWeight: 700 }}>P{pos}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </details>
         )}
