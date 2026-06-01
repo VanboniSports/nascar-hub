@@ -6564,6 +6564,38 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     const rows = driverIdx[driverName];
     if (!rows || rows.length === 0) continue;
     const sorted = [...rows].sort((a, b) => (a[9] || "").localeCompare(b[9] || ""));
+
+    // Determine current season year from the most recent race in the dataset
+    const currentYear = sorted.length > 0 ? sorted[sorted.length - 1][2] : new Date().getFullYear();
+
+    // Full current season stats
+    const seasonRows = sorted.filter(r => r[2] === currentYear);
+    const seasonRaceCount = seasonRows.length;
+    const seasonAvg = seasonRaceCount > 0
+      ? seasonRows.reduce((s, r) => s + r[3], 0) / seasonRaceCount
+      : 20.0;
+
+    // Season track-type form: how they've done at THIS type of track THIS season
+    const seasonTypeRows = seasonRows.filter(r => predGetTrackType(r[1]) === trackType);
+    const seasonTypeAvg = seasonTypeRows.length > 0
+      ? seasonTypeRows.reduce((s, r) => s + r[3], 0) / seasonTypeRows.length
+      : null; // null signals "fall back to all-time typeAvg" below
+
+    // Recency-weighted season average: more recent races count slightly more
+    // Linear decay: most recent race gets weight N, second gets N-1, etc.
+    let seasonWeightedAvg = seasonAvg; // fallback
+    if (seasonRaceCount >= 3) {
+      let weightedSum = 0;
+      let totalWeight = 0;
+      for (let i = 0; i < seasonRaceCount; i++) {
+        const weight = i + 1; // oldest=1, newest=N
+        weightedSum += seasonRows[i][3] * weight;
+        totalWeight += weight;
+      }
+      seasonWeightedAvg = weightedSum / totalWeight;
+    }
+
+    // Keep last-5 as a fallback for early-season or cross-season edge cases
     const recent    = sorted.slice(-5);
     const recentAvg = recent.reduce((s, r) => s + r[3], 0) / recent.length;
     const trackRows       = rows.filter(r => predMatchTrack(race.track, r[1]));
@@ -6594,9 +6626,10 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
         : typeLedPct;
     const projLapsLed = Math.round(blendedLedPct * totalLaps);
     let projFinish;
-    if (trackRaces >= 5)      projFinish = trackAvg * 0.55 + typeAvg * 0.25 + recentTypeAvg * 0.10 + recentAvg * 0.10;
-    else if (trackRaces >= 2) projFinish = trackAvg * 0.35 + typeAvg * 0.35 + recentTypeAvg * 0.15 + recentAvg * 0.15;
-    else                      projFinish = typeAvg  * 0.50 + recentTypeAvg * 0.25 + recentAvg * 0.25;
+    const effectiveSeasonTypeAvg = seasonTypeAvg !== null ? seasonTypeAvg : typeAvg;
+    if (trackRaces >= 5)      projFinish = trackAvg * 0.45 + typeAvg * 0.15 + effectiveSeasonTypeAvg * 0.15 + seasonWeightedAvg * 0.15 + recentAvg * 0.10;
+    else if (trackRaces >= 2) projFinish = trackAvg * 0.25 + typeAvg * 0.20 + effectiveSeasonTypeAvg * 0.20 + seasonWeightedAvg * 0.20 + recentAvg * 0.15;
+    else                      projFinish = typeAvg  * 0.25 + effectiveSeasonTypeAvg * 0.25 + seasonWeightedAvg * 0.30 + recentAvg * 0.20;
     if (trackWins >= 3)      projFinish *= 0.88;
     else if (trackWins >= 1) projFinish *= 0.93;
     // Practice adjustment: multi-component speed boost when practice data available
@@ -6633,6 +6666,27 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
       }
     }
     projFinish = Math.max(1, Math.min(40, Math.round(projFinish * 10) / 10));
+
+    // ═══ DNF RISK MODIFIER ═══
+    const DNF_FINISH_THRESHOLD = 33;  // P33+ is almost always a DNF/wreck
+    const DNF_PENALTY_FINISH   = 36;  // Expected finish value for a DNF
+    const DNF_RISK_WEIGHT      = 1.0; // Master dial: 1.0 = full effect, 0 = off
+
+    const careerBadOutcomes = sorted.filter(r => r[3] >= DNF_FINISH_THRESHOLD).length;
+    const careerDnfRate     = sorted.length > 0 ? careerBadOutcomes / sorted.length : 0;
+    const seasonBadOutcomes = seasonRows.filter(r => r[3] >= DNF_FINISH_THRESHOLD).length;
+    const seasonDnfRate     = seasonRaceCount > 0 ? seasonBadOutcomes / seasonRaceCount : 0;
+
+    let dnfCareerWeight, dnfSeasonWeight;
+    if (seasonRaceCount <= 5)       { dnfCareerWeight = 0.60; dnfSeasonWeight = 0.40; }
+    else if (seasonRaceCount <= 10) { dnfCareerWeight = 0.40; dnfSeasonWeight = 0.60; }
+    else                            { dnfCareerWeight = 0.30; dnfSeasonWeight = 0.70; }
+
+    const blendedDnfRate = (careerDnfRate * dnfCareerWeight + seasonDnfRate * dnfSeasonWeight) * DNF_RISK_WEIGHT;
+
+    // Apply finish penalty: expected value blend between clean finish and DNF
+    const riskAdjustedFinish = projFinish * (1 - blendedDnfRate) + DNF_PENALTY_FINISH * blendedDnfRate;
+    projFinish = Math.max(1, Math.min(40, Math.round(riskAdjustedFinish * 10) / 10));
     let projStart = Math.max(1, Math.min(40, Math.round(avgStart)));
     // Override projStart with actual qualifying position when available
     if (qualifyingData && qualifyingData[driverName]) {
@@ -6654,12 +6708,17 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     flShare               = Math.max(0, Math.min(0.40, flShare)); // cap at 40% — no driver realistically gets more
     const projectedFL     = Math.round(totalLaps * flShare);
 
+    // Apply DNF discounts to laps-related inputs
+    const adjustedLapsLed       = Math.round(projLapsLed  * (1 - blendedDnfRate * 0.7));
+    const adjustedFL            = Math.round(projectedFL  * (1 - blendedDnfRate * 0.5));
+    const adjustedLapsCompleted = Math.round(totalLaps    * (1 - blendedDnfRate * 0.5));
+
     let projectedPts;
     if (platformId === "dk") {
-      const isMostLaps = projLapsLed > totalLaps * 0.25;
-      projectedPts = dfsScoreDK(Math.round(projFinish), projStart, projLapsLed, totalLaps, isMostLaps, projectedFL);
+      const isMostLaps = adjustedLapsLed > totalLaps * 0.25;
+      projectedPts = dfsScoreDK(Math.round(projFinish), projStart, adjustedLapsLed, totalLaps, isMostLaps, adjustedFL);
     } else {
-      projectedPts = dfsScoreFD(Math.round(projFinish), projStart, projLapsLed, totalLaps, totalLaps);
+      projectedPts = dfsScoreFD(Math.round(projFinish), projStart, adjustedLapsLed, totalLaps, adjustedLapsCompleted);
     }
     // Apply deep starter bonus after base scoring
     if (isDeepStarter) {
@@ -6680,6 +6739,9 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     if (isDeepStarter) tags.push("🚀 Deep Start");
     if (recentTypeAvg <= 10 && typeRows.length >= 5) tags.push("Type Specialist");
     if (platformId === "dk" && projectedFL >= totalLaps * 0.15) tags.push("Speed Demon");
+    if (blendedDnfRate >= 0.25) tags.push("⚠️ High DNF Risk");
+    else if (blendedDnfRate >= 0.12) tags.push("DNF Risk");
+    if (seasonDnfRate === 0 && seasonRaceCount >= 8) tags.push("Iron Man");
     projections.push({
       driver: driverName,
       num: dInfo?.num || "?",
