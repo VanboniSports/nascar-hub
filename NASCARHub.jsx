@@ -6672,8 +6672,13 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     const DNF_PENALTY_FINISH   = 36;  // Expected finish value for a DNF
     const DNF_RISK_WEIGHT      = 1.0; // Master dial: 1.0 = full effect, 0 = off
 
-    // Exact DNF identification using status field (index 10): anything not "Running"
-    const isDnf = r => !/^running$/i.test((r[10] || "Running").trim());
+    // Hybrid DNF identification: explicit non-Running status OR P33+ finish as backstop
+    // (scraper sometimes logs DNFs as "Running" so position-based fallback is necessary)
+    const isDnf = r => {
+      const status = (r[10] || "Running").trim();
+      if (!/^running$/i.test(status)) return true;
+      return r[3] >= 33;
+    };
 
     const careerBadOutcomes = sorted.filter(isDnf).length;
     const careerDnfRate     = sorted.length > 0 ? careerBadOutcomes / sorted.length : 0;
