@@ -383,7 +383,8 @@ function parseCSVData(csvText) {
     })();
     const lapsCompleted = parseInt(vals[colIdx["laps_completed"]]) || 0;
     const raceDate = vals[colIdx["race_date"]] || "";
-    rows.push([driverName, trackName, year, finish, start, lapsLed, 1, manufacturer, lapsCompleted, raceDate]);
+    const status = vals[colIdx["status"]] || "Running";
+    rows.push([driverName, trackName, year, finish, start, lapsLed, 1, manufacturer, lapsCompleted, raceDate, status]);
   }
   return rows;
 }
@@ -6668,13 +6669,15 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     projFinish = Math.max(1, Math.min(40, Math.round(projFinish * 10) / 10));
 
     // ═══ DNF RISK MODIFIER ═══
-    const DNF_FINISH_THRESHOLD = 33;  // P33+ is almost always a DNF/wreck
     const DNF_PENALTY_FINISH   = 36;  // Expected finish value for a DNF
     const DNF_RISK_WEIGHT      = 1.0; // Master dial: 1.0 = full effect, 0 = off
 
-    const careerBadOutcomes = sorted.filter(r => r[3] >= DNF_FINISH_THRESHOLD).length;
+    // Exact DNF identification using status field (index 10): anything not "Running"
+    const isDnf = r => !/^running$/i.test((r[10] || "Running").trim());
+
+    const careerBadOutcomes = sorted.filter(isDnf).length;
     const careerDnfRate     = sorted.length > 0 ? careerBadOutcomes / sorted.length : 0;
-    const seasonBadOutcomes = seasonRows.filter(r => r[3] >= DNF_FINISH_THRESHOLD).length;
+    const seasonBadOutcomes = seasonRows.filter(isDnf).length;
     const seasonDnfRate     = seasonRaceCount > 0 ? seasonBadOutcomes / seasonRaceCount : 0;
 
     let dnfCareerWeight, dnfSeasonWeight;
