@@ -8810,21 +8810,58 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GA4 VIRTUAL PAGEVIEWS
-// The Hub is a single-page app: the URL never changes when switching
-// tabs, so GA4's automatic page tracking sees everything as one page.
-// This helper fires a manual page_view per tab so GA4 can report
-// traffic per Hub section (page path looks like "/#dfs").
-// (gtag's automatic pageview is disabled in index.html to avoid
-// double counting the initial load.)
+// ROUTES + GA4 VIRTUAL PAGEVIEWS
+// The Hub is a single-page app, but each tab gets its own real URL
+// (e.g. /dfs) so sections are shareable and indexable by search engines.
+// Vercel rewrites every path to index.html; on load the tab is picked
+// from the URL, and tab clicks update the URL via history.pushState.
+// Each tab switch also fires a manual GA4 page_view (gtag's automatic
+// pageview is disabled in index.html) so Analytics reports per-section
+// traffic under the real page path.
 // ─────────────────────────────────────────────────────────────
+const TAB_ROUTES = {
+  "/": "power",
+  "/predictions": "predictor",
+  "/battle": "tracker",
+  "/tracks": "tracks",
+  "/drivers": "analytics",
+  "/season": "season",
+  "/dfs": "dfs",
+  "/blog": "blog",
+};
+const TAB_META = {
+  power:     { title: "NASCAR Cup Series Power Rankings | Vanboni Sports", desc: "Weekly NASCAR Cup Series power rankings computed from official race results, updated after every race." },
+  predictor: { title: "NASCAR Race Predictor: Model Picks & Win Probabilities | Vanboni Sports", desc: "Data-driven NASCAR race predictions from Pure Stats, Enhanced Pure Stats and power-ranking models, with winner probabilities for every driver." },
+  tracker:   { title: "Predictor Battle Tracker: Models vs. the Gut | Vanboni Sports", desc: "Follow the season-long battle between the Vanboni Sports models and Morgan's gut picks, scored against actual NASCAR race results." },
+  tracks:    { title: "NASCAR Track Stats & History | Vanboni Sports", desc: "Track-by-track NASCAR Cup Series stats: past winners, track types, and how each track plays." },
+  analytics: { title: "NASCAR Driver Analytics | Vanboni Sports", desc: "Deep NASCAR driver stats, trends and head-to-head comparisons across the Cup Series field." },
+  season:    { title: "NASCAR Cup Series Season Stats & Standings | Vanboni Sports", desc: "2026 NASCAR Cup Series points standings and season-long driver statistics, updated weekly." },
+  dfs:       { title: "NASCAR DFS Optimizer: DraftKings & FanDuel Lineups | Vanboni Sports", desc: "Build optimal NASCAR DFS lineups with projections, salaries and value plays for DraftKings and FanDuel." },
+  blog:      { title: "Vanboni Sports Blog: NASCAR Predictions & Race Recaps | Vanboni Sports", desc: "Weekly NASCAR predictions, race recaps and model scorecards from Vanboni Sports." },
+};
+function tabIdFromPath() {
+  if (typeof window === "undefined") return "power";
+  const p = window.location.pathname.replace(/\/+$/, "") || "/";
+  return TAB_ROUTES[p] || "power";
+}
+function pathForTab(tabId) {
+  for (const path in TAB_ROUTES) if (TAB_ROUTES[path] === tabId) return path;
+  return "/";
+}
+function applyTabMeta(tabId) {
+  const meta = TAB_META[tabId] || TAB_META.power;
+  document.title = meta.title;
+  const tag = document.querySelector('meta[name="description"]');
+  if (tag) tag.setAttribute("content", meta.desc);
+}
 function trackHubTabView(tabId) {
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;
   const label = TABS.find(t => t.id === tabId)?.label || tabId;
+  const page_path = pathForTab(tabId);
   window.gtag("event", "page_view", {
     page_title: "Vanboni Sports - " + label,
-    page_location: window.location.origin + window.location.pathname + "#" + tabId,
-    page_path: "/#" + tabId,
+    page_location: window.location.origin + page_path,
+    page_path: page_path,
   });
 }
 
@@ -8832,9 +8869,28 @@ function trackHubTabView(tabId) {
 // MAIN APP
 // ─────────────────────────────────────────────────────────────
 export default function NASCARHub() {
-  const [activeTab, setActiveTab] = useState("power");
-  // Track the initial tab as a virtual pageview on first load
-  useEffect(() => { trackHubTabView(activeTab); }, []);
+  const [activeTab, setActiveTab] = useState(() => tabIdFromPath());
+  // Apply the tab's title/meta and track the initial view on first load
+  useEffect(() => { applyTabMeta(activeTab); trackHubTabView(activeTab); }, []);
+  // Keep the tab in sync with the browser back/forward buttons
+  useEffect(() => {
+    const onPopState = () => {
+      const tabId = tabIdFromPath();
+      setActiveTab(tabId);
+      applyTabMeta(tabId);
+      trackHubTabView(tabId);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+  // Tab clicks update state, URL, page meta and analytics together
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    const path = pathForTab(tabId);
+    if (window.location.pathname !== path) window.history.pushState({ tab: tabId }, "", path);
+    applyTabMeta(tabId);
+    trackHubTabView(tabId);
+  };
   const [drivers,         setDrivers]         = useState(JSON.parse(JSON.stringify(INITIAL_DRIVERS)));
   const [prevRanks,       setPrevRanks]       = useState({});
   const [recentFinishes,  setRecentFinishes]  = useState({});
@@ -9234,7 +9290,7 @@ export default function NASCARHub() {
             {TABS.map(tab => {
               const active = tab.id === activeTab;
               return (
-                <button key={tab.id} onClick={()=>{ setActiveTab(tab.id); trackHubTabView(tab.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
+                <button key={tab.id} onClick={()=>handleTabChange(tab.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
                   <span style={{ opacity:active?1:0.5 }}>{Ic[tab.icon]?.()}</span>
                   {tab.label}
                 </button>
