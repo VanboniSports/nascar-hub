@@ -9033,13 +9033,13 @@ function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, coll
   const qpMatch = qualPractice && qualPractice.week === hub.week;
   const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
   const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
-  const sectionLabel = { fontSize: 10, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", margin: "14px 0 8px" };
+  const sectionLabel = { fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", margin: "16px 0 8px" };
   return (
     <div style={{
       background: `linear-gradient(135deg, ${typeColor}16, ${T.surface} 65%)`,
       borderBottom: `1px solid ${T.border}`,
       borderLeft: `3px solid ${typeColor}`,
-      padding: "14px 18px",
+      padding: "18px 22px",
     }}>
       <div onClick={collapsible ? () => setOpen(o => !o) : undefined} style={collapsible ? { cursor: "pointer" } : undefined}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
@@ -9050,14 +9050,14 @@ function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, coll
           )}
           {collapsible && <span style={{ marginLeft: "auto", color: T.textDim, display: "flex" }}><Ic.Chevron open={open} /></span>}
         </div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1 }}>
+        <div style={{ fontSize: 24, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1 }}>
           {hub.name}
         </div>
-        <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+        <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 5 }}>
           {hub.track} · {hub.dateLabel} · {hub.laps} laps
         </div>
         {actuals && (
-          <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 5 }}>
             Winner: <span style={{ color: T.gold, fontWeight: 700 }}>{actuals[0]}</span>
           </div>
         )}
@@ -9066,23 +9066,23 @@ function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, coll
         <div>
           <div style={sectionLabel}>{hasAnyPredictions ? "Top 3 by predictor" : "Predictions"}</div>
           {!hasAnyPredictions ? (
-            <div style={{ fontSize: 12, color: T.textDim }}>Models drop Monday, my picks land Wednesday.</div>
+            <div style={{ fontSize: 13, color: T.textDim }}>Models drop Monday, my picks land Wednesday.</div>
           ) : HUB_PREDICTORS.map(m => {
             const picks = (predictions[m] || []).slice(0, 3);
             const color = PREDICTOR_COLORS[m] || T.accent;
             return (
-              <div key={m} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{m}</span>
+              <div key={m} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{m}</span>
                 </div>
                 {picks.length === 0 ? (
-                  <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", paddingLeft: 14 }}>No picks yet.</div>
+                  <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", paddingLeft: 16 }}>No picks yet.</div>
                 ) : picks.map((d, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0 3px 14px", fontSize: 12 }}>
-                    <span style={{ fontSize: 10, fontWeight: 900, color: i === 0 ? color : T.textDim, width: 12 }}>{i + 1}</span>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 9, padding: "4px 0 4px 16px", fontSize: 13 }}>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: i === 0 ? color : T.textDim, width: 13 }}>{i + 1}</span>
                     <span style={{ color: T.text, fontWeight: i === 0 ? 700 : 500 }}>{d}</span>
-                    {actuals && actuals[0] === d && <span style={{ fontSize: 9, color: T.gold, fontWeight: 800, letterSpacing: 1 }}>WINNER</span>}
+                    {actuals && actuals[0] === d && <span style={{ fontSize: 10, color: T.gold, fontWeight: 800, letterSpacing: 1 }}>WINNER</span>}
                   </div>
                 ))}
               </div>
@@ -9091,21 +9091,21 @@ function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, coll
           {(darkHorse || suckPick) && (
             <div>
               <div style={sectionLabel}>My calls</div>
-              {darkHorse && <div style={{ fontSize: 12, color: T.textMid, padding: "3px 0" }}>Dark horse: <span style={{ color: T.text, fontWeight: 700 }}>{darkHorse}</span></div>}
-              {suckPick && <div style={{ fontSize: 12, color: T.textMid, padding: "3px 0" }}>Suck pick: <span style={{ color: T.text, fontWeight: 700 }}>{suckPick}</span></div>}
+              {darkHorse && <div style={{ fontSize: 13, color: T.textMid, padding: "3px 0" }}>Dark horse: <span style={{ color: T.text, fontWeight: 700 }}>{darkHorse}</span></div>}
+              {suckPick && <div style={{ fontSize: 13, color: T.textMid, padding: "3px 0" }}>Suck pick: <span style={{ color: T.text, fontWeight: 700 }}>{suckPick}</span></div>}
             </div>
           )}
           <div style={sectionLabel}>Battle</div>
-          <div style={{ fontSize: 12, color: T.textMid }}>
+          <div style={{ fontSize: 13, color: T.textMid }}>
             {actuals && winner
               ? <span><span style={{ color: T.gold, fontWeight: 700 }}>{winner.predictor}</span> took it with {winner.points} pts.</span>
               : "Scored after the race."}
           </div>
           <div style={sectionLabel}>Weekend</div>
-          <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+          <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
             Practice: {pracCount ? `${pracCount} drivers` : "—"} · Qualifying: {qualCount ? `${qualCount} drivers` : "—"}
           </div>
-          <button onClick={() => onOpen(hub.slug)} style={{ marginTop: 14, padding: 0, background: "none", border: "none", color: typeColor, fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}>
+          <button onClick={() => onOpen(hub.slug)} style={{ marginTop: 16, padding: 0, background: "none", border: "none", color: typeColor, fontSize: 13, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}>
             Full race hub <span>→</span>
           </button>
         </div>
@@ -9632,7 +9632,7 @@ export default function NASCARHub() {
 
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
           {activeTab !== "race" && (
-          <div className="nascar-sidebar" style={{ flex:1, minWidth:0 }}>
+          <div className="nascar-sidebar" style={{ flex: "1 1 380px", minWidth: 320, maxWidth: 560 }}>
             <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
           </div>
           )}
