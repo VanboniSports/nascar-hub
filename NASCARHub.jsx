@@ -655,6 +655,7 @@ function scoreEntry(predDrivers, actualResults) {
 // MAIN TABS — no admin in nav
 // ─────────────────────────────────────────────────────────────
 const TABS = [
+  { id:"race",      label:"Race Hub",       icon:"Car"     },
   { id:"power",     label:"Power Rankings", icon:"Trophy"  },
   { id:"predictor", label:"Race Predictor", icon:"Flag"    },
   { id:"tracker",   label:"Battle Tracker", icon:"Chart"   },
@@ -8566,7 +8567,8 @@ function currentHub() {
 // traffic under the real page path.
 // ─────────────────────────────────────────────────────────────
 const TAB_ROUTES = {
-  "/": "power",
+  "/": "race",
+  "/power": "power",
   "/predictions": "predictor",
   "/battle": "tracker",
   "/races": "races",
@@ -8630,6 +8632,15 @@ function trackRacePageView(slug, hubName) {
     page_title: "Vanboni Sports - " + (hubName ? hubName + " Race Hub" : "Race Hub"),
     page_location: window.location.origin + page_path,
     page_path: page_path,
+  });
+}
+// GA4 pageview for the Race Hub tab at / (shows the current week's hub).
+function trackRaceTabView(hub) {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  window.gtag("event", "page_view", {
+    page_title: "Vanboni Sports - " + (hub ? hub.name + " Race Hub" : "Race Hub"),
+    page_location: window.location.origin + "/",
+    page_path: "/",
   });
 }
 function applyRaceMeta(hub) {
@@ -9061,9 +9072,11 @@ export default function NASCARHub() {
         const slug = raceSlugFromPath();
         setRaceSlug(slug);
         setActiveTab("race");
-        const hub = hubBySlug(slug);
+        // No slug (i.e. plain /) means the Race Hub tab: show the current week's hub.
+        const hub = slug ? hubBySlug(slug) : currentHub();
         applyRaceMeta(hub);
-        trackRacePageView(slug, hub && hub.name);
+        if (slug) trackRacePageView(slug, hub && hub.name);
+        else trackRaceTabView(hub);
       } else {
         const tabId = tabIdFromPath();
         setActiveTab(tabId);
@@ -9077,6 +9090,16 @@ export default function NASCARHub() {
   // Tab clicks update state, URL, page meta and analytics together
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
+    if (tabId === "race") {
+      // The Race Hub tab lives at / and always shows the current week's hub.
+      setRaceSlug(null);
+      const hub = currentHub();
+      if (window.location.pathname !== "/") window.history.pushState({ tab: tabId }, "", "/");
+      applyRaceMeta(hub);
+      trackRaceTabView(hub);
+      try { window.scrollTo(0, 0); } catch (e) {}
+      return;
+    }
     const path = pathForTab(tabId);
     if (window.location.pathname !== path) window.history.pushState({ tab: tabId }, "", path);
     applyTabMeta(tabId);
@@ -9491,7 +9514,7 @@ export default function NASCARHub() {
           </div>
           <nav style={{ display:"flex", overflowX:"auto", msOverflowStyle:"none", scrollbarWidth:"none" }}>
             {TABS.map(tab => {
-              const active = tab.id === activeTab || (tab.id === "races" && activeTab === "race");
+              const active = tab.id === activeTab;
               return (
                 <button key={tab.id} onClick={()=>handleTabChange(tab.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
                   <span style={{ opacity:active?1:0.5 }}>{Ic[tab.icon]?.()}</span>
@@ -9514,10 +9537,12 @@ export default function NASCARHub() {
           </div>
         )}
 
-        {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner) */}
+        {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner); hidden on the Race Hub tab itself */}
+        {activeTab !== "race" && (
         <div className="nascar-mobile-banner">
           <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} onOpen={openRacePage} />
         </div>
+        )}
 
         {/* CONTENT + SIDEBAR */}
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
@@ -9527,7 +9552,7 @@ export default function NASCARHub() {
               {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
-              {activeTab === "race"      && <RaceHubPage hub={hubBySlug(raceSlug)} battleRace={findBattleForHub(battleRaces, hubBySlug(raceSlug))} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} />}
+              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
@@ -9536,10 +9561,12 @@ export default function NASCARHub() {
             </div>
           </main>
 
-          {/* DESKTOP SIDEBAR — hero card sits to the side */}
+          {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
+          {activeTab !== "race" && (
           <div className="nascar-sidebar" style={{ flex:1, minWidth:0 }}>
             <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} onOpen={openRacePage} />
           </div>
+          )}
         </div>
 
         {/* GLOBAL ADMIN */}
