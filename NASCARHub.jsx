@@ -2700,11 +2700,21 @@ function ScorecardTab({ battleRaces, incrementTool }) {
 
   const rows = PREDICTORS.map((p) => {
     const m = models[p];
-    const types = Object.entries(m.byType);
-    let bestType = null, bestAvg = -1;
-    types.forEach(([type, t]) => {
-      const avg = t.points / t.races;
-      if (avg > bestAvg) { bestAvg = avg; bestType = type; }
+    // Relative edge: the track type where this model beats the other models
+    // by the most (avg pts vs. the field average on that type).
+    let edgeType = null, edgeVal = 0;
+    Object.keys(m.byType).forEach((type) => {
+      const t = m.byType[type];
+      if (!t.races) return;
+      const myAvg = t.points / t.races;
+      const others = PREDICTORS.filter((q) => q !== p)
+        .map((q) => models[q].byType[type])
+        .filter((ot) => ot && ot.races)
+        .map((ot) => ot.points / ot.races);
+      if (!others.length) return;
+      const fieldAvg = others.reduce((a, b) => a + b, 0) / others.length;
+      const edge = myAvg - fieldAvg;
+      if (edge > edgeVal) { edgeVal = edge; edgeType = type; }
     });
     return {
       predictor: p,
@@ -2712,7 +2722,8 @@ function ScorecardTab({ battleRaces, incrementTool }) {
       winPct: m.races ? (m.wins / m.races) * 100 : 0,
       avgTop10: m.races ? m.top10Hits / m.races : 0,
       avgPts: m.races ? m.points / m.races : 0,
-      bestType,
+      edgeType,
+      edgeVal,
     };
   }).sort((a, b) => b.winPct - a.winPct || b.avgPts - a.avgPts);
 
@@ -2775,9 +2786,9 @@ function ScorecardTab({ battleRaces, incrementTool }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: PREDICTOR_COLORS[row.predictor] || T.textDim, flexShrink: 0 }} />
                   <div style={{ fontSize: 14, fontWeight: 700, color: T.text, fontFamily: "'Barlow Condensed',sans-serif" }}>{row.predictor}</div>
-                  {row.bestType && (
-                    <span style={{ fontSize: 10, color: BATTLE_TRACK_COLORS[row.bestType] || T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
-                      Best at {row.bestType}
+                  {row.edgeType && (
+                    <span style={{ fontSize: 10, color: BATTLE_TRACK_COLORS[row.edgeType] || T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                      Edge: {row.edgeType} (+{row.edgeVal.toFixed(1)} vs field)
                     </span>
                   )}
                   <span style={{ fontSize: 20, fontWeight: 700, color: T.gold, fontFamily: "'IBM Plex Mono',monospace", marginLeft: "auto" }}>
