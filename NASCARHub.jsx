@@ -35,12 +35,11 @@ const MFG_COLORS = { Chevrolet:"#f59e0b", Ford:"#3b82f6", Toyota:"#ef4444" };
 // ─────────────────────────────────────────────────────────────
 // PREDICTOR BATTLE CONSTANTS
 // ─────────────────────────────────────────────────────────────
-const PREDICTORS = ["Pure Stats", "Enhanced Pure Stats", "NASCAR 2026 ML", "Power Rankings", "My Gut"];
+const PREDICTORS = ["Pure Stats", "Enhanced Pure Stats", "Power Rankings", "My Gut"];
 
 const PREDICTOR_DESCRIPTIONS = {
   "Pure Stats": "Track-type weighted statistics, no ML",
   "Enhanced Pure Stats": "Pure Stats + manufacturer affinity, momentum & playoff adjustments",
-  "NASCAR 2026 ML": "Random Forest ML with 2026 schedule classifications",
   "Power Rankings": "Live power rankings from the NASCAR Hub",
   "My Gut": "Personal picks based on intuition & race knowledge",
 };
@@ -73,7 +72,6 @@ const TOOL_USAGE_KEYS = [
 const PREDICTOR_COLORS = {
   "Pure Stats": "#f59e0b",
   "Enhanced Pure Stats": "#e879f9",
-  "NASCAR 2026 ML": "#3b82f6",
   "Power Rankings": "#10b981",
   "My Gut": "#f43f5e",
 };
@@ -2517,7 +2515,7 @@ function BattleTrackerTab({ battleRaces, incrementTool }) {
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
       <InfoLegend title="How the Battle Tracker Works">
         <div>
-          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>THE 5 PREDICTORS</div>
+          <div style={{ fontWeight:700, color:T.text, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:1 }}>THE 4 PREDICTORS</div>
           <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
             {PREDICTORS.map(p => (
               <div key={p} style={{ display:"flex", alignItems:"center", gap:8 }}>
