@@ -8810,10 +8810,31 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// GA4 VIRTUAL PAGEVIEWS
+// The Hub is a single-page app: the URL never changes when switching
+// tabs, so GA4's automatic page tracking sees everything as one page.
+// This helper fires a manual page_view per tab so GA4 can report
+// traffic per Hub section (page path looks like "/#dfs").
+// (gtag's automatic pageview is disabled in index.html to avoid
+// double counting the initial load.)
+// ─────────────────────────────────────────────────────────────
+function trackHubTabView(tabId) {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  const label = TABS.find(t => t.id === tabId)?.label || tabId;
+  window.gtag("event", "page_view", {
+    page_title: "Vanboni Sports - " + label,
+    page_location: window.location.origin + window.location.pathname + "#" + tabId,
+    page_path: "/#" + tabId,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────
 export default function NASCARHub() {
   const [activeTab, setActiveTab] = useState("power");
+  // Track the initial tab as a virtual pageview on first load
+  useEffect(() => { trackHubTabView(activeTab); }, []);
   const [drivers,         setDrivers]         = useState(JSON.parse(JSON.stringify(INITIAL_DRIVERS)));
   const [prevRanks,       setPrevRanks]       = useState({});
   const [recentFinishes,  setRecentFinishes]  = useState({});
@@ -9213,7 +9234,7 @@ export default function NASCARHub() {
             {TABS.map(tab => {
               const active = tab.id === activeTab;
               return (
-                <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
+                <button key={tab.id} onClick={()=>{ setActiveTab(tab.id); trackHubTabView(tab.id); }} style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
                   <span style={{ opacity:active?1:0.5 }}>{Ic[tab.icon]?.()}</span>
                   {tab.label}
                 </button>
