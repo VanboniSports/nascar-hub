@@ -33,6 +33,10 @@
       "destination": "/og-image.png"
     },
     {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }

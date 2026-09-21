@@ -658,6 +658,7 @@ const TABS = [
   { id:"power",     label:"Power Rankings", icon:"Trophy"  },
   { id:"predictor", label:"Race Predictor", icon:"Flag"    },
   { id:"tracker",   label:"Battle Tracker", icon:"Chart"   },
+  { id:"races",     label:"Races",          icon:"Flag"    },
   { id:"tracks",    label:"Track Stats",    icon:"Flag"    },
   { id:"analytics", label:"Driver Analytics",icon:"Trend"  },
   { id:"season",    label:"Season Stats",   icon:"Chart"   },
@@ -1067,346 +1068,6 @@ function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
   return predictions;
 }
 
-// Predictor model metadata
-// ─────────────────────────────────────────────────────────────
-// THIS WEEK'S RACE — Sidebar (desktop) / Banner (mobile)
-// ─────────────────────────────────────────────────────────────
-function ThisWeekPanel({ csvData, drivers, incrementTool, mode }) {
-  const [expanded, setExpanded] = useState(false);
-  const [quickResults, setQuickResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const race = useMemo(() => getThisWeeksRace(), []);
-  const trackType = race ? (CSV_TRACK_TYPES[race.track] || TL[race.type] || "Intermediate") : "";
-  const typeColor = race ? (TC[race.type] || T.accent) : T.accent;
-
-  // Recent winners at this track from CSV
-  const recentWinners = useMemo(() => {
-    if (!csvData.length || !race) return [];
-    // Parse either ISO "YYYY-MM-DD" or US "M/D/YYYY" (Excel re-save artifact) into a sortable number.
-    const parseRaceDate = (s, fallbackYear) => {
-      if (!s) return (fallbackYear || 0) * 10000;
-      if (s.includes("-")) {
-        // ISO: "2025-09-28"
-        return parseInt(s.replace(/-/g, ""), 10) || (fallbackYear || 0) * 10000;
-      }
-      if (s.includes("/")) {
-        // US: "9/28/2025" -> 20250928
-        const [m, d, y] = s.split("/").map(n => parseInt(n, 10));
-        if (y && m && d) return y * 10000 + m * 100 + d;
-      }
-      return (fallbackYear || 0) * 10000;
-    };
-    const wins = [];
-    for (const r of csvData) {
-      if (r[3] === 1 && predMatchTrack(race.track, r[1])) {
-        wins.push({
-          driver: r[0],
-          year: r[2] || 0,
-          sortKey: parseRaceDate(r[9], r[2]),
-        });
-      }
-    }
-    wins.sort((a, b) => b.sortKey - a.sortKey);
-    return wins.slice(0, 3);
-  }, [csvData, race]);
-
-  // Days until race
-  const daysUntil = useMemo(() => {
-    if (!race?.raceDate) return null;
-    const now = new Date();
-    const diff = Math.ceil((race.raceDate - now) / (1000 * 60 * 60 * 24));
-    return Math.max(0, diff);
-  }, [race]);
-
-  const runQuickPredict = () => {
-    if (!race || !csvData.length) return;
-    setLoading(true);
-    incrementTool?.("this_week_predict");
-    setTimeout(() => {
-      const preds = runEnhancedPureStatsPrediction(csvData, race.track, race.type);
-      setQuickResults(preds.slice(0, 5));
-      setLoading(false);
-    }, 300);
-  };
-
-  if (!race) return null;
-
-  const trackTypeFull = TL[race.type] || race.type;
-
-  // ── Mobile banner mode ──
-  if (mode === "banner") {
-    return (
-      <div style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-        {/* Collapsed row */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          style={{
-            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "10px 16px", background: "transparent", border: "none", cursor: "pointer", gap: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-            <div style={{
-              width: 6, height: 28, borderRadius: 3, background: typeColor, flexShrink: 0,
-            }} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{
-                fontSize: 11, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif",
-                letterSpacing: 1.5, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-              }}>
-                {race.name}
-              </div>
-              <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
-                {race.date} · <span style={{ color: typeColor }}>{trackTypeFull}</span>
-                {daysUntil != null && (
-                  <span style={{ color: daysUntil === 0 ? T.gold : T.textDim }}> · {daysUntil === 0 ? "RACE DAY" : `${daysUntil}d away`}</span>
-                )}
-              </div>
-            </div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textDim} strokeWidth="2.5" strokeLinecap="round" style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", flexShrink: 0 }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
-
-        {/* Expanded content */}
-        {expanded && (
-          <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
-              <span>{race.track}</span>
-              <span>{race.length} mi · {race.laps} laps</span>
-            </div>
-
-            {recentWinners.length > 0 && (
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>RECENT WINNERS HERE</div>
-                {recentWinners.map((w, i) => (
-                  <div key={i} style={{ fontSize: 11, color: T.text, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.6 }}>
-                    <span style={{ color: T.gold }}>🏆</span> {w.driver} <span style={{ color: T.textDim }}>({w.year})</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!quickResults ? (
-              <button onClick={runQuickPredict} disabled={loading || !csvData.length}
-                style={{
-                  padding: "8px 16px", borderRadius: 6, border: `1px solid ${typeColor}40`,
-                  background: `${typeColor}15`, color: typeColor, fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase",
-                  cursor: csvData.length ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                }}>
-                {loading ? <><Ic.Spinner /> Running…</> : "⚡ Quick Predict"}
-              </button>
-            ) : (
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#e879f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>TOP 5 — ENHANCED PURE STATS</div>
-                {quickResults.map((p, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: i < 4 ? `1px solid ${T.border}` : "none" }}>
-                    <span style={{ width: 20, height: 20, borderRadius: "50%", background: i < 3 ? `${typeColor}22` : `${T.border}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: i < 3 ? typeColor : T.textDim, flexShrink: 0 }}>{i + 1}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>#{p.num} {p.driver}</div>
-                    </div>
-                    <span style={{ fontSize: 10, color: T.gold, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace" }}>{p.winPct}%</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ── Desktop sidebar mode ──
-  return (
-    <aside style={{
-      width: "100%", height: "100%",
-      background: T.surface, borderLeft: `1px solid ${T.border}`,
-      display: "flex", flexDirection: "column", alignItems: "center", overflow: "auto",
-      fontFamily: "'Barlow',sans-serif",
-    }}>
-      <div style={{ width: "100%", maxWidth: 300 }}>
-      {/* Header stripe */}
-      <div style={{
-        padding: "14px 16px 12px", borderBottom: `1px solid ${T.border}`,
-        background: `linear-gradient(135deg, ${typeColor}10, transparent)`,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <div style={{
-            width: 4, height: 32, borderRadius: 2, background: typeColor,
-          }} />
-          <div>
-            <div style={{
-              fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace",
-              letterSpacing: 2, textTransform: "uppercase", marginBottom: 2,
-            }}>
-              THIS WEEK
-            </div>
-            <div style={{
-              fontSize: 16, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif",
-              letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1,
-            }}>
-              {race.name}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{
-            display: "inline-block", padding: "2px 8px", borderRadius: 4,
-            background: `${typeColor}18`, border: `1px solid ${typeColor}30`,
-            fontSize: 10, fontWeight: 700, color: typeColor,
-            fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase",
-          }}>
-            {trackTypeFull}
-          </span>
-          <span style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
-            {race.date}
-          </span>
-          {daysUntil != null && (
-            <span style={{
-              fontSize: 10, fontWeight: 700,
-              color: daysUntil === 0 ? T.gold : daysUntil <= 2 ? T.green : T.textDim,
-              fontFamily: "'IBM Plex Mono',monospace",
-            }}>
-              {daysUntil === 0 ? "🏁 RACE DAY" : `${daysUntil}d`}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Track info */}
-      <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
-          TRACK INFO
-        </div>
-        <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.8 }}>
-          {race.track}
-        </div>
-        <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-          {[
-            { label: "LENGTH", value: `${race.length} mi` },
-            { label: "LAPS", value: race.laps },
-          ].map(s => (
-            <div key={s.label}>
-              <div style={{ fontSize: 8, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1.5 }}>{s.label}</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif" }}>{s.value}</div>
-            </div>
-          ))}
-          {race.week > 0 && (
-            <div>
-              <div style={{ fontSize: 8, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1.5 }}>WEEK</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: typeColor, fontFamily: "'Barlow Condensed',sans-serif" }}>{race.week}</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recent winners at this track */}
-      {recentWinners.length > 0 && (
-        <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
-            RECENT WINNERS HERE
-          </div>
-          {recentWinners.map((w, i) => (
-            <div key={i} style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "5px 0",
-              borderBottom: i < recentWinners.length - 1 ? `1px solid ${T.border}` : "none",
-            }}>
-              <span style={{ fontSize: 13 }}>🏆</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{w.driver}</div>
-                <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{w.year}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Quick Predict */}
-      <div style={{ padding: "12px 16px", flex: 1 }}>
-        {!quickResults ? (
-          <button onClick={runQuickPredict} disabled={loading || !csvData.length}
-            style={{
-              width: "100%", padding: "10px 14px", borderRadius: 8,
-              border: `1px solid ${typeColor}40`, background: `${typeColor}12`,
-              color: typeColor, fontSize: 12, fontWeight: 800,
-              fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase",
-              cursor: csvData.length ? "pointer" : "default",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { if (csvData.length) { e.currentTarget.style.background = `${typeColor}25`; e.currentTarget.style.borderColor = `${typeColor}70`; }}}
-            onMouseLeave={e => { e.currentTarget.style.background = `${typeColor}12`; e.currentTarget.style.borderColor = `${typeColor}40`; }}
-          >
-            {loading ? <><Ic.Spinner /> Running…</> : "⚡ Quick Predict"}
-          </button>
-        ) : (
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: "#e879f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
-              🔬 TOP 5 — ENHANCED PURE STATS
-            </div>
-            {quickResults.map((p, i) => {
-              const dInfo = INITIAL_DRIVERS.find(d => d.num === p.num);
-              return (
-                <div key={i} style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "7px 0",
-                  borderBottom: i < 4 ? `1px solid ${T.border}` : "none",
-                }}>
-                  <span style={{
-                    width: 24, height: 24, borderRadius: "50%",
-                    background: i === 0 ? `${T.gold}22` : i < 3 ? `${typeColor}22` : `${T.border}44`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 900,
-                    color: i === 0 ? T.gold : i < 3 ? typeColor : T.textDim,
-                    flexShrink: 0,
-                  }}>
-                    {i + 1}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 12, fontWeight: 700, color: T.text,
-                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    }}>
-                      #{p.num} {p.driver}
-                    </div>
-                    <div style={{ fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
-                      {dInfo?.team?.split(" ").map(w => w[0]).join("") || p.mfg}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: T.gold, fontFamily: "'IBM Plex Mono',monospace" }}>
-                      {p.winPct}%
-                    </div>
-                    <div style={{ fontSize: 8, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>WIN</div>
-                  </div>
-                </div>
-              );
-            })}
-            <button onClick={() => setQuickResults(null)}
-              style={{
-                width: "100%", marginTop: 10, padding: "6px", borderRadius: 6,
-                border: `1px solid ${T.border}`, background: "transparent",
-                color: T.textDim, fontSize: 10, fontFamily: "'IBM Plex Mono',monospace",
-                cursor: "pointer", letterSpacing: 1,
-              }}>
-              ↻ Re-run
-            </button>
-          </div>
-        )}
-        {!csvData.length && (
-          <div style={{ marginTop: 8, fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", textAlign: "center" }}>
-            CSV data loading…
-          </div>
-        )}
-      </div>
-      </div>
-    </aside>
-  );
-}
 
 const PRED_MODELS = [
   { id:"power",    label:"Power Rankings",     color:"#10b981", desc:"Supabase-connected live ratings", icon:"⚡" },
@@ -8810,6 +8471,91 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// RACE HUBS — forward-only archive of per-race hub pages.
+// Each hub gets a page at /race/<slug>. New hubs are appended to the
+// FRONT of this list (newest first) as the season goes on. No backfill:
+// the archive starts with Kansas (week 30) and grows from here.
+// Hub content is a view over existing data: battle tracker picks and
+// results (Supabase app_state "battleRaces"), DFS practice/qualifying
+// (qualPractice), and the static schedule below. No new data model.
+// ─────────────────────────────────────────────────────────────
+const RACE_HUBS = [
+  { slug:"kansas-2026", name:"Kansas II", officialName:"Hollywood Casino 400", track:"Kansas Speedway", date:"2026-09-27", dateLabel:"Sun Sep 27", trackType:"intermediate", length:1.5, laps:267, week:30,
+    nascarRaceId:5628,
+    intro:[
+      "Kansas Speedway is a 1.5-mile tri-oval outside Kansas City, and it has quietly become one of the best pure racing tracks in the Cup Series. The progressive banking gives drivers three or four usable grooves, so restarts get chaotic in the best way and track position is never quite safe. Long green-flag runs are the norm here, which means tire management decides about as many races as raw speed does.",
+      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
+    ] },
+];
+// Predictors shown on race hub pages. The ML model is retired from hubs.
+const HUB_PREDICTORS = ["Pure Stats", "Enhanced Pure Stats", "Power Rankings", "My Gut"];
+function hubBySlug(slug) {
+  return RACE_HUBS.find(h => h.slug === slug) || null;
+}
+// upcoming = race day is in the future, live = race day is today, completed = race day has passed.
+// hub.statusOverride ("upcoming" | "live" | "completed") forces a status manually.
+function hubStatus(hub) {
+  if (!hub) return "upcoming";
+  if (hub.statusOverride) return hub.statusOverride;
+  const d = new Date(hub.date + "T12:00:00");
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (day === today) return "live";
+  return day > today ? "upcoming" : "completed";
+}
+function hubCountdown(hub) {
+  if (!hub) return null;
+  const now = new Date();
+  const d = new Date(hub.date + "T23:59:59");
+  return Math.max(0, Math.ceil((d - now) / 86400000));
+}
+// Match a battle tracker race entry to a hub by track (primary) or race name (fallback).
+function findBattleForHub(battleRaces, hub) {
+  if (!hub || !battleRaces || !battleRaces.length) return null;
+  const norm = s => (s || "").toLowerCase().trim();
+  return battleRaces.find(r => norm(r.track) === norm(hub.track))
+      || battleRaces.find(r => norm(r.raceName) === norm(hub.officialName) || norm(r.raceName) === norm(hub.name))
+      || null;
+}
+// Highest-scoring predictor for a race that has actual results.
+// `models` limits which predictors are eligible (race hubs exclude the
+// retired ML model; the Battle Tracker tab keeps its own list).
+function battleWinnerFor(race, models) {
+  if (!race || !race.actualResults || !race.actualResults.length) return null;
+  const list = models || PREDICTORS;
+  let best = null;
+  for (const p of list) {
+    const preds = race.predictions && race.predictions[p];
+    if (!preds || !preds.length) continue;
+    const s = scoreEntry(preds, race.actualResults);
+    if (s && (!best || s.points > best.points)) best = { predictor: p, points: s.points };
+  }
+  return best;
+}
+// Drivers the predictors disagree on most: biggest rank spread across models.
+function topDisagreements(predictions) {
+  const models = Object.keys(predictions || {}).filter(m => predictions[m] && predictions[m].length);
+  if (models.length < 2) return [];
+  const ranks = {};
+  models.forEach(m => predictions[m].forEach((d, i) => { (ranks[d] = ranks[d] || {})[m] = i + 1; }));
+  return Object.entries(ranks)
+    .filter(([, r]) => Object.keys(r).length >= 2)
+    .map(([driver, r]) => {
+      const vals = Object.entries(r).sort((a, b) => a[1] - b[1]);
+      return { driver, spread: vals[vals.length - 1][1] - vals[0][1], high: vals[0], low: vals[vals.length - 1] };
+    })
+    .filter(x => x.spread >= 3)
+    .sort((a, b) => b.spread - a.spread)
+    .slice(0, 3);
+}
+// The hub matching this week's scheduled race (for the homepage hero card).
+function currentHub() {
+  const race = getThisWeeksRace();
+  return (race && RACE_HUBS.find(h => h.week === race.week)) || RACE_HUBS[0] || null;
+}
+
+// ─────────────────────────────────────────────────────────────
 // ROUTES + GA4 VIRTUAL PAGEVIEWS
 // The Hub is a single-page app, but each tab gets its own real URL
 // (e.g. /dfs) so sections are shareable and indexable by search engines.
@@ -8823,16 +8569,20 @@ const TAB_ROUTES = {
   "/": "power",
   "/predictions": "predictor",
   "/battle": "tracker",
+  "/races": "races",
   "/tracks": "tracks",
   "/drivers": "analytics",
   "/season": "season",
   "/dfs": "dfs",
   "/blog": "blog",
 };
+// NOTE: /race/<slug> pages are handled separately (tab id "race") via
+// raceSlugFromPath / applyRaceMeta / trackRacePageView below.
 const TAB_META = {
   power:     { title: "NASCAR Cup Series Power Rankings | Vanboni Sports", desc: "Weekly NASCAR Cup Series power rankings computed from official race results, updated after every race." },
   predictor: { title: "NASCAR Race Predictor: Model Picks & Win Probabilities | Vanboni Sports", desc: "Data-driven NASCAR race predictions from Pure Stats, Enhanced Pure Stats and power-ranking models, with winner probabilities for every driver." },
   tracker:   { title: "Predictor Battle Tracker: Models vs. the Gut | Vanboni Sports", desc: "Follow the season-long battle between the Vanboni Sports models and Morgan's gut picks, scored against actual NASCAR race results." },
+  races:     { title: "NASCAR Race Hubs: Every Race, One Page | Vanboni Sports", desc: "Browse every NASCAR Cup Series race hub: model predictions, battle tracker scoring, DFS notes and official results for each race." },
   tracks:    { title: "NASCAR Track Stats & History | Vanboni Sports", desc: "Track-by-track NASCAR Cup Series stats: past winners, track types, and how each track plays." },
   analytics: { title: "NASCAR Driver Analytics | Vanboni Sports", desc: "Deep NASCAR driver stats, trends and head-to-head comparisons across the Cup Series field." },
   season:    { title: "NASCAR Cup Series Season Stats & Standings | Vanboni Sports", desc: "2026 NASCAR Cup Series points standings and season-long driver statistics, updated weekly." },
@@ -8842,7 +8592,15 @@ const TAB_META = {
 function tabIdFromPath() {
   if (typeof window === "undefined") return "power";
   const p = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (p === "/race" || p.startsWith("/race/")) return "race";
   return TAB_ROUTES[p] || "power";
+}
+function raceSlugFromPath() {
+  if (typeof window === "undefined") return null;
+  const p = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (p === "/race") return null;
+  if (p.startsWith("/race/")) return decodeURIComponent(p.slice(6)) || null;
+  return null;
 }
 function pathForTab(tabId) {
   for (const path in TAB_ROUTES) if (TAB_ROUTES[path] === tabId) return path;
@@ -8864,21 +8622,454 @@ function trackHubTabView(tabId) {
     page_path: page_path,
   });
 }
+// GA4 pageview for /race/<slug> pages (not Hub tabs, so tracked separately).
+function trackRacePageView(slug, hubName) {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  const page_path = "/race/" + slug;
+  window.gtag("event", "page_view", {
+    page_title: "Vanboni Sports - " + (hubName ? hubName + " Race Hub" : "Race Hub"),
+    page_location: window.location.origin + page_path,
+    page_path: page_path,
+  });
+}
+function applyRaceMeta(hub) {
+  if (typeof document === "undefined") return;
+  const name = hub ? (hub.officialName || hub.name) : null;
+  document.title = name
+    ? `${name} Race Hub: Predictions, Battle & Results | Vanboni Sports`
+    : "Race Hub | Vanboni Sports";
+  const tag = document.querySelector('meta[name="description"]');
+  if (tag) tag.setAttribute("content", hub
+    ? `NASCAR race hub for ${name} at ${hub.track}: model predictions, battle tracker scoring, DFS notes and official results.`
+    : "NASCAR race hubs from Vanboni Sports: predictions, results and the model battle for every race.");
+}
+
+// ─────────────────────────────────────────────────────────────
+// RACE HUBS — Races tab (archive index), per-race hub page, homepage hero card
+// ─────────────────────────────────────────────────────────────
+function HubStatusBadge({ status }) {
+  const map = {
+    upcoming:  { label: "UPCOMING", color: T.accent,  bg: T.accentSoft },
+    live:      { label: "RACE DAY", color: T.red,     bg: T.redBg },
+    completed: { label: "FINAL",    color: T.green,   bg: T.greenBg },
+  };
+  const s = map[status] || map.upcoming;
+  return (
+    <span style={{
+      display: "inline-block", padding: "2px 10px", borderRadius: 4,
+      background: s.bg, border: `1px solid ${s.color}45`,
+      fontSize: 10, fontWeight: 800, color: s.color,
+      fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5,
+    }}>{s.label}</span>
+  );
+}
+
+function sectionTitle(text, sub) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>{text}</div>
+      {sub && <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+}
+
+// RACES TAB — archive index of race hubs, newest first.
+function RacesTab({ battleRaces, onOpenRace }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>Race Hubs</div>
+        <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+          Every race gets one page: model predictions, the battle tracker scoring, DFS notes and official results.
+        </div>
+      </div>
+      {RACE_HUBS.length === 0 ? (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 28, textAlign: "center", color: T.textDim, fontSize: 13 }}>
+          No race hubs yet. The first one drops with Kansas.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {RACE_HUBS.map(hub => {
+            const status = hubStatus(hub);
+            const battle = findBattleForHub(battleRaces, hub);
+            const scored = battle && battle.actualResults && battle.actualResults.length > 0;
+            const winner = battleWinnerFor(battle, HUB_PREDICTORS);
+            return (
+              <button key={hub.slug} onClick={() => onOpenRace(hub.slug)} style={{
+                display: "flex", alignItems: "center", gap: 14, textAlign: "left",
+                background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
+                padding: "14px 18px", cursor: "pointer", width: "100%",
+                transition: "border-color 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = T.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+                    {hub.officialName || hub.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 3 }}>
+                    {hub.track} · {hub.dateLabel} · {hub.laps} laps
+                  </div>
+                  {scored && (
+                    <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 3 }}>
+                      Winner: <span style={{ color: T.gold, fontWeight: 700 }}>{battle.actualResults[0]}</span>
+                      {winner && <> · Battle: <span style={{ color: T.accentText, fontWeight: 700 }}>{winner.predictor}</span></>}
+                    </div>
+                  )}
+                </div>
+                <HubStatusBadge status={status} />
+                <span style={{ color: T.textDim, fontSize: 18 }}>›</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// LIVE RUNNING ORDER — shown on a race hub while that race is actually live.
+// Data comes from /api/live-leaderboard, a Vercel serverless proxy for
+// NASCAR's official live feed (the CDN sends no CORS headers, so the browser
+// cannot fetch it directly). Polls every 45 seconds. Renders nothing when
+// the race is not live or the feed is unreachable: no errors, no boxes.
+function LiveRunningOrder({ hub }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    if (!hub || !hub.nascarRaceId) return;
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`/api/live-leaderboard?race_id=${hub.nascarRaceId}`);
+        const j = await r.json();
+        if (alive) setData(j && j.live ? j : null);
+      } catch (e) { if (alive) setData(null); }
+    };
+    load();
+    const t = setInterval(load, 45000);
+    return () => { alive = false; clearInterval(t); };
+  }, [hub ? hub.slug : null]);
+  if (!data) return null;
+  const flagColors = { GREEN: T.green, CAUTION: "#f59e0b", "RED FLAG": T.red, CHECKERED: T.textDim };
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.red}55`, borderRadius: 12, padding: "16px 18px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.red, animation: "hubBlink 1.2s infinite" }} />
+        <span style={{ fontSize: 12, fontWeight: 900, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2 }}>LIVE</span>
+        <span style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+          Lap {data.lap} of {data.lapsTotal}
+        </span>
+        {data.flag && (
+          <span style={{ fontSize: 10, fontWeight: 800, color: flagColors[data.flag] || T.textMid, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{data.flag}</span>
+        )}
+        {data.stage != null && (
+          <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Stage {data.stage}</span>
+        )}
+        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>auto-refreshes</span>
+      </div>
+      <div>
+        {data.order.slice(0, 10).map(o => (
+          <div key={o.pos} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: `1px solid ${T.border}` }}>
+            <span style={{ width: 22, fontSize: 11, fontWeight: 800, color: o.pos <= 3 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{o.pos}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", minWidth: 28 }}>#{o.number}</span>
+            <span style={{ fontSize: 12, fontWeight: o.pos === 1 ? 800 : 600, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</span>
+            {!o.running && <span style={{ fontSize: 9, fontWeight: 700, color: T.red, fontFamily: "'IBM Plex Mono',monospace" }}>OUT</span>}
+            <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{o.delta}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// RACE HUB PAGE — /race/<slug>
+function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
+  if (!hub) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
+        <div style={{ fontSize: 22, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>Unknown race hub</div>
+        <div style={{ fontSize: 13, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>That race page does not exist yet. The archive starts with Kansas and grows from here.</div>
+        <button onClick={() => onOpenTab("races")} style={{ padding: "8px 18px", borderRadius: 6, border: `1px solid ${T.accent}50`, background: T.accentSoft, color: T.accentText, fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>
+          Back to Races
+        </button>
+      </div>
+    );
+  }
+
+  const status = hubStatus(hub);
+  const predictions = (battleRace && battleRace.predictions) || {};
+  const MODELS = HUB_PREDICTORS;
+  const hasAnyPredictions = MODELS.some(m => predictions[m] && predictions[m].length);
+  // Disagreements and the battle winner only consider hub predictors,
+  // so the retired ML model can never appear on this page.
+  const hubPredictions = Object.fromEntries(Object.entries(predictions).filter(([m]) => MODELS.includes(m)));
+  const disagreements = hasAnyPredictions ? topDisagreements(hubPredictions) : [];
+  const darkHorse = battleRace && battleRace.darkHorse;
+  const suckPick = battleRace && battleRace.suckPick;
+  const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
+  const winner = battleWinnerFor(battleRace, HUB_PREDICTORS);
+  const typeColor = TC[hub.trackType] || T.accent;
+
+  const qpMatch = qualPractice && qualPractice.week === hub.week;
+  const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
+  const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
+
+  const idx = RACE_HUBS.findIndex(h => h.slug === hub.slug);
+  const olderHub = idx >= 0 ? RACE_HUBS[idx + 1] : null;
+  const newerHub = idx > 0 ? RACE_HUBS[idx - 1] : null;
+
+  const card = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1100 }}>
+      {/* HERO */}
+      <div style={{ ...card, background: `linear-gradient(135deg, ${typeColor}14, ${T.surface} 60%)`, borderLeft: `3px solid ${typeColor}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, textTransform: "uppercase" }}>Race Hub</span>
+          <HubStatusBadge status={status} />
+        </div>
+        <div style={{ fontSize: 30, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1 }}>
+          {hub.officialName || hub.name}
+        </div>
+        <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 6 }}>
+          {hub.name} · {hub.track} · {hub.dateLabel} · {hub.length} mi · {hub.laps} laps · <span style={{ color: typeColor }}>{TL[hub.trackType] || hub.trackType}</span>
+        </div>
+      </div>
+
+      {/* LIVE RUNNING ORDER — only renders while the race is actually live */}
+      {status === "live" && <LiveRunningOrder hub={hub} />}
+
+      {/* INTRO — per-race editorial, above the predictions */}
+      {hub.intro && hub.intro.length > 0 && (
+        <div style={{ ...card }}>
+          {hub.intro.map((p, i) => (
+            <p key={i} style={{ fontSize: 13, color: T.textMid, lineHeight: 1.75, margin: i > 0 ? "12px 0 0" : 0 }}>{p}</p>
+          ))}
+        </div>
+      )}
+
+      {/* PREDICTIONS */}
+      <div>
+        {sectionTitle("Model Predictions", hasAnyPredictions ? "Top 10 from each predictor, via the Battle Tracker" : null)}
+        {!hasAnyPredictions ? (
+          <div style={{ ...card, textAlign: "center", color: T.textDim, fontSize: 13, padding: "28px 20px" }}>
+            <div style={{ fontSize: 26, marginBottom: 8 }}>🔮</div>
+            <div>Predictions drop Monday morning.</div>
+            <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>Check back once the models and my gut have weighed in.</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
+            {MODELS.map(m => {
+              const picks = predictions[m] || [];
+              const color = PREDICTOR_COLORS[m] || T.accent;
+              return (
+                <div key={m} style={{ ...card, padding: "14px 16px", borderTop: `2px solid ${color}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
+                    <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{m}</span>
+                  </div>
+                  {picks.length === 0 ? (
+                    <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>No picks yet.</div>
+                  ) : (
+                    picks.slice(0, 10).map((d, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 9, padding: "5px 0", borderBottom: i < 9 ? `1px solid ${T.border}` : "none" }}>
+                        <span style={{ width: 22, height: 22, borderRadius: "50%", background: i === 0 ? `${color}30` : `${T.border}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: i === 0 ? color : T.textDim, flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ fontSize: 12, fontWeight: i === 0 ? 800 : 600, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {disagreements.length > 0 && (
+          <div style={{ ...card, marginTop: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>Biggest disagreements</div>
+            {disagreements.map((x, i) => (
+              <div key={i} style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.7 }}>
+                <span style={{ color: T.text, fontWeight: 700 }}>{x.driver}</span>: {x.high[0]} has {x.high[0] === "My Gut" ? "me" : "them"} P{x.high[1]}, {x.low[0]} has {x.low[0] === "My Gut" ? "me" : "them"} P{x.low[1]}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* DARK HORSE + SUCK PICK */}
+      <div>
+        {sectionTitle("My Calls")}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
+          <div style={{ ...card, borderLeft: `3px solid ${T.green}` }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: T.green, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Dark Horse</div>
+            {darkHorse
+              ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{darkHorse}</div>
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my dark horse Wednesday morning.</div>}
+          </div>
+          <div style={{ ...card, borderLeft: `3px solid ${T.red}` }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Suck Pick</div>
+            {suckPick
+              ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{suckPick}</div>
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my suck pick Wednesday morning.</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* WEEKEND TIMELINE */}
+      <div>
+        {sectionTitle("Race Weekend")}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { label: "Practice", when: "Friday 6:00 PM", done: pracCount > 0, note: pracCount > 0 ? `${pracCount} drivers logged` : "Scheduled" },
+            { label: "Qualifying", when: "Saturday 3:00 PM", done: qualCount > 0, note: qualCount > 0 ? `${qualCount} drivers logged` : "Scheduled" },
+            { label: "Race", when: hub.dateLabel, done: status !== "upcoming", note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
+          ].map((row, i) => (
+            <div key={i} style={{ ...card, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: row.done ? T.green : T.textDim, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", minWidth: 90 }}>{row.label}</span>
+              <span style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{row.when}</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: row.done ? T.green : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{row.note}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* DFS CALLOUT */}
+      <div style={{ ...card, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: `linear-gradient(135deg, ${T.goldBg}, ${T.surface} 70%)` }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase" }}>Building a DFS lineup?</div>
+          <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>Run the optimizer with this week's salaries and projections.</div>
+        </div>
+        <button onClick={() => onOpenTab("dfs")} style={{ padding: "9px 20px", borderRadius: 6, border: `1px solid ${T.gold}60`, background: `${T.gold}18`, color: T.gold, fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>
+          Open DFS Optimizer
+        </button>
+      </div>
+
+      {/* RESULTS */}
+      <div>
+        {sectionTitle("Official Results")}
+        {actuals ? (
+          <div style={card}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 22 }}>🏆</span>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, textTransform: "uppercase" }}>Winner</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: T.gold, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1 }}>{actuals[0]}</div>
+              </div>
+              {winner && (
+                <div style={{ marginLeft: "auto", fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
+                  Battle winner: <span style={{ color: T.accentText, fontWeight: 700 }}>{winner.predictor}</span> ({winner.points} pts)
+                </div>
+              )}
+            </div>
+            {actuals.slice(0, 10).map((d, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: i < 9 ? `1px solid ${T.border}` : "none" }}>
+                <span style={{ width: 24, fontSize: 11, fontWeight: 800, color: i === 0 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>P{i + 1}</span>
+                <span style={{ fontSize: 13, fontWeight: i === 0 ? 800 : 500, color: T.text }}>{d}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ ...card, textAlign: "center", color: T.textDim, padding: "30px 20px" }}>
+            <div style={{ marginBottom: 10, opacity: 0.7 }}>{Ic.Lock()}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>Results locked</div>
+            <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>This section unlocks after the checkered flag on race day.</div>
+          </div>
+        )}
+      </div>
+
+      {/* PREV / NEXT */}
+      <div style={{ display: "flex", gap: 10 }}>
+        <button disabled={!olderHub} onClick={() => olderHub && onOpenRace(olderHub.slug)} style={{ flex: 1, padding: "10px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: olderHub ? T.textMid : T.textDim, fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", cursor: olderHub ? "pointer" : "default", opacity: olderHub ? 1 : 0.5 }}>
+          {olderHub ? `← ${olderHub.name}` : "← No older race"}
+        </button>
+        <button disabled={!newerHub} onClick={() => newerHub && onOpenRace(newerHub.slug)} style={{ flex: 1, padding: "10px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: newerHub ? T.textMid : T.textDim, fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", cursor: newerHub ? "pointer" : "default", opacity: newerHub ? 1 : 0.5 }}>
+          {newerHub ? `${newerHub.name} →` : "No newer race →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// HOMEPAGE HERO CARD — replaces the old collapsible next-race banner.
+// Mobile: sits on top. Desktop: sits to the side.
+function RaceHeroCard({ hub, battleRace, onOpen }) {
+  if (!hub) return null;
+  const status = hubStatus(hub);
+  const days = hubCountdown(hub);
+  const typeColor = TC[hub.trackType] || T.accent;
+  const scored = battleRace && battleRace.actualResults && battleRace.actualResults.length > 0;
+  return (
+    <div style={{
+      background: `linear-gradient(135deg, ${typeColor}16, ${T.surface} 65%)`,
+      borderBottom: `1px solid ${T.border}`,
+      borderLeft: `3px solid ${typeColor}`,
+      padding: "14px 18px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, textTransform: "uppercase" }}>This week</span>
+        <HubStatusBadge status={status} />
+        {days != null && status === "upcoming" && (
+          <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{days === 0 ? "RACE DAY" : `${days}d away`}</span>
+        )}
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1 }}>
+        {hub.name}
+      </div>
+      <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+        {hub.track} · {hub.dateLabel} · {hub.laps} laps
+      </div>
+      {scored && (
+        <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+          Winner: <span style={{ color: T.gold, fontWeight: 700 }}>{battleRace.actualResults[0]}</span>
+        </div>
+      )}
+      <button onClick={() => onOpen(hub.slug)} style={{
+        marginTop: 10, width: "100%", padding: "9px 16px", borderRadius: 6,
+        border: `1px solid ${typeColor}55`, background: `${typeColor}18`, color: typeColor,
+        fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif",
+        letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+      }}>
+        Open race hub <span>→</span>
+      </button>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────
 export default function NASCARHub() {
   const [activeTab, setActiveTab] = useState(() => tabIdFromPath());
-  // Apply the tab's title/meta and track the initial view on first load
-  useEffect(() => { applyTabMeta(activeTab); trackHubTabView(activeTab); }, []);
-  // Keep the tab in sync with the browser back/forward buttons
+  const [raceSlug, setRaceSlug] = useState(() => raceSlugFromPath());
+  // Apply the title/meta and track the initial view on first load
+  useEffect(() => {
+    if (tabIdFromPath() === "race") {
+      const slug = raceSlugFromPath();
+      const hub = hubBySlug(slug);
+      applyRaceMeta(hub);
+      trackRacePageView(slug, hub && hub.name);
+    } else {
+      applyTabMeta(activeTab);
+      trackHubTabView(activeTab);
+    }
+  }, []);
+  // Keep the view in sync with the browser back/forward buttons
   useEffect(() => {
     const onPopState = () => {
-      const tabId = tabIdFromPath();
-      setActiveTab(tabId);
-      applyTabMeta(tabId);
-      trackHubTabView(tabId);
+      if (tabIdFromPath() === "race") {
+        const slug = raceSlugFromPath();
+        setRaceSlug(slug);
+        setActiveTab("race");
+        const hub = hubBySlug(slug);
+        applyRaceMeta(hub);
+        trackRacePageView(slug, hub && hub.name);
+      } else {
+        const tabId = tabIdFromPath();
+        setActiveTab(tabId);
+        applyTabMeta(tabId);
+        trackHubTabView(tabId);
+      }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -8890,6 +9081,17 @@ export default function NASCARHub() {
     if (window.location.pathname !== path) window.history.pushState({ tab: tabId }, "", path);
     applyTabMeta(tabId);
     trackHubTabView(tabId);
+  };
+  // Open a race hub page at /race/<slug>
+  const openRacePage = (slug) => {
+    const path = "/race/" + slug;
+    setRaceSlug(slug);
+    setActiveTab("race");
+    if (window.location.pathname !== path) window.history.pushState({ race: slug }, "", path);
+    const hub = hubBySlug(slug);
+    applyRaceMeta(hub);
+    trackRacePageView(slug, hub && hub.name);
+    try { window.scrollTo(0, 0); } catch (e) {}
   };
   const [drivers,         setDrivers]         = useState(JSON.parse(JSON.stringify(INITIAL_DRIVERS)));
   const [prevRanks,       setPrevRanks]       = useState({});
@@ -9240,6 +9442,7 @@ export default function NASCARHub() {
       <style>{`
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes hubBlink{0%,100%{opacity:1}50%{opacity:0.25}}
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:5px;height:5px}
         ::-webkit-scrollbar-track{background:${T.bg}}
@@ -9288,7 +9491,7 @@ export default function NASCARHub() {
           </div>
           <nav style={{ display:"flex", overflowX:"auto", msOverflowStyle:"none", scrollbarWidth:"none" }}>
             {TABS.map(tab => {
-              const active = tab.id === activeTab;
+              const active = tab.id === activeTab || (tab.id === "races" && activeTab === "race");
               return (
                 <button key={tab.id} onClick={()=>handleTabChange(tab.id)} style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 16px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
                   <span style={{ opacity:active?1:0.5 }}>{Ic[tab.icon]?.()}</span>
@@ -9311,9 +9514,9 @@ export default function NASCARHub() {
           </div>
         )}
 
-        {/* MOBILE BANNER */}
+        {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner) */}
         <div className="nascar-mobile-banner">
-          <ThisWeekPanel csvData={csvData} drivers={drivers} incrementTool={incrementTool} mode="banner" />
+          <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} onOpen={openRacePage} />
         </div>
 
         {/* CONTENT + SIDEBAR */}
@@ -9323,6 +9526,8 @@ export default function NASCARHub() {
               {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
               {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
+              {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
+              {activeTab === "race"      && <RaceHubPage hub={hubBySlug(raceSlug)} battleRace={findBattleForHub(battleRaces, hubBySlug(raceSlug))} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
@@ -9331,9 +9536,9 @@ export default function NASCARHub() {
             </div>
           </main>
 
-          {/* DESKTOP SIDEBAR */}
+          {/* DESKTOP SIDEBAR — hero card sits to the side */}
           <div className="nascar-sidebar" style={{ flex:1, minWidth:0 }}>
-            <ThisWeekPanel csvData={csvData} drivers={drivers} incrementTool={incrementTool} mode="sidebar" />
+            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} onOpen={openRacePage} />
           </div>
         </div>
 
