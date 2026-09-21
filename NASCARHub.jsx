@@ -9111,7 +9111,7 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
       {hub.intro && hub.intro.length > 0 && (
         <div style={{ ...card }}>
           {hub.intro.map((p, i) => (
-            <p key={i} style={{ fontSize: 13, color: T.textMid, lineHeight: 1.75, margin: i > 0 ? "12px 0 0" : 0, maxWidth: 1000 }}>{p}</p>
+            <p key={i} style={{ fontSize: 13, color: T.textMid, lineHeight: 1.75, margin: i > 0 ? "12px 0 0" : 0 }}>{p}</p>
           ))}
         </div>
       )}
