@@ -9089,7 +9089,7 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
   const card = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1100 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%" }}>
       {/* HERO */}
       <div style={{ ...card, background: `linear-gradient(135deg, ${typeColor}14, ${T.surface} 60%)`, borderLeft: `3px solid ${typeColor}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
@@ -9281,6 +9281,7 @@ function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, coll
   const sectionLabel = { fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", margin: "16px 0 8px" };
   return (
     <div style={{
+      width: "100%",
       background: `linear-gradient(135deg, ${typeColor}16, ${T.surface} 65%)`,
       borderBottom: `1px solid ${T.border}`,
       borderLeft: `3px solid ${typeColor}`,
@@ -9788,6 +9789,8 @@ export default function NASCARHub() {
         textarea{color-scheme:dark}
         .nascar-sidebar{display:flex}
         .nascar-mobile-banner{display:none}
+        @media(min-width:1800px){.nascar-main{zoom:1.15}}
+        @media(min-width:2400px){.nascar-main{zoom:1.3}}
         @media(max-width:768px){
           .nascar-sidebar{display:none!important}
           .nascar-mobile-banner{display:block}
@@ -9860,7 +9863,7 @@ export default function NASCARHub() {
 
         {/* CONTENT + SIDEBAR */}
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
-          <main style={{ flex:"0 1 1000px", overflow:"auto", padding:"24px 28px", width:"100%" }}>
+          <main className="nascar-main" style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
               {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
               {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
@@ -9878,7 +9881,7 @@ export default function NASCARHub() {
 
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
           {activeTab !== "race" && (
-          <div className="nascar-sidebar" style={{ flex: "1 1 380px", minWidth: 320, maxWidth: 560 }}>
+          <div className="nascar-sidebar" style={{ flex: "0 1 320px", minWidth: 280, maxWidth: 320 }}>
             <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
           </div>
           )}
