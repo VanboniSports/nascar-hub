@@ -9281,6 +9281,7 @@ function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, coll
   const sectionLabel = { fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", margin: "16px 0 8px" };
   return (
     <div style={{
+      width: "100%",
       background: `linear-gradient(135deg, ${typeColor}16, ${T.surface} 65%)`,
       borderBottom: `1px solid ${T.border}`,
       borderLeft: `3px solid ${typeColor}`,
