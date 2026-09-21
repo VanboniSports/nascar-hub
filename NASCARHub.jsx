@@ -9789,6 +9789,8 @@ export default function NASCARHub() {
         textarea{color-scheme:dark}
         .nascar-sidebar{display:flex}
         .nascar-mobile-banner{display:none}
+        @media(min-width:1800px){.nascar-main{zoom:1.15}}
+        @media(min-width:2400px){.nascar-main{zoom:1.3}}
         @media(max-width:768px){
           .nascar-sidebar{display:none!important}
           .nascar-mobile-banner{display:block}
@@ -9861,7 +9863,7 @@ export default function NASCARHub() {
 
         {/* CONTENT + SIDEBAR */}
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
-          <main style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
+          <main className="nascar-main" style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
               {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
               {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
