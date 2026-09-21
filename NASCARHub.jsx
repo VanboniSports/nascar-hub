@@ -9881,7 +9881,7 @@ export default function NASCARHub() {
 
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
           {activeTab !== "race" && (
-          <div className="nascar-sidebar" style={{ flex: "0 1 480px", minWidth: 300, maxWidth: 480 }}>
+          <div className="nascar-sidebar" style={{ flex: "0 1 320px", minWidth: 280, maxWidth: 320 }}>
             <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
           </div>
           )}
