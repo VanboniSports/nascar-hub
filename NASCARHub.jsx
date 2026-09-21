@@ -8903,13 +8903,13 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
             <div style={{ fontSize: 11, fontWeight: 800, color: T.green, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Dark Horse</div>
             {darkHorse
               ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{darkHorse}</div>
-              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my dark horse Monday morning.</div>}
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my dark horse Wednesday morning.</div>}
           </div>
           <div style={{ ...card, borderLeft: `3px solid ${T.red}` }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Suck Pick</div>
             {suckPick
               ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{suckPick}</div>
-              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my suck pick Monday morning.</div>}
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my suck pick Wednesday morning.</div>}
           </div>
         </div>
       </div>
