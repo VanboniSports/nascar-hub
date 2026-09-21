@@ -9860,7 +9860,7 @@ export default function NASCARHub() {
 
         {/* CONTENT + SIDEBAR */}
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
-          <main style={{ flex:"0 1 1000px", overflow:"auto", padding:"24px 28px", width:"100%" }}>
+          <main style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
               {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
               {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
@@ -9878,7 +9878,7 @@ export default function NASCARHub() {
 
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
           {activeTab !== "race" && (
-          <div className="nascar-sidebar" style={{ flex: "1 1 380px", minWidth: 320, maxWidth: 560 }}>
+          <div className="nascar-sidebar" style={{ flex: "0 1 640px", minWidth: 320, maxWidth: 640 }}>
             <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
           </div>
           )}
