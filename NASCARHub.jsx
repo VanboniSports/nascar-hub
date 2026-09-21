@@ -8807,6 +8807,37 @@ function currentHub() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// TEMP PREVIEW ONLY — REMOVE BEFORE MERGE (PR #7)
+// Sample picks so the populated race-hub layout can be reviewed on the
+// preview build. NOT real data: never touches Supabase, only used when no
+// real battle entry exists for the Kansas hub.
+// ─────────────────────────────────────────────────────────────
+const SAMPLE_BATTLE_RACE = {
+  predictions: {
+    "Pure Stats": ["Kyle Larson","Denny Hamlin","Christopher Bell","William Byron","Ryan Blaney","Chase Elliott","Tyler Reddick","Ross Chastain","Joey Logano","Alex Bowman"],
+    "Enhanced Pure Stats": ["Denny Hamlin","Kyle Larson","William Byron","Christopher Bell","Ryan Blaney","Tyler Reddick","Chase Elliott","Ross Chastain","Alex Bowman","Joey Logano"],
+    "Power Rankings": ["Kyle Larson","Joey Logano","Denny Hamlin","Christopher Bell","William Byron","Ryan Blaney","Chase Elliott","Tyler Reddick","Brad Keselowski","Alex Bowman"],
+    "My Gut": ["Kyle Larson","Christopher Bell","Denny Hamlin","William Byron","Tyler Reddick","Ryan Blaney","Chase Elliott","Ross Chastain","Joey Logano","Brad Keselowski"],
+  },
+  darkHorse: "Brad Keselowski",
+  suckPick: "Austin Cindric",
+  actualResults: [],
+};
+const SAMPLE_QUAL_PRACTICE = {
+  week: 30,
+  practice: Object.fromEntries(Array.from({ length: 38 }, (_, i) => ["driver" + i, true])),
+  qualifying: Object.fromEntries(Array.from({ length: 38 }, (_, i) => ["driver" + i, true])),
+};
+function previewSampleBattle(hub) {
+  return (hub && hub.slug === "kansas-2026") ? SAMPLE_BATTLE_RACE : null;
+}
+function previewSampleQP(hub, realQP) {
+  if (realQP && realQP.week === (hub && hub.week) && (Object.keys(realQP.practice || {}).length || Object.keys(realQP.qualifying || {}).length)) return realQP;
+  return (hub && hub.slug === "kansas-2026") ? SAMPLE_QUAL_PRACTICE : realQP;
+}
+// ─────────────────── END TEMP PREVIEW ONLY ───────────────────
+
+// ─────────────────────────────────────────────────────────────
 // ROUTES + GA4 VIRTUAL PAGEVIEWS
 // The Hub is a single-page app, but each tab gets its own real URL
 // (e.g. /dfs) so sections are shareable and indexable by search engines.
@@ -9870,7 +9901,7 @@ export default function NASCARHub() {
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
-              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} />}
+              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub()) || previewSampleBattle(raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={previewSampleQP(raceSlug ? hubBySlug(raceSlug) : currentHub(), qualPractice)} onOpenRace={openRacePage} onOpenTab={handleTabChange} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
@@ -9882,7 +9913,7 @@ export default function NASCARHub() {
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
           {activeTab !== "race" && (
           <div className="nascar-sidebar" style={{ flex: "0 1 320px", minWidth: 280, maxWidth: 320 }}>
-            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
+            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub()) || previewSampleBattle(currentHub())} qualPractice={previewSampleQP(currentHub(), qualPractice)} onOpen={openRacePage} defaultOpen />
           </div>
           )}
         </div>
