@@ -430,6 +430,7 @@ const Ic = {
   List:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
   ArrowLeft:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
   Eye:     ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+  Embed:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -8288,6 +8289,37 @@ function BlogTab({ blogPosts, incrementTool }) {
     incrementTool?.("blog_post", { post_title: post.title, post_id: post.id });
   }, [incrementTool]);
 
+  // Load third-party embed scripts when the viewed post contains rich embeds.
+  // Re-run per post so client-side navigation re-triggers each provider's scan.
+  useEffect(() => {
+    if (!viewingPost?.body) return;
+    const body = viewingPost.body;
+    const ensureScript = (id, src) => new Promise((resolve) => {
+      let s = document.getElementById(id);
+      if (!s) {
+        s = document.createElement("script");
+        s.id = id; s.src = src; s.async = true;
+        s.onload = resolve; s.onerror = resolve;
+        document.body.appendChild(s);
+      } else resolve();
+    });
+    if (body.includes("tiktok-embed")) {
+      const old = document.getElementById("tiktok-embed-js");
+      if (old) old.remove();
+      const s = document.createElement("script");
+      s.id = "tiktok-embed-js"; s.src = "https://www.tiktok.com/embed.js"; s.async = true;
+      document.body.appendChild(s);
+    }
+    if (body.includes("twitter-tweet")) {
+      ensureScript("twitter-widgets-js", "https://platform.twitter.com/widgets.js")
+        .then(() => { window.twttr?.widgets?.load?.(document.querySelector(".blog-article-body")); });
+    }
+    if (body.includes("instagram-media")) {
+      ensureScript("instagram-embed-js", "https://www.instagram.com/embed.js")
+        .then(() => { window.instgrm?.Embeds?.process?.(); });
+    }
+  }, [viewingPost?.id]);
+
   // Full article view
   if (viewingPost) {
     return (
@@ -8339,6 +8371,12 @@ function BlogTab({ blogPosts, incrementTool }) {
           .blog-article-body li{margin-bottom:6px}
           .blog-article-body blockquote{border-left:3px solid ${T.accent};padding:8px 16px;margin:16px 0;color:${T.textMid};background:${T.accentSoft};border-radius:0 8px 8px 0}
           .blog-article-body strong,.blog-article-body b{color:${T.text};font-weight:700}
+          .blog-article-body blockquote.tiktok-embed,.blog-article-body blockquote.twitter-tweet,.blog-article-body blockquote.instagram-media{border-left:none;background:none;padding:0;border-radius:0}
+          .blog-article-body .blog-embed-video{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;margin:16px 0}
+          .blog-article-body .blog-embed-video iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:8px}
+          .blog-article-body .tiktok-embed{margin:16px auto !important}
+          .blog-article-body .twitter-tweet{margin-left:auto !important;margin-right:auto !important}
+          .blog-article-body .instagram-media{margin:16px auto !important}
         `}</style>
       </div>
     );
@@ -8488,6 +8526,48 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
       reader.readAsDataURL(file);
     };
     fileInput.click();
+  };
+
+  const escAttr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+  // Build provider embed HTML from a pasted URL. Returns null when the URL
+  // isn't a recognized embeddable link (caller falls back to a plain link).
+  const buildEmbedHtml = (url) => {
+    let m;
+    // TikTok — https://www.tiktok.com/@user/video/1234567890
+    m = url.match(/tiktok\.com\/@[^/?#]+\/video\/(\d+)/);
+    if (m) {
+      const id = m[1];
+      return `<blockquote class="tiktok-embed" cite="${escAttr(url)}" data-video-id="${id}" style="max-width:605px;min-width:325px;"><section><p>TikTok embed (renders when published)</p></section></blockquote><p><br></p>`;
+    }
+    // YouTube — watch?v=, youtu.be/, shorts/, embed/
+    m = url.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    if (m) {
+      const id = m[1];
+      return `<div class="blog-embed-video"><iframe src="https://www.youtube.com/embed/${id}" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><p><br></p>`;
+    }
+    // X / Twitter — https://x.com/user/status/1234567890
+    m = url.match(/(?:twitter\.com|x\.com)\/[A-Za-z0-9_]+\/status\/(\d+)/);
+    if (m) {
+      return `<blockquote class="twitter-tweet" data-dnt="true"><p>X post embed (renders when published)</p><a href="${escAttr(url)}"></a></blockquote><p><br></p>`;
+    }
+    // Instagram — /p/ or /reel/
+    m = url.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
+    if (m) {
+      const canon = `https://www.instagram.com/p/${m[1]}/`;
+      return `<blockquote class="instagram-media" data-instgrm-permalink="${canon}" data-instgrm-version="14"><p>Instagram embed (renders when published)</p><a href="${canon}"></a></blockquote><p><br></p>`;
+    }
+    return null;
+  };
+
+  const handleInsertEmbed = () => {
+    const url = window.prompt("Paste a TikTok, YouTube, X, or Instagram URL to embed:");
+    if (!url || !url.trim()) return;
+    const clean = url.trim();
+    const html = buildEmbedHtml(clean) || `<p><a href="${escAttr(clean)}">${escAttr(clean)}</a></p>`;
+    editorRef.current?.focus();
+    execCmd("insertHTML", html);
+    setBlogBody(editorRef.current?.innerHTML || "");
   };
 
   const handleFeaturedImage = () => {
@@ -8669,6 +8749,7 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
           <div style={{ width:1, background:T.border, margin:"0 4px" }} />
           <button onClick={handleInsertLink} style={toolbarBtnStyle(false)} title="Insert Link"><Ic.Link /></button>
           <button onClick={handleInsertImage} style={toolbarBtnStyle(false)} title="Insert Image"><Ic.Image /></button>
+          <button onClick={handleInsertEmbed} style={toolbarBtnStyle(false)} title="Embed media (TikTok, YouTube, X, Instagram)"><Ic.Embed /></button>
           <button onClick={() => execCmd("formatBlock", "blockquote")} style={toolbarBtnStyle(false)} title="Quote">
             <span style={{ fontSize:14, fontWeight:700, fontFamily:"serif" }}>"</span>
           </button>
@@ -8679,6 +8760,12 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
           ref={editorRef}
           contentEditable
           suppressContentEditableWarning
+          role="textbox"
+          aria-label="Post body"
+          aria-multiline="true"
+          tabIndex={0}
+          data-testid="blog-body-editor"
+          data-placeholder="Write your post here…"
           onInput={() => setBlogBody(editorRef.current?.innerHTML || "")}
           style={{
             minHeight:300, background:T.surface2, border:`1px solid ${T.border}`, borderRadius:"0 0 8px 8px",
@@ -8695,6 +8782,10 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
           [contenteditable] img{max-width:100%;border-radius:8px;margin:8px 0}
           [contenteditable] blockquote{border-left:3px solid ${T.accent};padding:4px 12px;margin:8px 0;color:${T.textMid}}
           [contenteditable]:empty:before{content:attr(data-placeholder);color:${T.textDim}}
+          [contenteditable] .blog-embed-video{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;margin:8px 0}
+          [contenteditable] .blog-embed-video iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:8px}
+          [contenteditable] .tiktok-embed,[contenteditable] .twitter-tweet,[contenteditable] .instagram-media{border:2px dashed ${T.accent};border-radius:8px;padding:14px 16px;margin:8px 0;background:transparent}
+          [contenteditable] .tiktok-embed section p,[contenteditable] .twitter-tweet p,[contenteditable] .instagram-media p{color:${T.textDim};font-size:13px;margin:0;text-align:center}
         `}</style>
       </div>
 
