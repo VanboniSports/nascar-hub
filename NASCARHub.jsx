@@ -8484,7 +8484,7 @@ const RACE_HUBS = [
     nascarRaceId:5628,
     intro:[
       "Kansas Speedway is a 1.5-mile tri-oval outside Kansas City, and it has quietly become one of the best pure racing tracks in the Cup Series. The progressive banking gives drivers three or four usable grooves, so restarts get chaotic in the best way and track position is never quite safe. Long green-flag runs are the norm here, which means tire management decides about as many races as raw speed does.",
-      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and Morgan's Gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps everyone honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
+      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
     ] },
 ];
 // Predictors shown on race hub pages. The ML model is retired from hubs.
@@ -8855,7 +8855,7 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
           <div style={{ ...card, textAlign: "center", color: T.textDim, fontSize: 13, padding: "28px 20px" }}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>🔮</div>
             <div>Predictions drop Monday morning.</div>
-            <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>Check back once the models and Morgan's gut have weighed in.</div>
+            <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>Check back once the models and my gut have weighed in.</div>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
@@ -8888,7 +8888,7 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
             <div style={{ fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>Biggest disagreements</div>
             {disagreements.map((x, i) => (
               <div key={i} style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.7 }}>
-                <span style={{ color: T.text, fontWeight: 700 }}>{x.driver}</span>: {x.high[0]} has {x.high[0] === "My Gut" ? "him" : "them"} P{x.high[1]}, {x.low[0]} has {x.low[0] === "My Gut" ? "him" : "them"} P{x.low[1]}
+                <span style={{ color: T.text, fontWeight: 700 }}>{x.driver}</span>: {x.high[0]} has {x.high[0] === "My Gut" ? "me" : "them"} P{x.high[1]}, {x.low[0]} has {x.low[0] === "My Gut" ? "me" : "them"} P{x.low[1]}
               </div>
             ))}
           </div>
@@ -8897,19 +8897,19 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
 
       {/* DARK HORSE + SUCK PICK */}
       <div>
-        {sectionTitle("Morgan's Calls")}
+        {sectionTitle("My Calls")}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
           <div style={{ ...card, borderLeft: `3px solid ${T.green}` }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: T.green, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Dark Horse</div>
             {darkHorse
               ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{darkHorse}</div>
-              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Morgan names his dark horse Monday morning.</div>}
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my dark horse Monday morning.</div>}
           </div>
           <div style={{ ...card, borderLeft: `3px solid ${T.red}` }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Suck Pick</div>
             {suckPick
               ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{suckPick}</div>
-              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Morgan names his suck pick Monday morning.</div>}
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my suck pick Monday morning.</div>}
           </div>
         </div>
       </div>
