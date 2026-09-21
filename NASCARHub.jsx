@@ -8511,13 +8511,25 @@ function hubCountdown(hub) {
   const d = new Date(hub.date + "T23:59:59");
   return Math.max(0, Math.ceil((d - now) / 86400000));
 }
-// Match a battle tracker race entry to a hub by track (primary) or race name (fallback).
+// Match a battle tracker race entry to a hub. Race-name match comes first:
+// tracks that host twice a year (Kansas, Texas, Darlington...) must never
+// match the other race at the same track. Falls back to track + closest date.
 function findBattleForHub(battleRaces, hub) {
   if (!hub || !battleRaces || !battleRaces.length) return null;
   const norm = s => (s || "").toLowerCase().trim();
-  return battleRaces.find(r => norm(r.track) === norm(hub.track))
-      || battleRaces.find(r => norm(r.raceName) === norm(hub.officialName) || norm(r.raceName) === norm(hub.name))
-      || null;
+  const byName = battleRaces.find(r => norm(r.raceName) === norm(hub.officialName) || norm(r.raceName) === norm(hub.name));
+  if (byName) return byName;
+  const byTrack = battleRaces.filter(r => norm(r.track) === norm(hub.track));
+  if (!byTrack.length) return null;
+  if (hub.date) {
+    const t = new Date(hub.date + "T12:00:00").getTime();
+    const dist = r => { const d = new Date((r.date || "") + "T12:00:00").getTime(); return isNaN(d) ? Infinity : Math.abs(d - t); };
+    byTrack.sort((a, b) => dist(a) - dist(b));
+    // Same-track fallback only counts for the same race week: never borrow
+    // another race at this track from months away.
+    return dist(byTrack[0]) <= 10 * 86400000 ? byTrack[0] : null;
+  }
+  return byTrack[0] || null;
 }
 // Highest-scoring predictor for a race that has actual results.
 // `models` limits which predictors are eligible (race hubs exclude the
