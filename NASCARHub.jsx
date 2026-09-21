@@ -1092,6 +1092,7 @@ function PredictorTab({ drivers, csvData, incrementTool }) {
   const runPrediction = () => {
     if (!race) return;
     incrementTool?.("race_predictor");
+    trackEvent("predictor_run", { model: selectedModel, race_week: race.week, race_name: race.name });
 
     if (selectedModel === "power") {
       // Original Power Rankings model — unchanged
@@ -6806,6 +6807,7 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
 
   const runOptimizer = () => {
     if (!race || !hasCsv) return;
+    trackEvent("dfs_optimizer_run", { platform: platform, race_week: race.week, race_name: race.name });
     let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled, qualPractice);
     projections = projections.map(p => {
       const sal = salaryData[p.driver] || 0;
@@ -8635,6 +8637,11 @@ function trackHubTabView(tabId) {
     page_location: window.location.origin + page_path,
     page_path: page_path,
   });
+}
+// GA4 custom event helper for useful actions (predictor runs, DFS actions, shares).
+function trackEvent(name, params) {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  window.gtag("event", name, params || {});
 }
 // GA4 pageview for /race/<slug> pages (not Hub tabs, so tracked separately).
 function trackRacePageView(slug, hubName) {
