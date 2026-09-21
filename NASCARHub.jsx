@@ -2762,7 +2762,8 @@ function ScorecardTab({ battleRaces, incrementTool }) {
         <div style={{ fontSize: 13, color: T.textDim, marginTop: 4, maxWidth: 720 }}>
           Every model picks a top 10 before each race. This page grades them against the actual results,
           updated after every race. Winner accuracy is the marquee number: how often the model's No. 1
-          pick takes the checkered flag. Based on {scoredCount} scored {scoredCount === 1 ? "race" : "races"}.
+          pick takes the checkered flag. Edge is the track type where a model beats the other models
+          (the field) by the most, measured in average points per race. Based on {scoredCount} scored {scoredCount === 1 ? "race" : "races"}.
         </div>
       </div>
 
