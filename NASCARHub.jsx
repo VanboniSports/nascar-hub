@@ -9003,12 +9003,25 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
 
 // HOMEPAGE HERO CARD — replaces the old collapsible next-race banner.
 // Mobile: sits on top. Desktop: sits to the side.
-function RaceHeroCard({ hub, battleRace, onOpen }) {
+// Race hub summary card. Desktop sidebar: always open, a full race-at-a-glance
+// panel that fills the column. Mobile banner: a collapsed dropdown, tap to
+// expand inline, so checking the race never navigates you away from your tab.
+function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, collapsible }) {
+  const [open, setOpen] = useState(!!defaultOpen || !collapsible);
   if (!hub) return null;
   const status = hubStatus(hub);
   const days = hubCountdown(hub);
   const typeColor = TC[hub.trackType] || T.accent;
-  const scored = battleRace && battleRace.actualResults && battleRace.actualResults.length > 0;
+  const predictions = (battleRace && battleRace.predictions) || {};
+  const hasAnyPredictions = HUB_PREDICTORS.some(m => predictions[m] && predictions[m].length);
+  const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
+  const winner = actuals ? battleWinnerFor(battleRace, HUB_PREDICTORS) : null;
+  const darkHorse = battleRace && battleRace.darkHorse;
+  const suckPick = battleRace && battleRace.suckPick;
+  const qpMatch = qualPractice && qualPractice.week === hub.week;
+  const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
+  const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
+  const sectionLabel = { fontSize: 10, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", margin: "14px 0 8px" };
   return (
     <div style={{
       background: `linear-gradient(135deg, ${typeColor}16, ${T.surface} 65%)`,
@@ -9016,33 +9029,75 @@ function RaceHeroCard({ hub, battleRace, onOpen }) {
       borderLeft: `3px solid ${typeColor}`,
       padding: "14px 18px",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, textTransform: "uppercase" }}>This week</span>
-        <HubStatusBadge status={status} />
-        {days != null && status === "upcoming" && (
-          <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{days === 0 ? "RACE DAY" : `${days}d away`}</span>
+      <div onClick={collapsible ? () => setOpen(o => !o) : undefined} style={collapsible ? { cursor: "pointer" } : undefined}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, textTransform: "uppercase" }}>This week</span>
+          <HubStatusBadge status={status} />
+          {days != null && status === "upcoming" && (
+            <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{days === 0 ? "RACE DAY" : `${days}d away`}</span>
+          )}
+          {collapsible && <span style={{ marginLeft: "auto", color: T.textDim, display: "flex" }}><Ic.Chevron open={open} /></span>}
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1 }}>
+          {hub.name}
+        </div>
+        <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+          {hub.track} · {hub.dateLabel} · {hub.laps} laps
+        </div>
+        {actuals && (
+          <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+            Winner: <span style={{ color: T.gold, fontWeight: 700 }}>{actuals[0]}</span>
+          </div>
         )}
       </div>
-      <div style={{ fontSize: 20, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", lineHeight: 1.1 }}>
-        {hub.name}
-      </div>
-      <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
-        {hub.track} · {hub.dateLabel} · {hub.laps} laps
-      </div>
-      {scored && (
-        <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
-          Winner: <span style={{ color: T.gold, fontWeight: 700 }}>{battleRace.actualResults[0]}</span>
+      {open && (
+        <div>
+          <div style={sectionLabel}>{hasAnyPredictions ? "Top 3 by predictor" : "Predictions"}</div>
+          {!hasAnyPredictions ? (
+            <div style={{ fontSize: 12, color: T.textDim }}>Models drop Monday, my picks land Wednesday.</div>
+          ) : HUB_PREDICTORS.map(m => {
+            const picks = (predictions[m] || []).slice(0, 3);
+            const color = PREDICTOR_COLORS[m] || T.accent;
+            return (
+              <div key={m} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{m}</span>
+                </div>
+                {picks.length === 0 ? (
+                  <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", paddingLeft: 14 }}>No picks yet.</div>
+                ) : picks.map((d, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0 3px 14px", fontSize: 12 }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: i === 0 ? color : T.textDim, width: 12 }}>{i + 1}</span>
+                    <span style={{ color: T.text, fontWeight: i === 0 ? 700 : 500 }}>{d}</span>
+                    {actuals && actuals[0] === d && <span style={{ fontSize: 9, color: T.gold, fontWeight: 800, letterSpacing: 1 }}>WINNER</span>}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          {(darkHorse || suckPick) && (
+            <div>
+              <div style={sectionLabel}>My calls</div>
+              {darkHorse && <div style={{ fontSize: 12, color: T.textMid, padding: "3px 0" }}>Dark horse: <span style={{ color: T.text, fontWeight: 700 }}>{darkHorse}</span></div>}
+              {suckPick && <div style={{ fontSize: 12, color: T.textMid, padding: "3px 0" }}>Suck pick: <span style={{ color: T.text, fontWeight: 700 }}>{suckPick}</span></div>}
+            </div>
+          )}
+          <div style={sectionLabel}>Battle</div>
+          <div style={{ fontSize: 12, color: T.textMid }}>
+            {actuals && winner
+              ? <span><span style={{ color: T.gold, fontWeight: 700 }}>{winner.predictor}</span> took it with {winner.points} pts.</span>
+              : "Scored after the race."}
+          </div>
+          <div style={sectionLabel}>Weekend</div>
+          <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+            Practice: {pracCount ? `${pracCount} drivers` : "—"} · Qualifying: {qualCount ? `${qualCount} drivers` : "—"}
+          </div>
+          <button onClick={() => onOpen(hub.slug)} style={{ marginTop: 14, padding: 0, background: "none", border: "none", color: typeColor, fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}>
+            Full race hub <span>→</span>
+          </button>
         </div>
       )}
-      <button onClick={() => onOpen(hub.slug)} style={{
-        marginTop: 10, width: "100%", padding: "9px 16px", borderRadius: 6,
-        border: `1px solid ${typeColor}55`, background: `${typeColor}18`, color: typeColor,
-        fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif",
-        letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-      }}>
-        Open race hub <span>→</span>
-      </button>
     </div>
   );
 }
@@ -9057,9 +9112,11 @@ export default function NASCARHub() {
   useEffect(() => {
     if (tabIdFromPath() === "race") {
       const slug = raceSlugFromPath();
-      const hub = hubBySlug(slug);
+      // No slug (i.e. plain /) means the Race Hub tab: show the current week's hub.
+      const hub = slug ? hubBySlug(slug) : currentHub();
       applyRaceMeta(hub);
-      trackRacePageView(slug, hub && hub.name);
+      if (slug) trackRacePageView(slug, hub && hub.name);
+      else trackRaceTabView(hub);
     } else {
       applyTabMeta(activeTab);
       trackHubTabView(activeTab);
@@ -9540,7 +9597,7 @@ export default function NASCARHub() {
         {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner); hidden on the Race Hub tab itself */}
         {activeTab !== "race" && (
         <div className="nascar-mobile-banner">
-          <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} onOpen={openRacePage} />
+          <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} collapsible />
         </div>
         )}
 
@@ -9564,7 +9621,7 @@ export default function NASCARHub() {
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
           {activeTab !== "race" && (
           <div className="nascar-sidebar" style={{ flex:1, minWidth:0 }}>
-            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} onOpen={openRacePage} />
+            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
           </div>
           )}
         </div>
