@@ -46,7 +46,7 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-T174076546');
+      gtag('config', 'G-T174076546', { send_page_view: false }); // SPA: pageviews are sent manually per tab (see trackHubTabView in NASCARHub.jsx)
     </script>
 
     <style>
