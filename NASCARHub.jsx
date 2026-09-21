@@ -9089,7 +9089,7 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
   const card = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1100 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%" }}>
       {/* HERO */}
       <div style={{ ...card, background: `linear-gradient(135deg, ${typeColor}14, ${T.surface} 60%)`, borderLeft: `3px solid ${typeColor}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
@@ -9111,7 +9111,7 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
       {hub.intro && hub.intro.length > 0 && (
         <div style={{ ...card }}>
           {hub.intro.map((p, i) => (
-            <p key={i} style={{ fontSize: 13, color: T.textMid, lineHeight: 1.75, margin: i > 0 ? "12px 0 0" : 0 }}>{p}</p>
+            <p key={i} style={{ fontSize: 13, color: T.textMid, lineHeight: 1.75, margin: i > 0 ? "12px 0 0" : 0, maxWidth: 1000 }}>{p}</p>
           ))}
         </div>
       )}
