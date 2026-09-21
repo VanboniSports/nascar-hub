@@ -8480,14 +8480,23 @@ function BlogAdminSection({ blogPosts, onBlogSave }) {
 // (qualPractice), and the static schedule below. No new data model.
 // ─────────────────────────────────────────────────────────────
 const RACE_HUBS = [
-  { slug:"kansas-2026", name:"Kansas II", officialName:"Hollywood Casino 400", track:"Kansas Speedway", date:"2026-09-27", dateLabel:"Sun Sep 27", trackType:"intermediate", length:1.5, laps:267, week:30 },
+  { slug:"kansas-2026", name:"Kansas II", officialName:"Hollywood Casino 400", track:"Kansas Speedway", date:"2026-09-27", dateLabel:"Sun Sep 27", trackType:"intermediate", length:1.5, laps:267, week:30,
+    nascarRaceId:5628,
+    intro:[
+      "Kansas Speedway is a 1.5-mile tri-oval outside Kansas City, and it has quietly become one of the best pure racing tracks in the Cup Series. The progressive banking gives drivers three or four usable grooves, so restarts get chaotic in the best way and track position is never quite safe. Long green-flag runs are the norm here, which means tire management decides about as many races as raw speed does.",
+      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and Morgan's Gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps everyone honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
+    ] },
 ];
+// Predictors shown on race hub pages. The ML model is retired from hubs.
+const HUB_PREDICTORS = ["Pure Stats", "Enhanced Pure Stats", "Power Rankings", "My Gut"];
 function hubBySlug(slug) {
   return RACE_HUBS.find(h => h.slug === slug) || null;
 }
-// upcoming = race day is in the future, live = race day is today, completed = race day has passed
+// upcoming = race day is in the future, live = race day is today, completed = race day has passed.
+// hub.statusOverride ("upcoming" | "live" | "completed") forces a status manually.
 function hubStatus(hub) {
   if (!hub) return "upcoming";
+  if (hub.statusOverride) return hub.statusOverride;
   const d = new Date(hub.date + "T12:00:00");
   const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const now = new Date();
@@ -8510,10 +8519,13 @@ function findBattleForHub(battleRaces, hub) {
       || null;
 }
 // Highest-scoring predictor for a race that has actual results.
-function battleWinnerFor(race) {
+// `models` limits which predictors are eligible (race hubs exclude the
+// retired ML model; the Battle Tracker tab keeps its own list).
+function battleWinnerFor(race, models) {
   if (!race || !race.actualResults || !race.actualResults.length) return null;
+  const list = models || PREDICTORS;
   let best = null;
-  for (const p of PREDICTORS) {
+  for (const p of list) {
     const preds = race.predictions && race.predictions[p];
     if (!preds || !preds.length) continue;
     const s = scoreEntry(preds, race.actualResults);
@@ -8681,7 +8693,7 @@ function RacesTab({ battleRaces, onOpenRace }) {
             const status = hubStatus(hub);
             const battle = findBattleForHub(battleRaces, hub);
             const scored = battle && battle.actualResults && battle.actualResults.length > 0;
-            const winner = battleWinnerFor(battle);
+            const winner = battleWinnerFor(battle, HUB_PREDICTORS);
             return (
               <button key={hub.slug} onClick={() => onOpenRace(hub.slug)} style={{
                 display: "flex", alignItems: "center", gap: 14, textAlign: "left",
@@ -8716,6 +8728,60 @@ function RacesTab({ battleRaces, onOpenRace }) {
   );
 }
 
+// LIVE RUNNING ORDER — shown on a race hub while that race is actually live.
+// Data comes from /api/live-leaderboard, a Vercel serverless proxy for
+// NASCAR's official live feed (the CDN sends no CORS headers, so the browser
+// cannot fetch it directly). Polls every 45 seconds. Renders nothing when
+// the race is not live or the feed is unreachable: no errors, no boxes.
+function LiveRunningOrder({ hub }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    if (!hub || !hub.nascarRaceId) return;
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`/api/live-leaderboard?race_id=${hub.nascarRaceId}`);
+        const j = await r.json();
+        if (alive) setData(j && j.live ? j : null);
+      } catch (e) { if (alive) setData(null); }
+    };
+    load();
+    const t = setInterval(load, 45000);
+    return () => { alive = false; clearInterval(t); };
+  }, [hub ? hub.slug : null]);
+  if (!data) return null;
+  const flagColors = { GREEN: T.green, CAUTION: "#f59e0b", "RED FLAG": T.red, CHECKERED: T.textDim };
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.red}55`, borderRadius: 12, padding: "16px 18px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.red, animation: "hubBlink 1.2s infinite" }} />
+        <span style={{ fontSize: 12, fontWeight: 900, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2 }}>LIVE</span>
+        <span style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+          Lap {data.lap} of {data.lapsTotal}
+        </span>
+        {data.flag && (
+          <span style={{ fontSize: 10, fontWeight: 800, color: flagColors[data.flag] || T.textMid, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{data.flag}</span>
+        )}
+        {data.stage != null && (
+          <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Stage {data.stage}</span>
+        )}
+        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>auto-refreshes</span>
+      </div>
+      <div>
+        {data.order.slice(0, 10).map(o => (
+          <div key={o.pos} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: `1px solid ${T.border}` }}>
+            <span style={{ width: 22, fontSize: 11, fontWeight: 800, color: o.pos <= 3 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{o.pos}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", minWidth: 28 }}>#{o.number}</span>
+            <span style={{ fontSize: 12, fontWeight: o.pos === 1 ? 800 : 600, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</span>
+            {!o.running && <span style={{ fontSize: 9, fontWeight: 700, color: T.red, fontFamily: "'IBM Plex Mono',monospace" }}>OUT</span>}
+            <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{o.delta}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // RACE HUB PAGE — /race/<slug>
 function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
   if (!hub) {
@@ -8732,13 +8798,16 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
 
   const status = hubStatus(hub);
   const predictions = (battleRace && battleRace.predictions) || {};
-  const MODELS = ["Pure Stats", "Enhanced Pure Stats", "Power Rankings", "My Gut"];
+  const MODELS = HUB_PREDICTORS;
   const hasAnyPredictions = MODELS.some(m => predictions[m] && predictions[m].length);
-  const disagreements = hasAnyPredictions ? topDisagreements(predictions) : [];
+  // Disagreements and the battle winner only consider hub predictors,
+  // so the retired ML model can never appear on this page.
+  const hubPredictions = Object.fromEntries(Object.entries(predictions).filter(([m]) => MODELS.includes(m)));
+  const disagreements = hasAnyPredictions ? topDisagreements(hubPredictions) : [];
   const darkHorse = battleRace && battleRace.darkHorse;
   const suckPick = battleRace && battleRace.suckPick;
   const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
-  const winner = battleWinnerFor(battleRace);
+  const winner = battleWinnerFor(battleRace, HUB_PREDICTORS);
   const typeColor = TC[hub.trackType] || T.accent;
 
   const qpMatch = qualPractice && qualPractice.week === hub.week;
@@ -8766,6 +8835,18 @@ function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
           {hub.name} · {hub.track} · {hub.dateLabel} · {hub.length} mi · {hub.laps} laps · <span style={{ color: typeColor }}>{TL[hub.trackType] || hub.trackType}</span>
         </div>
       </div>
+
+      {/* LIVE RUNNING ORDER — only renders while the race is actually live */}
+      {status === "live" && <LiveRunningOrder hub={hub} />}
+
+      {/* INTRO — per-race editorial, above the predictions */}
+      {hub.intro && hub.intro.length > 0 && (
+        <div style={{ ...card }}>
+          {hub.intro.map((p, i) => (
+            <p key={i} style={{ fontSize: 13, color: T.textMid, lineHeight: 1.75, margin: i > 0 ? "12px 0 0" : 0 }}>{p}</p>
+          ))}
+        </div>
+      )}
 
       {/* PREDICTIONS */}
       <div>
@@ -9361,6 +9442,7 @@ export default function NASCARHub() {
       <style>{`
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes hubBlink{0%,100%{opacity:1}50%{opacity:0.25}}
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:5px;height:5px}
         ::-webkit-scrollbar-track{background:${T.bg}}
