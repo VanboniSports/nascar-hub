@@ -21,8 +21,12 @@ const PRED_SHORT_TRACKS = ['Martinsville Speedway','Bristol Motor Speedway','Ric
 const PRED_SUPERSPEEDWAYS = ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway','Atlanta Motor Speedway'];
 const PRED_DIRT_TRACKS = ['Bristol Motor Speedway (DIRT)'];
 
-export function predGetTrackType(trackName) {
+export function predGetTrackType(trackName, year) {
   const tl = (trackName||"").toLowerCase();
+  // Indianapolis ran the road course in 2022-2023 and the oval from 2024 on.
+  if (tl.includes("indianapolis motor speedway")) {
+    return (year != null && year >= 2024) ? 'intermediate' : 'road_course';
+  }
   if (PRED_DIRT_TRACKS.some(r => tl.includes(r.toLowerCase()))) return 'dirt';
   if (PRED_ROAD_COURSES.some(r => tl.includes(r.toLowerCase()))) return 'road_course';
   if (PRED_SHORT_TRACKS.some(r => tl.includes(r.toLowerCase()))) return 'short_track';
@@ -65,9 +69,9 @@ export function predBuildDriverIndex(csvData) {
 }
 
 // ── Pure Stats Predictor (from pure_stats_predictor.py) ──
-export function runPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
+export function runPureStatsPrediction(csvData, scheduleTrack, scheduleType, scheduleYear) {
   const driverIdx = predBuildDriverIndex(csvData);
-  const trackType = predGetTrackType(scheduleTrack);
+  const trackType = predGetTrackType(scheduleTrack, scheduleYear);
   const predictions = [];
 
   for (const driverName of FULL_TIMER_NAMES) {
@@ -88,7 +92,7 @@ export function runPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
     const trackRaces = trackRows.length;
 
     // Track-type performance
-    const typeRows = rows.filter(r => predGetTrackType(r[1]) === trackType);
+    const typeRows = rows.filter(r => predGetTrackType(r[1], r[2]) === trackType);
     const typeAvg = typeRows.length > 0 ? typeRows.reduce((s,r)=>s+r[3],0)/typeRows.length : 20.0;
     const typeWins = typeRows.filter(r => r[3]===1).length;
     const typeRaces = typeRows.length;
@@ -150,9 +154,9 @@ const ENH_PLAYOFF_TRACKS = [
   'Talladega Superspeedway','Martinsville Speedway','Homestead-Miami Speedway',
 ];
 
-export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
+export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType, scheduleYear) {
   const driverIdx = predBuildDriverIndex(csvData);
-  const trackType = predGetTrackType(scheduleTrack);
+  const trackType = predGetTrackType(scheduleTrack, scheduleYear);
   const predictions = [];
 
   for (const driverName of FULL_TIMER_NAMES) {
@@ -173,7 +177,7 @@ export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleT
     const trackRaces = trackRows.length;
 
     // Track-type
-    const typeRows = rows.filter(r => predGetTrackType(r[1]) === trackType);
+    const typeRows = rows.filter(r => predGetTrackType(r[1], r[2]) === trackType);
     const typeAvg = typeRows.length > 0 ? typeRows.reduce((s,r)=>s+r[3],0)/typeRows.length : 20.0;
     const typeWins = typeRows.filter(r=>r[3]===1).length;
     const typeRaces = typeRows.length;
