@@ -156,6 +156,7 @@ const INITIAL_DRIVERS = [
   { num:"4",  name:"Noah Gragson",          team:"Front Row Motorsports",     mfg:"Ford",      overall:65, superspeedway:68, intermediate:64, short:63, road:63 },
   { num:"38", name:"Zane Smith",            team:"Front Row Motorsports",     mfg:"Ford",      overall:64, superspeedway:67, intermediate:64, short:62, road:61 },
   { num:"35", name:"Riley Herbst",          team:"23XI Racing",               mfg:"Toyota",    overall:63, superspeedway:66, intermediate:62, short:61, road:62 },
+  { num:"8",  name:"Austin Hill",           team:"Richard Childress Racing",  mfg:"Chevrolet", overall:63, superspeedway:66, intermediate:63, short:62, road:60 },
   { num:"3",  name:"Austin Dillon",         team:"Richard Childress Racing",  mfg:"Chevrolet", overall:62, superspeedway:58, intermediate:64, short:63, road:57 },
   { num:"34", name:"Todd Gilliland",        team:"Front Row Motorsports",     mfg:"Ford",      overall:60, superspeedway:64, intermediate:60, short:58, road:56 },
   { num:"10", name:"Ty Dillon",             team:"Kaulig Racing",             mfg:"Chevrolet", overall:58, superspeedway:60, intermediate:58, short:57, road:56 },
