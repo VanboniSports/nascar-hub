@@ -1327,3 +1327,6 @@ export function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, increm
 }
 
 // §6 DFS ADMIN SECTION
+
+// Default export for React.lazy code-splitting.
+export default DFSTab;
