@@ -18,7 +18,7 @@ const PRED_ROAD_COURSES = [
   'Naval Base Coronado Street Course',
 ];
 const PRED_SHORT_TRACKS = ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway','Iowa Speedway','New Hampshire Motor Speedway'];
-const PRED_SUPERSPEEDWAYS = ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway'];
+const PRED_SUPERSPEEDWAYS = ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway','Atlanta Motor Speedway'];
 const PRED_DIRT_TRACKS = ['Bristol Motor Speedway (DIRT)'];
 
 export function predGetTrackType(trackName) {
