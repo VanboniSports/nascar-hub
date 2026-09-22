@@ -1954,3 +1954,6 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
 // results (Supabase app_state "battleRaces"), DFS practice/qualifying
 // (qualPractice), and the static schedule below. No new data model.
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default GlobalAdminPanel;
