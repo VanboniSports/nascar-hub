@@ -807,3 +807,6 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 // PREDICTOR BATTLE TRACKER — sub-components
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default StatsTab;
