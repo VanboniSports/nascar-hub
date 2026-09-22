@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { T, TC, TL } from "../theme.js";
 import { InfoLegend } from "./ui.jsx";
-import { SCHEDULE } from "../data/schedule.js";
+import { SCHEDULE, SCHEDULE_YEAR } from "../data/schedule.js";
 import { trackEvent } from "../lib/analytics.js";
 import { DFS_PLATFORMS } from "../data/siteMeta.js";
 import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
@@ -55,11 +55,11 @@ export function dfsScoreFD(fin, start, lapsLed, totalLaps, lapsCompleted) {
 // §3 PROJECT DFS POINTS
 
 
-export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracticeData) {
+export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracticeData, raceYear) {
   if (!csvData?.length || !race) return [];
   const disabledSet = new Set((disabledDrivers || []).map(d => d.name));
   const driverIdx   = predBuildDriverIndex(csvData);
-  const trackType   = predGetTrackType(race.track);
+  const trackType   = predGetTrackType(race.track, raceYear);
   const totalLaps   = race.laps || 200;
   // Extract qualifying/practice data if it matches the current race week
   const raceWeek = race.allStar ? "allstar" : race.week;
@@ -83,7 +83,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
       : 20.0;
 
     // Season track-type form: how they've done at THIS type of track THIS season
-    const seasonTypeRows = seasonRows.filter(r => predGetTrackType(r[1]) === trackType);
+    const seasonTypeRows = seasonRows.filter(r => predGetTrackType(r[1], r[2]) === trackType);
     const seasonTypeAvg = seasonTypeRows.length > 0
       ? seasonTypeRows.reduce((s, r) => s + r[3], 0) / seasonTypeRows.length
       : null; // null signals "fall back to all-time typeAvg" below
@@ -110,7 +110,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
     const trackWins       = trackRows.filter(r => r[3] === 1).length;
     const trackRaces      = trackRows.length;
     const trackBestFinish = trackRows.length > 0 ? Math.min(...trackRows.map(r => r[3])) : 40;
-    const typeRows = rows.filter(r => predGetTrackType(r[1]) === trackType);
+    const typeRows = rows.filter(r => predGetTrackType(r[1], r[2]) === trackType);
     const typeAvg  = typeRows.length > 0 ? typeRows.reduce((s, r) => s + r[3], 0) / typeRows.length : 20.0;
     const typeRowsSorted = [...typeRows].sort((a, b) => (a[9] || "").localeCompare(b[9] || ""));
     const recentType     = typeRowsSorted.slice(-3);
@@ -704,7 +704,7 @@ export function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, increm
   const runOptimizer = () => {
     if (!race || !hasCsv) return;
     trackEvent("dfs_optimizer_run", { platform: platform, race_week: race.week, race_name: race.name });
-    let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled, qualPractice);
+    let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled, qualPractice, SCHEDULE_YEAR);
     projections = projections.map(p => {
       const sal = salaryData[p.driver] || 0;
       return { ...p, salary: sal, value: sal > 0 ? Math.round((p.diffPts / (sal / 1000)) * 100) / 100 : 0 };
