@@ -5858,44 +5858,44 @@ year,race_date,race_name,track_name,driver_name,car_number,finish_position,start
 2026,2026-05-24,May Charlotte,Charlotte Motor Speedway,Chase Elliott,9,37,16,89,0,Accident,Unknown,8.0,20.0,0,0,2,5,7,32.25
 2026,2026-05-24,May Charlotte,Charlotte Motor Speedway,Austin Cindric,2,38,8,52,0,Accident,Unknown,12.6,29.0,0,0,0,1,4,33.93
 2026,2026-05-24,May Charlotte,Charlotte Motor Speedway,Connor Zilisch,88,39,25,52,0,Accident,Unknown,20.67,20.67,0,0,0,0,0,37.21
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Denny Hamlin,11,1,1,300,57,Running,Unknown,8.0,8.0,0,0,1,6,8,13.87
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Christopher Bell,20,2,4,300,29,Running,Unknown,19.6,19.6,0,0,0,4,5,6.16
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Chase Briscoe,19,3,31,300,14,Running,Unknown,18.6,18.6,0,0,0,4,5,8.02
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Ricky Stenhouse Jr,47,4,15,300,0,Running,Unknown,17.8,17.8,0,0,0,1,2,20.75
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Shane van Gisbergen,97,5,10,300,12,Running,Unknown,17.0,17.0,0,0,1,2,3,9.74
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Tyler Reddick,45,6,2,300,42,Running,Unknown,5.6,5.6,0,0,5,9,10,6.11
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Chase Elliott,9,7,29,300,3,Running,Unknown,14.8,14.8,0,0,2,5,7,11.7
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Ryan Blaney,12,8,7,300,46,Running,Unknown,17.8,17.8,0,0,1,3,8,7.41
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Zane Smith,38,9,11,300,18,Running,Unknown,17.4,17.4,0,0,0,1,4,13.35
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Carson Hocevar,77,10,17,300,0,Running,Unknown,14.4,14.4,0,0,1,3,5,16.91
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Erik Jones,43,11,13,300,3,Running,Unknown,18.0,18.0,0,0,0,0,2,10.36
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Ty Dillon,10,12,30,300,0,Running,Unknown,25.6,25.6,0,0,0,0,0,24.46
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Ty Gibbs,54,13,6,300,1,Running,Unknown,17.6,17.6,0,0,1,6,9,11.31
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Joey Logano,22,14,9,300,1,Running,Unknown,30.4,30.4,0,0,0,2,4,16.04
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Michael McDowell,71,15,14,300,0,Running,Unknown,21.8,21.8,0,0,0,2,3,14.38
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Noah Gragson,4,16,26,299,0,Running,Unknown,22.2,22.2,0,0,0,0,1,24.46
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Riley Herbst,35,17,23,299,1,Running,Unknown,19.4,19.4,0,0,0,0,1,18.75
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Austin Dillon,3,18,32,299,0,Running,Unknown,18.2,18.2,0,0,0,0,1,25.89
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Daniel Suarez,7,19,3,299,10,Running,Unknown,10.2,10.2,0,0,1,2,4,15.61
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Todd Gilliland,34,20,21,299,0,Running,Unknown,19.4,19.4,0,0,0,0,1,22.66
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Cole Custer,41,21,20,299,0,Running,Unknown,25.8,25.8,0,0,0,0,0,23.91
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Cody Ware,51,22,34,299,0,Running,Unknown,30.6,30.6,0,0,0,0,0,30.41
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Kyle Larson,5,23,5,299,56,Running,Unknown,20.8,20.8,0,0,0,4,7,5.95
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,John Hunter Nemechek,42,24,27,298,0,Running,Unknown,20.2,20.2,0,0,0,0,1,22.73
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Corey Heim,67,25,24,298,0,Running,Unknown,24.6,24.6,0,0,0,0,0,19.73
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Austin Cindric,2,26,36,296,0,Running,Unknown,16.4,16.4,0,0,0,1,4,25.35
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Austin Hill,33,27,25,293,0,Running,Unknown,26.4,26.4,0,0,0,0,0,25.74
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Chad Finchum,66,28,37,289,0,Running,Unknown,34.8,34.8,0,0,0,0,0,33.61
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Chris Buescher,17,29,22,286,0,Accident,Unknown,11.8,11.8,0,0,0,2,6,20.6
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,William Byron,24,30,8,231,0,Accident,Unknown,19.0,19.0,0,0,0,2,7,18.22
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Josh Berry,21,31,33,214,0,Accident,Unknown,32.2,32.2,0,0,0,0,2,26.94
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Bubba Wallace,23,32,18,203,0,Accident,Unknown,20.2,20.2,0,0,0,1,6,19.75
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Alex Bowman,48,33,19,203,0,Accident,Unknown,13.2,13.2,0,0,0,2,2,21.26
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Brad Keselowski,6,34,12,192,0,Accident,Unknown,19.0,19.0,0,0,0,2,4,21.8
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,AJ Allmendinger,16,35,16,172,7,Accident,Unknown,19.4,19.4,0,0,0,0,2,23.35
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Ryan Preece,60,36,28,90,0,Radiator,Unknown,18.0,18.0,0,0,0,0,2,34.65
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Ross Chastain,1,37,35,81,0,Accident,Unknown,24.2,24.2,0,0,0,1,2,33.24
-2026,2026-05-31,May Nashville,Nashville SuperSpeedway,Connor Zilisch,88,38,38,71,0,Accident,Unknown,29.2,29.2,0,0,0,0,0,35.84
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Denny Hamlin,11,1,1,300,57,Running,Unknown,8.0,8.0,0,0,1,6,8,13.87
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Christopher Bell,20,2,4,300,29,Running,Unknown,19.6,19.6,0,0,0,4,5,6.16
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Chase Briscoe,19,3,31,300,14,Running,Unknown,18.6,18.6,0,0,0,4,5,8.02
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Ricky Stenhouse Jr,47,4,15,300,0,Running,Unknown,17.8,17.8,0,0,0,1,2,20.75
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Shane van Gisbergen,97,5,10,300,12,Running,Unknown,17.0,17.0,0,0,1,2,3,9.74
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Tyler Reddick,45,6,2,300,42,Running,Unknown,5.6,5.6,0,0,5,9,10,6.11
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Chase Elliott,9,7,29,300,3,Running,Unknown,14.8,14.8,0,0,2,5,7,11.7
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Ryan Blaney,12,8,7,300,46,Running,Unknown,17.8,17.8,0,0,1,3,8,7.41
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Zane Smith,38,9,11,300,18,Running,Unknown,17.4,17.4,0,0,0,1,4,13.35
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Carson Hocevar,77,10,17,300,0,Running,Unknown,14.4,14.4,0,0,1,3,5,16.91
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Erik Jones,43,11,13,300,3,Running,Unknown,18.0,18.0,0,0,0,0,2,10.36
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Ty Dillon,10,12,30,300,0,Running,Unknown,25.6,25.6,0,0,0,0,0,24.46
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Ty Gibbs,54,13,6,300,1,Running,Unknown,17.6,17.6,0,0,1,6,9,11.31
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Joey Logano,22,14,9,300,1,Running,Unknown,30.4,30.4,0,0,0,2,4,16.04
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Michael McDowell,71,15,14,300,0,Running,Unknown,21.8,21.8,0,0,0,2,3,14.38
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Noah Gragson,4,16,26,299,0,Running,Unknown,22.2,22.2,0,0,0,0,1,24.46
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Riley Herbst,35,17,23,299,1,Running,Unknown,19.4,19.4,0,0,0,0,1,18.75
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Austin Dillon,3,18,32,299,0,Running,Unknown,18.2,18.2,0,0,0,0,1,25.89
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Daniel Suarez,7,19,3,299,10,Running,Unknown,10.2,10.2,0,0,1,2,4,15.61
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Todd Gilliland,34,20,21,299,0,Running,Unknown,19.4,19.4,0,0,0,0,1,22.66
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Cole Custer,41,21,20,299,0,Running,Unknown,25.8,25.8,0,0,0,0,0,23.91
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Cody Ware,51,22,34,299,0,Running,Unknown,30.6,30.6,0,0,0,0,0,30.41
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Kyle Larson,5,23,5,299,56,Running,Unknown,20.8,20.8,0,0,0,4,7,5.95
+2026,2026-05-31,May Nashville,Nashville Superspeedway,John Hunter Nemechek,42,24,27,298,0,Running,Unknown,20.2,20.2,0,0,0,0,1,22.73
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Corey Heim,67,25,24,298,0,Running,Unknown,24.6,24.6,0,0,0,0,0,19.73
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Austin Cindric,2,26,36,296,0,Running,Unknown,16.4,16.4,0,0,0,1,4,25.35
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Austin Hill,33,27,25,293,0,Running,Unknown,26.4,26.4,0,0,0,0,0,25.74
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Chad Finchum,66,28,37,289,0,Running,Unknown,34.8,34.8,0,0,0,0,0,33.61
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Chris Buescher,17,29,22,286,0,Accident,Unknown,11.8,11.8,0,0,0,2,6,20.6
+2026,2026-05-31,May Nashville,Nashville Superspeedway,William Byron,24,30,8,231,0,Accident,Unknown,19.0,19.0,0,0,0,2,7,18.22
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Josh Berry,21,31,33,214,0,Accident,Unknown,32.2,32.2,0,0,0,0,2,26.94
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Bubba Wallace,23,32,18,203,0,Accident,Unknown,20.2,20.2,0,0,0,1,6,19.75
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Alex Bowman,48,33,19,203,0,Accident,Unknown,13.2,13.2,0,0,0,2,2,21.26
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Brad Keselowski,6,34,12,192,0,Accident,Unknown,19.0,19.0,0,0,0,2,4,21.8
+2026,2026-05-31,May Nashville,Nashville Superspeedway,AJ Allmendinger,16,35,16,172,7,Accident,Unknown,19.4,19.4,0,0,0,0,2,23.35
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Ryan Preece,60,36,28,90,0,Radiator,Unknown,18.0,18.0,0,0,0,0,2,34.65
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Ross Chastain,1,37,35,81,0,Accident,Unknown,24.2,24.2,0,0,0,1,2,33.24
+2026,2026-05-31,May Nashville,Nashville Superspeedway,Connor Zilisch,88,38,38,71,0,Accident,Unknown,29.2,29.2,0,0,0,0,0,35.84
 2026,2026-06-07,June Michigan,Michigan International Speedway,Denny Hamlin,11,1,1,200,40,Running,Unknown,7.4,4.0,1,1,2,7,9,14.37
 2026,2026-06-07,June Michigan,Michigan International Speedway,Erik Jones,43,2,10,200,0,Running,Unknown,15.6,11.25,0,0,0,0,2,11.72
 2026,2026-06-07,June Michigan,Michigan International Speedway,Bubba Wallace,23,3,13,200,9,Running,Unknown,25.6,12.5,0,1,0,1,6,5.51
@@ -5971,45 +5971,45 @@ year,race_date,race_name,track_name,driver_name,car_number,finish_position,start
 2026,2026-06-14,June Pocono,Pocono Raceway,Casey Mears,62,36,36,105,0,Accident,Unknown,30.8,30.8,0,0,0,0,0,33.6
 2026,2026-06-14,June Pocono,Pocono Raceway,Zane Smith,38,37,18,66,0,Handling,Unknown,18.4,27.0,0,0,0,1,5,31.99
 2026,2026-06-14,June Pocono,Pocono Raceway,Brad Keselowski,6,38,37,46,0,Accident,Unknown,25.2,11.5,0,0,0,2,4,34.77
-2026,2026-06-21,June San Diego,Naval Base Coronado,Corey Heim,67,1,13,75,3,Running,Unknown,27.0,27.0,0,0,0,0,0,11.35
-2026,2026-06-21,June San Diego,Naval Base Coronado,Bubba Wallace,23,2,12,75,2,Running,Unknown,21.4,21.4,0,0,0,2,7,16.96
-2026,2026-06-21,June San Diego,Naval Base Coronado,Kyle Larson,5,3,14,75,11,Running,Unknown,12.0,12.0,0,0,0,6,9,6.45
-2026,2026-06-21,June San Diego,Naval Base Coronado,Zane Smith,38,4,4,75,3,Running,Unknown,21.4,21.4,0,0,0,1,5,9.89
-2026,2026-06-21,June San Diego,Naval Base Coronado,AJ Allmendinger,16,5,15,75,0,Running,Unknown,19.8,19.8,0,0,0,0,2,12.09
-2026,2026-06-21,June San Diego,Naval Base Coronado,Chris Buescher,17,6,16,75,7,Running,Unknown,17.4,17.4,0,0,0,2,8,8.33
-2026,2026-06-21,June San Diego,Naval Base Coronado,Ross Chastain,1,7,23,75,0,Running,Unknown,24.6,24.6,0,0,0,1,3,14.92
-2026,2026-06-21,June San Diego,Naval Base Coronado,Riley Herbst,35,8,24,75,3,Running,Unknown,18.6,18.6,0,0,0,0,1,11.49
-2026,2026-06-21,June San Diego,Naval Base Coronado,Ryan Blaney,12,9,3,75,12,Running,Unknown,8.8,8.8,0,0,1,3,11,8.8
-2026,2026-06-21,June San Diego,Naval Base Coronado,Michael McDowell,71,10,9,75,0,Running,Unknown,14.8,14.8,0,0,0,2,3,15.07
-2026,2026-06-21,June San Diego,Naval Base Coronado,Ryan Preece,60,11,7,75,5,Running,Unknown,27.8,27.8,0,0,0,0,2,10.8
-2026,2026-06-21,June San Diego,Naval Base Coronado,Chase Elliott,9,12,30,75,0,Running,Unknown,22.2,22.2,0,0,2,5,8,23.57
-2026,2026-06-21,June San Diego,Naval Base Coronado,Daniel Suarez,7,13,6,75,0,Running,Unknown,10.4,10.4,0,0,1,2,5,16.27
-2026,2026-06-21,June San Diego,Naval Base Coronado,Denny Hamlin,11,14,26,75,0,Running,Unknown,4.4,4.4,0,0,4,9,11,17.67
-2026,2026-06-21,June San Diego,Naval Base Coronado,Ty Gibbs,54,15,11,75,0,Running,Unknown,11.2,11.2,0,0,1,6,10,14.67
-2026,2026-06-21,June San Diego,Naval Base Coronado,John Hunter Nemechek,42,16,28,75,0,Running,Unknown,15.6,15.6,0,0,0,1,2,19.37
-2026,2026-06-21,June San Diego,Naval Base Coronado,Chase Briscoe,19,17,22,75,0,Running,Unknown,12.6,12.6,0,0,0,5,7,16.51
-2026,2026-06-21,June San Diego,Naval Base Coronado,Joey Logano,22,18,19,75,0,Running,Unknown,20.2,20.2,0,0,0,2,5,14.84
-2026,2026-06-21,June San Diego,Naval Base Coronado,Carson Hocevar,77,19,2,75,4,Running,Unknown,17.2,17.2,0,0,1,4,7,12.48
-2026,2026-06-21,June San Diego,Naval Base Coronado,Erik Jones,43,20,38,75,0,Running,Unknown,10.2,10.2,0,0,0,1,4,26.11
-2026,2026-06-21,June San Diego,Naval Base Coronado,Todd Gilliland,34,21,5,75,0,Running,Unknown,19.6,19.6,0,0,0,0,1,16.75
-2026,2026-06-21,June San Diego,Naval Base Coronado,Austin Cindric,2,22,31,75,0,Running,Unknown,19.6,19.6,0,0,0,1,4,26.97
-2026,2026-06-21,June San Diego,Naval Base Coronado,Cody Ware,51,23,39,75,0,Running,Unknown,28.0,28.0,0,0,0,0,0,28.12
-2026,2026-06-21,June San Diego,Naval Base Coronado,Austin Dillon,3,24,18,75,0,Running,Unknown,23.4,23.4,0,0,0,0,1,25.15
-2026,2026-06-21,June San Diego,Naval Base Coronado,Tyler Reddick,45,25,17,75,9,Running,Unknown,10.4,10.4,0,0,5,10,12,16.73
-2026,2026-06-21,June San Diego,Naval Base Coronado,Alex Bowman,48,26,20,75,0,Running,Unknown,24.2,24.2,0,0,0,2,2,19.15
-2026,2026-06-21,June San Diego,Naval Base Coronado,Kevin Magnussen,91,27,21,75,0,Running,Unknown,15.0,15.0,0,0,0,0,0,23.67
-2026,2026-06-21,June San Diego,Naval Base Coronado,Jimmie Johnson,84,28,36,75,0,Running,Unknown,31.4,31.4,0,0,0,0,0,30.87
-2026,2026-06-21,June San Diego,Naval Base Coronado,Josh Berry,21,29,35,75,0,Running,Unknown,28.0,28.0,0,0,0,0,2,28.24
-2026,2026-06-21,June San Diego,Naval Base Coronado,Ty Dillon,10,30,34,74,0,Running,Unknown,25.2,25.2,0,0,0,0,0,29.4
-2026,2026-06-21,June San Diego,Naval Base Coronado,Cole Custer,41,31,25,72,0,Running,Unknown,17.6,17.6,0,0,0,0,0,21.47
-2026,2026-06-21,June San Diego,Naval Base Coronado,William Byron,24,32,27,68,0,Running,Unknown,19.2,19.2,0,0,0,3,8,23.68
-2026,2026-06-21,June San Diego,Naval Base Coronado,Ricky Stenhouse Jr,47,33,33,59,0,Radiator,Unknown,18.2,18.2,0,0,0,2,3,30.25
-2026,2026-06-21,June San Diego,Naval Base Coronado,Brad Keselowski,6,34,29,59,0,Running,Unknown,30.2,30.2,0,0,0,2,4,28.68
-2026,2026-06-21,June San Diego,Naval Base Coronado,Noah Gragson,4,35,32,37,0,Accident,Unknown,24.8,24.8,0,0,0,0,1,32.32
-2026,2026-06-21,June San Diego,Naval Base Coronado,Austin Hill,33,36,10,31,1,Accident,Unknown,25.0,25.0,0,0,0,0,0,25.51
-2026,2026-06-21,June San Diego,Naval Base Coronado,Connor Zilisch,88,37,8,31,8,Accident,Unknown,31.2,31.2,0,0,0,0,0,26.37
-2026,2026-06-21,June San Diego,Naval Base Coronado,Shane van Gisbergen,97,38,1,31,7,Accident,Unknown,15.6,15.6,0,0,1,3,4,24.88
-2026,2026-06-21,June San Diego,Naval Base Coronado,Christopher Bell,20,39,37,28,0,Engine,Unknown,16.4,16.4,0,0,0,5,6,34.19
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Corey Heim,67,1,13,75,3,Running,Unknown,27.0,27.0,0,0,0,0,0,11.35
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Bubba Wallace,23,2,12,75,2,Running,Unknown,21.4,21.4,0,0,0,2,7,16.96
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Kyle Larson,5,3,14,75,11,Running,Unknown,12.0,12.0,0,0,0,6,9,6.45
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Zane Smith,38,4,4,75,3,Running,Unknown,21.4,21.4,0,0,0,1,5,9.89
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,AJ Allmendinger,16,5,15,75,0,Running,Unknown,19.8,19.8,0,0,0,0,2,12.09
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Chris Buescher,17,6,16,75,7,Running,Unknown,17.4,17.4,0,0,0,2,8,8.33
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Ross Chastain,1,7,23,75,0,Running,Unknown,24.6,24.6,0,0,0,1,3,14.92
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Riley Herbst,35,8,24,75,3,Running,Unknown,18.6,18.6,0,0,0,0,1,11.49
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Ryan Blaney,12,9,3,75,12,Running,Unknown,8.8,8.8,0,0,1,3,11,8.8
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Michael McDowell,71,10,9,75,0,Running,Unknown,14.8,14.8,0,0,0,2,3,15.07
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Ryan Preece,60,11,7,75,5,Running,Unknown,27.8,27.8,0,0,0,0,2,10.8
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Chase Elliott,9,12,30,75,0,Running,Unknown,22.2,22.2,0,0,2,5,8,23.57
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Daniel Suarez,7,13,6,75,0,Running,Unknown,10.4,10.4,0,0,1,2,5,16.27
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Denny Hamlin,11,14,26,75,0,Running,Unknown,4.4,4.4,0,0,4,9,11,17.67
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Ty Gibbs,54,15,11,75,0,Running,Unknown,11.2,11.2,0,0,1,6,10,14.67
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,John Hunter Nemechek,42,16,28,75,0,Running,Unknown,15.6,15.6,0,0,0,1,2,19.37
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Chase Briscoe,19,17,22,75,0,Running,Unknown,12.6,12.6,0,0,0,5,7,16.51
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Joey Logano,22,18,19,75,0,Running,Unknown,20.2,20.2,0,0,0,2,5,14.84
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Carson Hocevar,77,19,2,75,4,Running,Unknown,17.2,17.2,0,0,1,4,7,12.48
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Erik Jones,43,20,38,75,0,Running,Unknown,10.2,10.2,0,0,0,1,4,26.11
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Todd Gilliland,34,21,5,75,0,Running,Unknown,19.6,19.6,0,0,0,0,1,16.75
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Austin Cindric,2,22,31,75,0,Running,Unknown,19.6,19.6,0,0,0,1,4,26.97
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Cody Ware,51,23,39,75,0,Running,Unknown,28.0,28.0,0,0,0,0,0,28.12
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Austin Dillon,3,24,18,75,0,Running,Unknown,23.4,23.4,0,0,0,0,1,25.15
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Tyler Reddick,45,25,17,75,9,Running,Unknown,10.4,10.4,0,0,5,10,12,16.73
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Alex Bowman,48,26,20,75,0,Running,Unknown,24.2,24.2,0,0,0,2,2,19.15
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Kevin Magnussen,91,27,21,75,0,Running,Unknown,15.0,15.0,0,0,0,0,0,23.67
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Jimmie Johnson,84,28,36,75,0,Running,Unknown,31.4,31.4,0,0,0,0,0,30.87
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Josh Berry,21,29,35,75,0,Running,Unknown,28.0,28.0,0,0,0,0,2,28.24
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Ty Dillon,10,30,34,74,0,Running,Unknown,25.2,25.2,0,0,0,0,0,29.4
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Cole Custer,41,31,25,72,0,Running,Unknown,17.6,17.6,0,0,0,0,0,21.47
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,William Byron,24,32,27,68,0,Running,Unknown,19.2,19.2,0,0,0,3,8,23.68
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Ricky Stenhouse Jr,47,33,33,59,0,Radiator,Unknown,18.2,18.2,0,0,0,2,3,30.25
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Brad Keselowski,6,34,29,59,0,Running,Unknown,30.2,30.2,0,0,0,2,4,28.68
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Noah Gragson,4,35,32,37,0,Accident,Unknown,24.8,24.8,0,0,0,0,1,32.32
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Austin Hill,33,36,10,31,1,Accident,Unknown,25.0,25.0,0,0,0,0,0,25.51
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Connor Zilisch,88,37,8,31,8,Accident,Unknown,31.2,31.2,0,0,0,0,0,26.37
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Shane van Gisbergen,97,38,1,31,7,Accident,Unknown,15.6,15.6,0,0,1,3,4,24.88
+2026,2026-06-21,June San Diego,Naval Base Coronado Street Course,Christopher Bell,20,39,37,28,0,Engine,Unknown,16.4,16.4,0,0,0,5,6,34.19
 2026,2026-06-28,June Sonoma,Sonoma Raceway,Shane van Gisbergen,97,1,6,110,74,Running,Unknown,23.0,1.0,1,1,1,3,4,2.1
 2026,2026-06-28,June Sonoma,Sonoma Raceway,Chase Briscoe,19,2,7,110,0,Running,Unknown,15.2,19.5,0,0,0,5,7,4.2
 2026,2026-06-28,June Sonoma,Sonoma Raceway,Ty Gibbs,54,3,1,110,31,Running,Unknown,13.6,20.67,0,0,1,6,10,6.9
@@ -6385,42 +6385,42 @@ year,race_date,race_name,track_name,driver_name,car_number,finish_position,start
 2026,2026-09-06,September Darlington,Darlington Raceway,Cody Ware,51,36,37,363,0,Running,Chevrolet,32.2,30.2,0,0,0,0,0,36
 2026,2026-09-06,September Darlington,Darlington Raceway,William Byron,24,37,20,319,0,Engine,Chevrolet,18.2,10.33,1,1,0,4,11,14
 2026,2026-09-06,September Darlington,Darlington Raceway,Chad Finchum,66,38,38,243,0,Suspension,Ford,32.0,,0,0,0,0,0,38
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Kyle Larson,5,1,2,247,80,Running,Chevrolet,16.0,,0,0,0,10,14,4.4
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Alex Bowman,48,2,11,247,0,Running,Chevrolet,15.8,,0,0,0,3,6,11.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Joey Logano,22,3,1,247,96,Running,Ford,11.2,,0,0,2,5,10,3.2
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,William Byron,24,4,24,247,0,Running,Chevrolet,21.4,,0,0,0,4,11,14.8
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Ross Chastain,1,5,20,247,15,Running,Chevrolet,21.2,,0,0,0,1,5,12.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Austin Dillon,3,6,22,247,0,Running,Chevrolet,19.4,,0,0,0,0,4,18.2
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Connor Zilisch,88,7,19,247,0,Running,Chevrolet,26.0,,0,0,0,0,1,17.3
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Carson Hocevar,77,8,6,247,0,Running,Chevrolet,27.2,,0,0,1,5,9,13.2
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Denny Hamlin,11,9,10,247,0,Running,Toyota,9.0,,0,0,4,14,17,10.1
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Austin Cindric,2,10,13,247,0,Running,Ford,12.6,,0,0,0,2,6,13.5
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Cole Custer,41,11,26,247,0,Running,Chevrolet,24.4,,0,0,0,0,1,21.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Brad Keselowski,6,12,23,247,55,Running,Ford,20.2,,0,0,0,2,6,6.1
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Erik Jones,43,13,25,247,0,Running,Toyota,29.8,,0,0,0,2,5,15.8
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Bubba Wallace,23,14,7,247,0,Running,Toyota,12.4,,0,0,0,4,12,17.7
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,John Hunter Nemechek,42,15,28,247,0,Running,Toyota,22.2,,0,0,0,1,2,18.5
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,AJ Allmendinger,16,16,17,247,0,Running,Chevrolet,23.2,,0,0,0,1,4,25.4
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Ryan Preece,60,17,14,247,0,Running,Ford,11.4,,0,0,1,1,8,13.3
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Ty Gibbs,54,18,9,247,0,Running,Toyota,11.6,,0,0,2,11,17,13.2
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Christopher Bell,20,19,4,247,0,Running,Toyota,6.2,,0,0,1,12,14,12.3
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Michael McDowell,71,20,29,247,0,Running,Chevrolet,18.0,,0,0,0,3,6,31.2
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Austin Hill,33,21,27,247,0,Running,Chevrolet,25.6,,0,0,0,0,0,23.1
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Cody Ware,51,22,30,247,0,Running,Chevrolet,33.2,,0,0,0,0,0,31.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Shane van Gisbergen,97,23,35,247,0,Running,Chevrolet,23.6,,0,0,2,5,7,24.4
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Todd Gilliland,34,24,34,247,0,Running,Ford,21.6,,0,0,0,0,2,25.1
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Tyler Reddick,45,25,18,247,0,Running,Toyota,12.2,,0,0,5,12,17,15.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Ricky Stenhouse Jr,47,26,36,247,0,Running,Chevrolet,23.4,,0,0,0,3,4,26.4
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Chris Buescher,17,27,21,237,0,Accident,Ford,22.4,,0,0,0,2,10,25.7
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Josh Berry,21,28,16,231,1,Running,Ford,6.2,,0,0,0,2,8,11.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Daniel Suarez,7,29,15,229,0,Accident,Chevrolet,15.8,,0,0,1,3,7,18.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Ty Dillon,10,30,32,227,0,Accident,Chevrolet,27.0,,0,0,0,0,0,28.9
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Chase Elliott,9,31,8,214,0,Accident,Chevrolet,16.4,,0,0,2,6,9,13
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Chase Briscoe,19,32,5,213,0,Accident,Toyota,10.6,,0,0,1,10,14,15.8
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Noah Gragson,4,33,31,198,0,Accident,Ford,20.6,,0,0,0,0,2,31.3
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Riley Herbst,35,34,33,176,0,Accident,Toyota,29.0,,0,0,0,0,3,32.6
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Ryan Blaney,12,35,3,154,0,Accident,Ford,10.8,,0,0,3,7,18,17.3
-2026,2026-09-13,September Gateway,World Wide Technology Raceway at Gateway,Zane Smith,38,36,12,129,0,Accident,Ford,24.4,,0,0,0,2,6,29.4
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Kyle Larson,5,1,2,247,80,Running,Chevrolet,16.0,,0,0,0,10,14,4.4
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Alex Bowman,48,2,11,247,0,Running,Chevrolet,15.8,,0,0,0,3,6,11.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Joey Logano,22,3,1,247,96,Running,Ford,11.2,,0,0,2,5,10,3.2
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,William Byron,24,4,24,247,0,Running,Chevrolet,21.4,,0,0,0,4,11,14.8
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Ross Chastain,1,5,20,247,15,Running,Chevrolet,21.2,,0,0,0,1,5,12.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Austin Dillon,3,6,22,247,0,Running,Chevrolet,19.4,,0,0,0,0,4,18.2
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Connor Zilisch,88,7,19,247,0,Running,Chevrolet,26.0,,0,0,0,0,1,17.3
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Carson Hocevar,77,8,6,247,0,Running,Chevrolet,27.2,,0,0,1,5,9,13.2
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Denny Hamlin,11,9,10,247,0,Running,Toyota,9.0,,0,0,4,14,17,10.1
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Austin Cindric,2,10,13,247,0,Running,Ford,12.6,,0,0,0,2,6,13.5
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Cole Custer,41,11,26,247,0,Running,Chevrolet,24.4,,0,0,0,0,1,21.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Brad Keselowski,6,12,23,247,55,Running,Ford,20.2,,0,0,0,2,6,6.1
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Erik Jones,43,13,25,247,0,Running,Toyota,29.8,,0,0,0,2,5,15.8
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Bubba Wallace,23,14,7,247,0,Running,Toyota,12.4,,0,0,0,4,12,17.7
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,John Hunter Nemechek,42,15,28,247,0,Running,Toyota,22.2,,0,0,0,1,2,18.5
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,AJ Allmendinger,16,16,17,247,0,Running,Chevrolet,23.2,,0,0,0,1,4,25.4
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Ryan Preece,60,17,14,247,0,Running,Ford,11.4,,0,0,1,1,8,13.3
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Ty Gibbs,54,18,9,247,0,Running,Toyota,11.6,,0,0,2,11,17,13.2
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Christopher Bell,20,19,4,247,0,Running,Toyota,6.2,,0,0,1,12,14,12.3
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Michael McDowell,71,20,29,247,0,Running,Chevrolet,18.0,,0,0,0,3,6,31.2
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Austin Hill,33,21,27,247,0,Running,Chevrolet,25.6,,0,0,0,0,0,23.1
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Cody Ware,51,22,30,247,0,Running,Chevrolet,33.2,,0,0,0,0,0,31.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Shane van Gisbergen,97,23,35,247,0,Running,Chevrolet,23.6,,0,0,2,5,7,24.4
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Todd Gilliland,34,24,34,247,0,Running,Ford,21.6,,0,0,0,0,2,25.1
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Tyler Reddick,45,25,18,247,0,Running,Toyota,12.2,,0,0,5,12,17,15.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Ricky Stenhouse Jr,47,26,36,247,0,Running,Chevrolet,23.4,,0,0,0,3,4,26.4
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Chris Buescher,17,27,21,237,0,Accident,Ford,22.4,,0,0,0,2,10,25.7
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Josh Berry,21,28,16,231,1,Running,Ford,6.2,,0,0,0,2,8,11.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Daniel Suarez,7,29,15,229,0,Accident,Chevrolet,15.8,,0,0,1,3,7,18.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Ty Dillon,10,30,32,227,0,Accident,Chevrolet,27.0,,0,0,0,0,0,28.9
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Chase Elliott,9,31,8,214,0,Accident,Chevrolet,16.4,,0,0,2,6,9,13
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Chase Briscoe,19,32,5,213,0,Accident,Toyota,10.6,,0,0,1,10,14,15.8
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Noah Gragson,4,33,31,198,0,Accident,Ford,20.6,,0,0,0,0,2,31.3
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Riley Herbst,35,34,33,176,0,Accident,Toyota,29.0,,0,0,0,0,3,32.6
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Ryan Blaney,12,35,3,154,0,Accident,Ford,10.8,,0,0,3,7,18,17.3
+2026,2026-09-13,September Gateway,World Wide Technology Raceway,Zane Smith,38,36,12,129,0,Accident,Ford,24.4,,0,0,0,2,6,29.4
 2026,2026-09-19,September Bristol,Bristol Motor Speedway,Joey Logano,22,1,2,500,93,Running,Ford,9.0,21.0,0,0,2,6,11,4
 2026,2026-09-19,September Bristol,Bristol Motor Speedway,Kyle Larson,5,2,1,500,45,Running,Chevrolet,9.6,7.0,2,0,1,11,15,8
 2026,2026-09-19,September Bristol,Bristol Motor Speedway,Carson Hocevar,77,3,5,500,39,Running,Chevrolet,22.6,14.0,0,0,1,5,10,8
