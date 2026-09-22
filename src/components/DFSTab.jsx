@@ -7,6 +7,7 @@ import { trackEvent } from "../lib/analytics.js";
 import { DFS_PLATFORMS } from "../data/siteMeta.js";
 import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
 import { predBuildDriverIndex, predGetTrackType, predMatchTrack } from "../models/predictors.js";
+import { dominatorRatingsForField, dominatorTagQualifiers } from "../lib/loopMetrics.js";
 
 
 // §2 SCORING ENGINES
@@ -53,6 +54,27 @@ export function dfsScoreFD(fin, start, lapsLed, totalLaps, lapsCompleted) {
   return finPts + placeDiff + ledPts + compPts;
 }
 
+// Expected laps-led share for one driver: laps led / laps completed, blended from
+// track-specific and track-type history, windowed to recent seasons (year >= currentYear - 2)
+// so old equipment/era numbers do not pollute the projection. Returns { trackLedPct, typeLedPct, blendedLedPct }.
+export function dfsLapsLedShare(driverRows, scheduleTrack, trackType, currentYear) {
+  const windowed = (driverRows || []).filter(r => r[2] >= currentYear - 2);
+  const trackRows = windowed.filter(r => predMatchTrack(scheduleTrack, r[1]));
+  const typeRows  = windowed.filter(r => predGetTrackType(r[1], r[2]) === trackType);
+  const trackLapsLed       = trackRows.reduce((s, r) => s + r[5], 0);
+  const trackLapsCompleted = trackRows.reduce((s, r) => s + r[8], 0);
+  const trackLedPct        = trackLapsCompleted > 0 ? trackLapsLed / trackLapsCompleted : 0;
+  const typeLapsLed       = typeRows.reduce((s, r) => s + r[5], 0);
+  const typeLapsCompleted = typeRows.reduce((s, r) => s + r[8], 0);
+  const typeLedPct        = typeLapsCompleted > 0 ? typeLapsLed / typeLapsCompleted : 0;
+  const blendedLedPct = trackRows.length >= 3
+    ? trackLedPct * 0.7 + typeLedPct * 0.3
+    : trackRows.length >= 1
+      ? trackLedPct * 0.4 + typeLedPct * 0.6
+      : typeLedPct;
+  return { trackLedPct, typeLedPct, blendedLedPct };
+}
+
 // §3 PROJECT DFS POINTS
 
 
@@ -62,6 +84,18 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
   const driverIdx   = predBuildDriverIndex(csvData);
   const trackType   = predGetTrackType(race.track, raceYear);
   const totalLaps   = race.laps || 200;
+  // Dominator rating per driver at THIS track type, recent seasons only, normalized vs the field.
+  // Rating formula (see dominatorRatingsForField in ../lib/loopMetrics.js):
+  // 40% laps-led share + 30% fastest-lap share + 30% top-15 share, each normalized
+  // vs the field max, windowed to the last 3 seasons at this track type.
+  const dataMaxYear = Math.max(...csvData.map(r => r[2]));
+  const domFieldRows = {};
+  for (const driverName of FULL_TIMER_NAMES) {
+    const drows = (driverIdx[driverName] || []).filter(r => r[2] >= dataMaxYear - 2 && predGetTrackType(r[1], r[2]) === trackType);
+    domFieldRows[driverName] = drows;
+  }
+  const domRatings = dominatorRatingsForField(domFieldRows);
+  const domTagNames = new Set(dominatorTagQualifiers(domRatings));
   // Extract qualifying/practice data if it matches the current race week
   const raceWeek = race.allStar ? "allstar" : race.week;
   const qualifyingData = (qualPracticeData && qualPracticeData.week === raceWeek) ? qualPracticeData.qualifying : null;
@@ -121,17 +155,11 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
       : typeRows.length > 0
         ? typeRows.reduce((s, r) => s + r[4], 0) / typeRows.length
         : 20.0;
-    const trackLapsLed       = trackRows.reduce((s, r) => s + r[5], 0);
-    const trackLapsCompleted = trackRows.reduce((s, r) => s + r[8], 0);
-    const trackLedPct        = trackLapsCompleted > 0 ? trackLapsLed / trackLapsCompleted : 0;
-    const typeLapsLed       = typeRows.reduce((s, r) => s + r[5], 0);
-    const typeLapsCompleted = typeRows.reduce((s, r) => s + r[8], 0);
-    const typeLedPct        = typeLapsCompleted > 0 ? typeLapsLed / typeLapsCompleted : 0;
-    const blendedLedPct = trackRows.length >= 3
-      ? trackLedPct * 0.7 + typeLedPct * 0.3
-      : trackRows.length >= 1
-        ? trackLedPct * 0.4 + typeLedPct * 0.6
-        : typeLedPct;
+    // Full pipeline for the laps-led projection:
+    //   blendedLedPct (windowed laps-led / laps-completed share, track + track-type blend)
+    //   -> projLapsLed (rounded share * totalLaps) -> adjustedLapsLed (DNF discount)
+    //   -> ledPts folded into projected points via dfsScoreDK (0.25 pts/lap) or dfsScoreFD (0.1 pts/lap).
+    const { blendedLedPct } = dfsLapsLedShare(rows, race.track, trackType, currentYear);
     const projLapsLed = Math.round(blendedLedPct * totalLaps);
     let projFinish;
     const effectiveSeasonTypeAvg = seasonTypeAvg !== null ? seasonTypeAvg : typeAvg;
@@ -283,7 +311,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
     else if (trackWins >= 1) tags.push("Track Winner");
     if (trackAvg <= 8 && trackRaces >= 3) tags.push("Elite Trk Avg");
     if (recentAvg <= 8) tags.push("Hot Streak");
-    if (projLapsLed > totalLaps * 0.10) tags.push("Dominator");
+    if (domTagNames.has(driverName)) tags.push("Dominator"); // rating >= 75 or top 3 in field
     if (projStart >= 25 && Math.round(projFinish) <= 15) tags.push("PD Play");
     if (isDeepStarter) tags.push("🚀 Deep Start");
     if (recentTypeAvg <= 10 && typeRows.length >= 5) tags.push("Type Specialist");
@@ -304,6 +332,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
       projFinish: Math.round(projFinish * 10) / 10,
       projStart,
       projLapsLed,
+      dominatorRating: Math.round(domRatings[driverName] || 0),
       projectedFL,
       top15Pct: histTop15Pct != null ? Math.round(histTop15Pct * 100) : null,
       histPassDiff: histPassDiff != null ? Math.round(histPassDiff * 10) / 10 : null,
@@ -798,7 +827,7 @@ export function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, increm
               ["Track Winner", "1 win at this track"],
               ["Elite Trk Avg", "Avg finish ≤ 8 (3+ track races)"],
               ["Hot Streak", "Last 5 overall avg ≤ 8"],
-              ["Dominator", "Projected 10%+ laps led"],
+              ["Dominator", "Elite dominator rating at this track type"],
               ["PD Play", "Place diff upside"],
               ["Type Specialist", "Strong recent type avg"],
               ...(platform === "dk" ? [["Speed Demon", "Projected 15%+ fastest laps (DK only)"]] : []),
@@ -1266,7 +1295,7 @@ export function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, increm
                         ["Trk Avg", d.trackAvg],
                         ["Type Avg", d.typeAvg],
                         ["Recent", d.recentAvg],
-                        ["Led", d.projLapsLed],
+                        ["Proj Laps Led", d.projLapsLed],
                         ...(platform === "dk" ? [["FL", d.projectedFL || 0]] : []),
                         ...(d.top15Pct != null ? [["Top15%", d.top15Pct + "%"]] : []),
                         ...(d.histPassDiff != null ? [["Pass +/-", (d.histPassDiff > 0 ? "+" : "") + d.histPassDiff]] : []),
