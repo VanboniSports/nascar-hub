@@ -208,3 +208,6 @@ export function BlogTab({ blogPosts, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 // BLOG ADMIN — Rich text editor + post management
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default BlogTab;
