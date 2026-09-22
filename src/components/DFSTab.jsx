@@ -6,6 +6,7 @@ import { SCHEDULE, SCHEDULE_YEAR } from "../data/schedule.js";
 import { trackEvent } from "../lib/analytics.js";
 import { DFS_PLATFORMS } from "../data/siteMeta.js";
 import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { predBuildDriverIndex, predGetTrackType, predMatchTrack } from "../models/predictors.js";
 
 
 // §2 SCORING ENGINES
