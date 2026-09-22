@@ -1,6 +1,9 @@
 // ───────────────────────────────────────────────────────────
 // LOOP METRICS - shared pure-computation library for loop-data features
 // Pure JS (no JSX, no React, no DOM) so it can be imported by Node tests.
+// Consumers: DFSTab (dominator rating, laps-led projections), DriverAnalyticsTab
+// (luck index, consistency score, dominator rating, track-fit ace tags),
+// StatsTab (sleeper ARP / Top15% / rating columns).
 //
 // Formula and threshold reference (all thresholds are exported constants):
 //  - Luck Index: mean(finish - avgRunningPos) over the last 12 completed
