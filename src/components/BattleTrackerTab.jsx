@@ -334,3 +334,6 @@ export function BattleTrackerTab({ battleRaces, incrementTool }) {
 // Winner accuracy %, top-10 hit rate and track-type splits per
 // model, computed from scored battle races via scoreEntry().
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default BattleTrackerTab;
