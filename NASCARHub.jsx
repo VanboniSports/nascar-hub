@@ -156,6 +156,7 @@ const INITIAL_DRIVERS = [
   { num:"4",  name:"Noah Gragson",          team:"Front Row Motorsports",     mfg:"Ford",      overall:65, superspeedway:68, intermediate:64, short:63, road:63 },
   { num:"38", name:"Zane Smith",            team:"Front Row Motorsports",     mfg:"Ford",      overall:64, superspeedway:67, intermediate:64, short:62, road:61 },
   { num:"35", name:"Riley Herbst",          team:"23XI Racing",               mfg:"Toyota",    overall:63, superspeedway:66, intermediate:62, short:61, road:62 },
+  { num:"33", name:"Austin Hill",           team:"Richard Childress Racing",  mfg:"Chevrolet", overall:63, superspeedway:66, intermediate:63, short:62, road:60 },
   { num:"3",  name:"Austin Dillon",         team:"Richard Childress Racing",  mfg:"Chevrolet", overall:62, superspeedway:58, intermediate:64, short:63, road:57 },
   { num:"34", name:"Todd Gilliland",        team:"Front Row Motorsports",     mfg:"Ford",      overall:60, superspeedway:64, intermediate:60, short:58, road:56 },
   { num:"10", name:"Ty Dillon",             team:"Kaulig Racing",             mfg:"Chevrolet", overall:58, superspeedway:60, intermediate:58, short:57, road:56 },
@@ -383,7 +384,32 @@ function parseCSVData(csvText) {
     const lapsCompleted = parseInt(vals[colIdx["laps_completed"]]) || 0;
     const raceDate = vals[colIdx["race_date"]] || "";
     const status = vals[colIdx["status"]] || "Running";
-    rows.push([driverName, trackName, year, finish, start, lapsLed, 1, manufacturer, lapsCompleted, raceDate, status]);
+    // Loop-data (DriverAverages) columns, appended 2026-09-21. All are
+    // post-race stats: only use them as lagged features (completed races).
+    const num = (name, isFloat) => {
+      const raw = colIdx[name] == null ? "" : (vals[colIdx[name]] || "");
+      const v = isFloat ? parseFloat(raw) : parseInt(raw);
+      return Number.isFinite(v) ? v : 0;
+    };
+    const fastestLaps      = num("fastest_laps");
+    const raceTotalLaps    = num("total_laps");
+    const passDifferential = num("pass_differential");
+    const qualityPasses    = num("quality_passes");
+    const driverRating     = num("driver_rating", true);
+    const avgRunningPos    = num("avg_running_position", true);
+    const midRunningPos    = num("mid_running_position", true);
+    const closerRunningPos = num("closer_running_position", true);
+    const bestRunningPos   = num("best_running_position");
+    const worstRunningPos  = num("worst_running_position");
+    const greenFlagPasses  = num("green_flag_passes");
+    const greenFlagPassed  = num("green_flag_times_passed");
+    const lapsInTop15      = num("laps_in_top_15");
+    const lapsInTop15Pct   = num("laps_in_top_15_pct", true);
+    const lapsLedPct       = num("laps_led_pct", true);
+    rows.push([driverName, trackName, year, finish, start, lapsLed, 1, manufacturer, lapsCompleted, raceDate, status,
+      fastestLaps, raceTotalLaps, passDifferential, qualityPasses, driverRating, avgRunningPos,
+      midRunningPos, closerRunningPos, bestRunningPos, worstRunningPos,
+      greenFlagPasses, greenFlagPassed, lapsInTop15, lapsInTop15Pct, lapsLedPct]);
   }
   return rows;
 }
@@ -832,7 +858,10 @@ function predMatchTrack(scheduleTrack, csvTrack) {
   return a2 === b2 || a2.includes(b2) || b2.includes(a2);
 }
 
-// CSV row indices: [0:driver, 1:track, 2:year, 3:finish, 4:start, 5:lapsLed, 6:running, 7:manufacturer, 8:lapsCompleted, 9:raceDate]
+// CSV row indices: [0:driver, 1:track, 2:year, 3:finish, 4:start, 5:lapsLed, 6:running, 7:manufacturer, 8:lapsCompleted, 9:raceDate, 10:status,
+//   11:fastestLaps, 12:raceTotalLaps, 13:passDifferential, 14:qualityPasses, 15:driverRating, 16:avgRunningPos,
+//   17:midRunningPos, 18:closerRunningPos, 19:bestRunningPos, 20:worstRunningPos,
+//   21:greenFlagPasses, 22:greenFlagTimesPassed, 23:lapsInTop15, 24:lapsInTop15Pct, 25:lapsLedPct]
 
 function predBuildDriverIndex(csvData) {
   const idx = {};
@@ -987,6 +1016,10 @@ function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
     const manufacturer = Object.entries(mfrCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "Unknown";
 
     // === BASELINE SCORE (exact Python weights) ===
+    // Base inputs blend finish position with avg running position (loop data):
+    // finishes are noisy (wrecks, late restarts), ARP measures true pace.
+    // Backtested 2026-09-21 on 101 races (2024-2026): 0.7/0.3 blend lifts
+    // top-5 hits 1.62 -> 1.79/race and top-10 4.74 -> 4.86/race, winners unchanged.
     let trackWeight, typeWeight, recentWeight;
     if (trackRaces >= 5) {
       trackWeight=0.60; typeWeight=0.30; recentWeight=0.10;
@@ -995,7 +1028,16 @@ function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
     } else {
       trackWeight=0.0; typeWeight=0.70; recentWeight=0.30;
     }
-    const baseScore = trackAvg*trackWeight + typeAvg*typeWeight + recentAvg*recentWeight;
+    const arpR = recent.map(r => r[16]).filter(v => v > 0);
+    const arpRecent = arpR.length >= 3 ? arpR.reduce((s,v)=>s+v,0)/arpR.length : null;
+    const arpT = trackRows.map(r => r[16]).filter(v => v > 0);
+    const arpTrack = arpT.length ? arpT.reduce((s,v)=>s+v,0)/arpT.length : null;
+    const arpTy = typeRows.map(r => r[16]).filter(v => v > 0);
+    const arpType = arpTy.length ? arpTy.reduce((s,v)=>s+v,0)/arpTy.length : null;
+    const inTrackAvg = arpTrack != null ? trackAvg*0.7 + arpTrack*0.3 : trackAvg;
+    const inTypeAvg = arpType != null ? typeAvg*0.7 + arpType*0.3 : typeAvg;
+    const inRecentAvg = arpRecent != null ? recentAvg*0.7 + arpRecent*0.3 : recentAvg;
+    const baseScore = inTrackAvg*trackWeight + inTypeAvg*typeWeight + inRecentAvg*recentWeight;
 
     // === ENHANCEMENTS (exact Python logic) ===
     const bonusTags = [];
@@ -1037,8 +1079,21 @@ function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType) {
       if (recentWins >= 1) { playoffBonus = -0.4; bonusTags.push("PO"); }
     }
 
+    // E8: Closer (late-race running position vs mid-race)
+    // Drivers who come alive late win races; drivers who fade are overvalued.
+    let closerBonus = 0;
+    const midVals = recent.map(r => r[17]).filter(v => v > 0);
+    const closerVals = recent.map(r => r[18]).filter(v => v > 0);
+    if (midVals.length >= 3 && closerVals.length >= 3) {
+      const midAvg = midVals.reduce((s,v)=>s+v,0)/midVals.length;
+      const closerAvg = closerVals.reduce((s,v)=>s+v,0)/closerVals.length;
+      const lateKick = midAvg - closerAvg; // >0 means improves late
+      if (lateKick > 2.0) { closerBonus = -0.3; bonusTags.push("Close"); }
+      else if (lateKick < -2.0) { closerBonus = 0.2; bonusTags.push("Fade"); }
+    }
+
     // Final enhanced score
-    const enhancedScore = (baseScore + mfrBonus + startBonus + momBonus + domBonus + playoffBonus) * winMult;
+    const enhancedScore = (baseScore + mfrBonus + startBonus + momBonus + domBonus + playoffBonus + closerBonus) * winMult;
 
     // Convert to probabilities (use same formula as Pure Stats for consistency)
     const winProb  = Math.max(5, Math.min(95, 100 - enhancedScore*2.5)) / 100;
@@ -4621,6 +4676,7 @@ const DA_SUBTABS = [
   { id:"teamh2h",     label:"Team H2H",                icon:"Compare" },
   { id:"consistency", label:"Consistency Score",       icon:"Chart"   },
   { id:"dnfrisk",     label:"Bad / Good Day",            icon:"Alert"   },
+  { id:"loop",        label:"Loop Data",               icon:"Trend"   },
 ];
 
 function TrackStatsTab({ csvData, incrementTool }) {
@@ -6094,6 +6150,125 @@ function DaBadDayRisk({ csvData, incrementTool }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// LOOP DATA — Sub-tab 6: season loop-data leaderboard
+// ─────────────────────────────────────────────────────────────
+function DaLoopData({ csvData }) {
+  const [sortCol, setSortCol] = useState("arp");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const leaderboard = useMemo(() => {
+    if (!csvData.length) return [];
+    const season = Math.max(...csvData.map(r => r[2]));
+    const byDriver = {};
+    for (const r of csvData) {
+      if (r[2] !== season) continue;
+      const d = r[0]; if (!d) continue;
+      if (!byDriver[d]) byDriver[d] = [];
+      byDriver[d].push(r);
+    }
+    return FULL_TIMER_NAMES.filter(n => byDriver[n]).map(name => {
+      const races = byDriver[n].filter(r => (r[12] || 0) > 0);
+      if (races.length < 3) return null;
+      const avg = (f) => races.reduce((s, r) => s + f(r), 0) / races.length;
+      const arp = avg(r => r[16]);
+      if (!(arp > 0)) return null;
+      const mid = avg(r => r[17]);
+      const closer = avg(r => r[18]);
+      return {
+        name,
+        races: races.length,
+        arp,
+        rating: avg(r => r[15]),
+        qPass: avg(r => r[14]),
+        passDiff: avg(r => r[13]),
+        fastLaps: avg(r => r[11]),
+        top15Pct: avg(r => r[24]) * 100,
+        closeEdge: (mid > 0 && closer > 0) ? mid - closer : null, // + means improves late
+      };
+    }).filter(Boolean);
+  }, [csvData]);
+
+  const sorted = useMemo(() => {
+    return [...leaderboard].sort((a, b) => {
+      let av = a[sortCol], bv = b[sortCol];
+      if (sortCol === "name") return sortAsc ? (av||"").localeCompare(bv||"") : (bv||"").localeCompare(av||"");
+      if (av == null) av = sortAsc ? 9999 : -9999;
+      if (bv == null) bv = sortAsc ? 9999 : -9999;
+      return sortAsc ? av - bv : bv - av;
+    });
+  }, [leaderboard, sortCol, sortAsc]);
+
+  const ASC_COLS = new Set(["name", "arp"]);
+  function toggleSort(col) {
+    if (sortCol === col) setSortAsc(!sortAsc);
+    else { setSortCol(col); setSortAsc(ASC_COLS.has(col)); }
+  }
+
+  const LSortHeader = ({ col, label, w, align }) => {
+    const active = sortCol === col;
+    return (
+      <th onClick={()=>toggleSort(col)} style={{ padding:"8px 6px", textAlign:align||"right", fontSize:9, color:active?T.accent:T.textDim, fontWeight:700, letterSpacing:1.5, fontFamily:"'Barlow Condensed',sans-serif", textTransform:"uppercase", cursor:"pointer", userSelect:"none", width:w||"auto", whiteSpace:"nowrap" }}>
+        {label} {active ? (sortAsc ? "▲" : "▼") : ""}
+      </th>
+    );
+  };
+
+  const arpColor = (v) => v <= 10 ? T.green : v <= 15 ? T.gold : T.red;
+  const edgeColor = (v) => v == null ? T.textDim : v >= 1.5 ? T.green : v <= -1.5 ? T.red : T.textMid;
+  const num = (v, d=1) => v == null ? "—" : v.toFixed(d);
+  const signed = (v) => v == null ? "—" : (v > 0 ? "+" : "") + v.toFixed(1);
+  const season = csvData.length ? Math.max(...csvData.map(r => r[2])) : "";
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:16 }}>
+        <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:4 }}>How It Works</div>
+        <div style={{ fontSize:12, color:T.textMid, fontFamily:"'IBM Plex Mono',monospace", lineHeight:1.6 }}>
+          NASCAR loop data, {season} season. ARP (avg running position) measures true race pace without crash luck. Driver Rating is NASCAR's composite performance score. QPass = quality passes per race, Pass +/- = net green-flag passes per race, FL = fastest laps per race, Top15% = share of laps in the top 15, Close = mid-race vs late-race running position (positive = comes alive late).
+        </div>
+      </div>
+
+      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, minWidth:860 }}>
+            <thead>
+              <tr style={{ borderBottom:`1px solid ${T.border}` }}>
+                <th style={{ padding:"8px 10px", textAlign:"center", fontSize:9, color:T.textDim, fontWeight:700, letterSpacing:1.5, fontFamily:"'Barlow Condensed',sans-serif", textTransform:"uppercase", width:35 }}>#</th>
+                <LSortHeader col="name" label="Driver" align="left" />
+                <LSortHeader col="arp" label="ARP" />
+                <LSortHeader col="rating" label="Rating" />
+                <LSortHeader col="qPass" label="QPass" />
+                <LSortHeader col="passDiff" label="Pass +/-" />
+                <LSortHeader col="fastLaps" label="FL" />
+                <LSortHeader col="top15Pct" label="Top15%" />
+                <LSortHeader col="closeEdge" label="Close" />
+                <LSortHeader col="races" label="Races" />
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((row, i) => (
+                <tr key={row.name} style={{ borderBottom:`1px solid ${T.border}33`, background:i%2===0?"transparent":`${T.surface2}55` }}>
+                  <td style={{ padding:"8px 10px", textAlign:"center", fontSize:11, fontWeight:700, color:T.textDim, fontFamily:"'Barlow Condensed',sans-serif" }}>{i+1}</td>
+                  <td style={{ padding:"8px 10px", fontWeight:700, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:0.5 }}>{row.name}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", fontWeight:800, fontSize:14, color:arpColor(row.arp) }}>{row.arp.toFixed(1)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.text, fontWeight:700 }}>{num(row.rating)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{num(row.qPass)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{signed(row.passDiff)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{num(row.fastLaps)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{num(row.top15Pct, 0)}%</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", fontWeight:700, color:edgeColor(row.closeEdge) }}>{signed(row.closeEdge)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textDim }}>{row.races}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // DRIVER ANALYTICS TAB — wrapper with sub-navigation
 // ─────────────────────────────────────────────────────────────
 function DriverAnalyticsTab({ csvData, incrementTool }) {
@@ -6147,6 +6322,7 @@ function DriverAnalyticsTab({ csvData, incrementTool }) {
         {subTab === "teamh2h"     && <DaTeamH2H csvData={csvData} incrementTool={incrementTool} />}
         {subTab === "consistency" && <DaConsistencyScore csvData={csvData} />}
         {subTab === "dnfrisk"     && <DaBadDayRisk csvData={csvData} incrementTool={incrementTool} />}
+        {subTab === "loop"        && <DaLoopData csvData={csvData} />}
       </div>
     </div>
   );
@@ -6608,13 +6784,47 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
 
     // Project fastest laps (DK only awards this; FD doesn't have FL points)
     // Every lap of the race awards 1 fastest lap (0.45 pts on DK), so totalLaps × share is the model.
-    // Drivers who lead laps tend to also turn fast laps (clean air, best car).
-    // Top finishers also grab a meaningful share even if they didn't lead the most.
-    const lapsLedPct      = totalLaps > 0 ? projLapsLed / totalLaps : 0;
-    const finishStrength  = Math.max(0, (15 - Math.min(40, projFinish)) / 15); // 1.0 for P1, 0 for P15+
-    let flShare           = (lapsLedPct * 0.6) + (finishStrength * 0.4 * 0.20); // top finishers split ~20% baseline
+    // Uses actual historical fastest-lap share from loop data (lagged: completed races only).
+    // Backtested 2026-09-21 on Bristol: hist FL share correlates 0.599 with actual FL
+    // vs 0.457 for laps-led share (the old heuristic's signal); MAE 8.35 laps.
+    const flShareLast5 = (() => {
+      const l5 = sorted.slice(-5).filter(r => (r[12] || 0) > 0);
+      if (l5.length < 3) return null;
+      return l5.reduce((s, r) => s + (r[11] || 0), 0) / l5.reduce((s, r) => s + r[12], 0);
+    })();
+    const flShareType = (() => {
+      const tr = typeRows.filter(r => (r[12] || 0) > 0);
+      if (tr.length < 3) return null;
+      return tr.reduce((s, r) => s + (r[11] || 0), 0) / tr.reduce((s, r) => s + r[12], 0);
+    })();
+    let flShare;
+    if (flShareLast5 != null && flShareType != null)      flShare = flShareLast5 * 0.5 + flShareType * 0.5;
+    else if (flShareLast5 != null)                        flShare = flShareLast5;
+    else if (flShareType != null)                         flShare = flShareType;
+    else {
+      // Fallback: old laps-led/finish heuristic (no loop data, e.g. uploaded CSV without loop columns)
+      const lapsLedPct     = totalLaps > 0 ? projLapsLed / totalLaps : 0;
+      const finishStrength = Math.max(0, (15 - Math.min(40, projFinish)) / 15); // 1.0 for P1, 0 for P15+
+      flShare = (lapsLedPct * 0.6) + (finishStrength * 0.4 * 0.20); // top finishers split ~20% baseline
+    }
     flShare               = Math.max(0, Math.min(0.40, flShare)); // cap at 40% — no driver realistically gets more
     const projectedFL     = Math.round(totalLaps * flShare);
+
+    // Historical loop-data context (descriptive, lagged: completed races only).
+    // NOTE: backtested 2026-09-21 — pass differential does NOT predict place
+    // movement (r=0.08 deep starters, 0.05 overall) and is not persistent
+    // (r=0.15 race-to-race), so it stays out of the points projection and is
+    // shown for lineup decisions instead.
+    const loopBlend = (c) => {
+      const l5 = sorted.slice(-5).filter(r => (r[12] || 0) > 0);
+      const s5 = l5.length >= 3 ? l5.reduce((s, r) => s + (r[c] || 0), 0) / l5.length : null;
+      const tr = typeRows.filter(r => (r[12] || 0) > 0);
+      const st = tr.length >= 3 ? tr.reduce((s, r) => s + (r[c] || 0), 0) / tr.length : null;
+      if (s5 != null && st != null) return s5 * 0.5 + st * 0.5;
+      return s5 != null ? s5 : st;
+    };
+    const histTop15Pct = loopBlend(24); // avg % of laps in top 15
+    const histPassDiff = loopBlend(13); // avg net green-flag passes per race
 
     // Apply DNF discounts to laps-related inputs
     const adjustedLapsLed       = Math.round(projLapsLed  * (1 - blendedDnfRate * 0.7));
@@ -6647,6 +6857,8 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
     if (isDeepStarter) tags.push("🚀 Deep Start");
     if (recentTypeAvg <= 10 && typeRows.length >= 5) tags.push("Type Specialist");
     if (platformId === "dk" && projectedFL >= totalLaps * 0.15) tags.push("Speed Demon");
+    if (histPassDiff != null && histPassDiff >= 8) tags.push("Passing Ace");
+    if (histTop15Pct != null && histTop15Pct >= 0.75) tags.push("Front Runner");
     if (blendedDnfRate >= 0.25) tags.push("⚠️ High DNF Risk");
     else if (blendedDnfRate >= 0.12) tags.push("DNF Risk");
     if (seasonDnfRate === 0 && seasonRaceCount >= 8) tags.push("Iron Man");
@@ -6662,6 +6874,8 @@ function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracti
       projStart,
       projLapsLed,
       projectedFL,
+      top15Pct: histTop15Pct != null ? Math.round(histTop15Pct * 100) : null,
+      histPassDiff: histPassDiff != null ? Math.round(histPassDiff * 10) / 10 : null,
       trackAvg: trackAvg.toFixed(1),
       trackRaces,
       trackWins,
@@ -7608,6 +7822,8 @@ function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, incrementTool
                         ["Recent", d.recentAvg],
                         ["Led", d.projLapsLed],
                         ...(platform === "dk" ? [["FL", d.projectedFL || 0]] : []),
+                        ...(d.top15Pct != null ? [["Top15%", d.top15Pct + "%"]] : []),
+                        ...(d.histPassDiff != null ? [["Pass +/-", (d.histPassDiff > 0 ? "+" : "") + d.histPassDiff]] : []),
                       ].map(([l, v]) => (
                         <span key={l} style={{ fontSize: 10 }}><span style={{ color: T.textDim }}>{l}: </span><span style={{ fontWeight: 700, color: T.text }}>{v}</span></span>
                       ))}
