@@ -690,3 +690,6 @@ export function TrackStatsTab({ csvData, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 // DRIVER ANALYTICS TAB
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default TrackStatsTab;
