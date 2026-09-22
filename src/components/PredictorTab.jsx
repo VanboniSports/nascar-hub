@@ -202,3 +202,6 @@ export function PredictorTab({ drivers, csvData, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 // COMPARE TAB
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default PredictorTab;
