@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 
 // ── Phase-1 module split: pure logic lives in src/ (see src/*/<module>.js) ──
 import { TRACK_KEYS, INITIAL_DRIVERS, FULL_TIMER_NAMES, normalizeCsvDriverName } from "./src/data/drivers.js";
@@ -16,18 +16,25 @@ import { Ic } from "./src/components/icons.jsx";
 import { sb } from "./src/lib/supabase.js";
 import { logUsageEvent, tabIdFromPath, raceSlugFromPath, pathForTab, applyTabMeta, trackRacePageView, trackRaceTabView, applyRaceMeta } from "./src/lib/analytics.js";
 import { hubBySlug, findBattleForHub, currentHub, RacesTab, RaceHubPage, RaceHeroCard } from "./src/components/RaceHub.jsx";
-import { RankingsTab } from "./src/components/RankingsTab.jsx";
-import { PredictorTab } from "./src/components/PredictorTab.jsx";
-import { PowerRankingsTab } from "./src/components/PowerRankingsTab.jsx";
-import { StatsTab } from "./src/components/StatsTab.jsx";
-import { BattleTrackerTab } from "./src/components/BattleTrackerTab.jsx";
-import { ScorecardTab } from "./src/components/ScorecardTab.jsx";
-import { TrackStatsTab } from "./src/components/TrackTabs.jsx";
-import { DriverAnalyticsTab } from "./src/components/DriverAnalyticsTab.jsx";
-import { DFSTab } from "./src/components/DFSTab.jsx";
-import { BlogTab } from "./src/components/BlogTab.jsx";
-import { GlobalAdminPanel } from "./src/components/AdminPanel.jsx";
+// Code-split: tabs are lazy-loaded so first paint ships only the Race Hub shell.
+// RaceHub.jsx stays eager (it renders the default Race Hub tab and the hero card).
+const PowerRankingsTab = lazy(() => import("./src/components/PowerRankingsTab.jsx"));
+const PredictorTab = lazy(() => import("./src/components/PredictorTab.jsx"));
+const StatsTab = lazy(() => import("./src/components/StatsTab.jsx"));
+const BattleTrackerTab = lazy(() => import("./src/components/BattleTrackerTab.jsx"));
+const ScorecardTab = lazy(() => import("./src/components/ScorecardTab.jsx"));
+const TrackStatsTab = lazy(() => import("./src/components/TrackTabs.jsx"));
+const DriverAnalyticsTab = lazy(() => import("./src/components/DriverAnalyticsTab.jsx"));
+const DFSTab = lazy(() => import("./src/components/DFSTab.jsx"));
+const BlogTab = lazy(() => import("./src/components/BlogTab.jsx"));
+const GlobalAdminPanel = lazy(() => import("./src/components/AdminPanel.jsx"));
 import { WelcomeModal } from "./src/components/ui.jsx";
+
+const TabLoading = () => (
+  <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10, padding:"60px 24px", color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", fontSize:12 }}>
+    <Ic.Spinner /> Loading tab…
+  </div>
+);
 
 // ─────────────────────────────────────────────────────────────
 // THEME — Steel Blue
@@ -597,6 +604,7 @@ export default function NASCARHub() {
         {/* CONTENT + SIDEBAR */}
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
           <main className="nascar-main" style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
+            <Suspense fallback={<TabLoading />}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
               {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
               {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
@@ -610,6 +618,7 @@ export default function NASCARHub() {
               {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} qualPractice={qualPractice} incrementTool={incrementTool} />}
               {activeTab === "blog"      && <BlogTab blogPosts={blogPosts} incrementTool={incrementTool} />}
             </div>
+            </Suspense>
           </main>
 
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
@@ -621,6 +630,7 @@ export default function NASCARHub() {
         </div>
 
         {/* GLOBAL ADMIN */}
+        <Suspense fallback={null}>
         <GlobalAdminPanel
           drivers={drivers}
           onRaceApplied={handleRaceApplied}
@@ -649,6 +659,7 @@ export default function NASCARHub() {
           blogPosts={blogPosts}
           onBlogSave={saveBlogPosts}
         />
+        </Suspense>
 
         {/* FOOTER */}
         <footer style={{ borderTop:`1px solid ${T.border}`, padding:"7px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", background:T.footerBg }}>
