@@ -1,4 +1,5 @@
 // 2026 Cup Series schedule + "this week" helper. Extracted from NASCARHub.jsx (phase 2).
+export const SCHEDULE_YEAR = 2026;
 export const SCHEDULE = [
   { week:1,  date:"Feb 15", name:"Daytona 500",            track:"Daytona International Speedway",      type:"superspeedway", length:2.5,   laps:200 },
   { week:2,  date:"Feb 22", name:"Atlanta",                 track:"Atlanta Motor Speedway",              type:"superspeedway", length:1.54,  laps:260 },
