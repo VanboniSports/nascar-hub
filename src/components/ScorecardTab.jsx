@@ -242,3 +242,6 @@ export function ScorecardTab({ battleRaces, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 // SEASON POINTS ADMIN — Manual entry of NASCAR official points
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default ScorecardTab;
