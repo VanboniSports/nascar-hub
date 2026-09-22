@@ -1679,3 +1679,6 @@ export function DriverAnalyticsTab({ csvData, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 // COMING SOON PANEL
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default DriverAnalyticsTab;
