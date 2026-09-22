@@ -124,3 +124,6 @@ async function saveToSupabase(drivers, raceHistory, seasonStats, ratingHistory, 
 // ─────────────────────────────────────────────────────────────
 // WELCOME MODAL
 // ─────────────────────────────────────────────────────────────
+
+// Default export for React.lazy code-splitting.
+export default PowerRankingsTab;
