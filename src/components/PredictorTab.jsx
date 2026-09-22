@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { T, TC, TL } from "../theme.js";
 import { InfoLegend } from "./ui.jsx";
-import { SCHEDULE } from "../data/schedule.js";
+import { SCHEDULE, SCHEDULE_YEAR } from "../data/schedule.js";
 import { getTier } from "../lib/tiers.js";
 import { trackEvent } from "../lib/analytics.js";
 import { INITIAL_DRIVERS } from "../data/drivers.js";
@@ -39,11 +39,11 @@ export function PredictorTab({ drivers, csvData, incrementTool }) {
       setResults(runPowerRankingsPrediction(drivers, race));
 
     } else if (selectedModel === "pure") {
-      const preds = runPureStatsPrediction(csvData, race.track, race.type);
+      const preds = runPureStatsPrediction(csvData, race.track, race.type, SCHEDULE_YEAR);
       setResults(preds);
 
     } else if (selectedModel === "enhanced") {
-      const preds = runEnhancedPureStatsPrediction(csvData, race.track, race.type);
+      const preds = runEnhancedPureStatsPrediction(csvData, race.track, race.type, SCHEDULE_YEAR);
       setResults(preds);
     }
   };
