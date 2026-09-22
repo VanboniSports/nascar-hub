@@ -6,6 +6,7 @@ import { CSV_TRACK_TYPES, CSV_TYPE_COLORS, H2H_COLORS } from "../data/siteMeta.j
 import { FinishBadge, StatCard } from "./ui.jsx";
 import { Ic } from "./icons.jsx";
 import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { luckIndex, consistencyScore, dominatorRatingsForField, trackFitTags } from "../lib/loopMetrics.js";
 
 export const DA_TRACKS_2026 = [
   "Bristol Motor Speedway","Charlotte Motor Speedway","Chicagoland Speedway","Circuit Of The Americas",
@@ -1029,24 +1030,17 @@ export function DaConsistencyScore({ csvData }) {
 
     return FULL_TIMER_NAMES.filter(n => byDriver[n]).map(name => {
       const races = byDriver[name];
-      const finishes = races.map(r => r[3]).filter(v => v > 0);
-      if (finishes.length < 3) return null;
-
-      const avg = finishes.reduce((a,b)=>a+b,0) / finishes.length;
-      const variance = finishes.reduce((sum, f) => sum + Math.pow(f - avg, 2), 0) / finishes.length;
-      const stdDev = Math.sqrt(variance);
-      // Consistency score: 100 - (stdDev * scaling factor), clamped to 0-100
-      // Lower std dev = higher consistency score
-      const consistency = Math.max(0, Math.min(100, Math.round(100 - stdDev * 4)));
+      const cs = consistencyScore(races);
+      if (!cs) return null;
 
       return {
         name,
-        consistency,
-        avgFinish: avg,
-        stdDev,
-        bestFinish: Math.min(...finishes),
-        worstFinish: Math.max(...finishes),
-        races: races.length,
+        consistency: cs.score,
+        avgFinish: cs.avg,
+        stdDev: cs.stdDev,
+        bestFinish: cs.best,
+        worstFinish: cs.worst,
+        races: cs.races,
       };
     }).filter(Boolean);
   }, [csvData]);
@@ -1092,7 +1086,7 @@ export function DaConsistencyScore({ csvData }) {
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:16 }}>
         <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:4 }}>How It Works</div>
         <div style={{ fontSize:12, color:T.textMid, fontFamily:"'IBM Plex Mono',monospace", lineHeight:1.6 }}>
-          Consistency measures how predictably a driver finishes. Lower variance in finish positions = higher score. Score of 100 = perfectly consistent, 0 = wildly unpredictable.
+          Consistency measures how predictably a driver finishes over their last 12 races (minimum 5). Score = 100 minus 4 times the standard deviation of finishes, clamped 0-100. 100 = perfectly consistent, 0 = wildly unpredictable.
         </div>
       </div>
 
@@ -1506,20 +1500,32 @@ export function DaLoopData({ csvData }) {
     if (!csvData.length) return [];
     const season = Math.max(...csvData.map(r => r[2]));
     const byDriver = {};
+    const allTimeByDriver = {};
     for (const r of csvData) {
-      if (r[2] !== season) continue;
       const d = r[0]; if (!d) continue;
+      if (!allTimeByDriver[d]) allTimeByDriver[d] = [];
+      allTimeByDriver[d].push(r);
+      if (r[2] !== season) continue;
       if (!byDriver[d]) byDriver[d] = [];
       byDriver[d].push(r);
     }
+    const seasonFieldRows = {};
+    for (const n of FULL_TIMER_NAMES) {
+      if (byDriver[n]) seasonFieldRows[n] = byDriver[n].filter(r => (r[12] || 0) > 0);
+    }
+    const domRatings = dominatorRatingsForField(seasonFieldRows);
+    // Luck/tags are windowed over the driver's last 12 races, so sort oldest to newest first
+    const chronological = (rows) => [...rows].sort((a, b) => (a[9] || "").localeCompare(b[9] || ""));
     return FULL_TIMER_NAMES.filter(n => byDriver[n]).map(name => {
-      const races = byDriver[n].filter(r => (r[12] || 0) > 0);
+      const races = seasonFieldRows[name];
       if (races.length < 3) return null;
       const avg = (f) => races.reduce((s, r) => s + f(r), 0) / races.length;
       const arp = avg(r => r[16]);
       if (!(arp > 0)) return null;
       const mid = avg(r => r[17]);
       const closer = avg(r => r[18]);
+      const driverAllTime = chronological(allTimeByDriver[name]);
+      const luck = luckIndex(driverAllTime);
       return {
         name,
         races: races.length,
@@ -1530,6 +1536,10 @@ export function DaLoopData({ csvData }) {
         fastLaps: avg(r => r[11]),
         top15Pct: avg(r => r[24]) * 100,
         closeEdge: (mid > 0 && closer > 0) ? mid - closer : null, // + means improves late
+        luck,
+        luckVal: luck?.value ?? null,
+        dom: Math.round(domRatings[name] ?? 0),
+        tags: trackFitTags(driverAllTime),
       };
     }).filter(Boolean);
   }, [csvData]);
@@ -1561,6 +1571,8 @@ export function DaLoopData({ csvData }) {
 
   const arpColor = (v) => v <= 10 ? T.green : v <= 15 ? T.gold : T.red;
   const edgeColor = (v) => v == null ? T.textDim : v >= 1.5 ? T.green : v <= -1.5 ? T.red : T.textMid;
+  const luckColor = (v) => v == null ? T.textDim : v >= 2 ? T.red : v <= -2 ? T.green : T.textMid;
+  const domColor = (v) => v >= 75 ? T.gold : v >= 50 ? T.green : T.textMid;
   const num = (v, d=1) => v == null ? "—" : v.toFixed(d);
   const signed = (v) => v == null ? "—" : (v > 0 ? "+" : "") + v.toFixed(1);
   const season = csvData.length ? Math.max(...csvData.map(r => r[2])) : "";
@@ -1570,13 +1582,13 @@ export function DaLoopData({ csvData }) {
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:16 }}>
         <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:4 }}>How It Works</div>
         <div style={{ fontSize:12, color:T.textMid, fontFamily:"'IBM Plex Mono',monospace", lineHeight:1.6 }}>
-          NASCAR loop data, {season} season. ARP (avg running position) measures true race pace without crash luck. Driver Rating is NASCAR's composite performance score. QPass = quality passes per race, Pass +/- = net green-flag passes per race, FL = fastest laps per race, Top15% = share of laps in the top 15, Close = mid-race vs late-race running position (positive = comes alive late).
+          NASCAR loop data, {season} season. ARP (avg running position) measures true race pace without crash luck. Driver Rating is NASCAR's composite performance score. QPass = quality passes per race, Pass +/- = net green-flag passes per race, FL = fastest laps per race, Top15% = share of laps in the top 15, Close = mid-race vs late-race running position (positive = comes alive late). Luck Index = avg(finish minus avg running position) over the driver's last 12 races (min 5). Positive = finishes worse than pace (unlucky), negative = beats pace (lucky). Dom = dominator rating 0-100 for the season: 40% laps-led share + 30% fastest-lap share + 30% top-15 share, each vs the field best.
         </div>
       </div>
 
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:"hidden" }}>
         <div style={{ overflowX:"auto" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, minWidth:860 }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, minWidth:960 }}>
             <thead>
               <tr style={{ borderBottom:`1px solid ${T.border}` }}>
                 <th style={{ padding:"8px 10px", textAlign:"center", fontSize:9, color:T.textDim, fontWeight:700, letterSpacing:1.5, fontFamily:"'Barlow Condensed',sans-serif", textTransform:"uppercase", width:35 }}>#</th>
@@ -1588,6 +1600,9 @@ export function DaLoopData({ csvData }) {
                 <LSortHeader col="fastLaps" label="FL" />
                 <LSortHeader col="top15Pct" label="Top15%" />
                 <LSortHeader col="closeEdge" label="Close" />
+                <LSortHeader col="luckVal" label="Luck" />
+                <LSortHeader col="dom" label="Dom" />
+                <th style={{ padding:"8px 6px", textAlign:"left", fontSize:9, color:T.textDim, fontWeight:700, letterSpacing:1.5, fontFamily:"'Barlow Condensed',sans-serif", textTransform:"uppercase", whiteSpace:"nowrap" }}>Tags</th>
                 <LSortHeader col="races" label="Races" />
               </tr>
             </thead>
@@ -1603,6 +1618,17 @@ export function DaLoopData({ csvData }) {
                   <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{num(row.fastLaps)}</td>
                   <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{num(row.top15Pct, 0)}%</td>
                   <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", fontWeight:700, color:edgeColor(row.closeEdge) }}>{signed(row.closeEdge)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", fontWeight:700, color:luckColor(row.luckVal) }}>{signed(row.luckVal)}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", fontWeight:700, color:domColor(row.dom) }}>{row.dom}</td>
+                  <td style={{ padding:"8px 6px", textAlign:"left" }}>
+                    {row.tags.length ? (
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
+                        {row.tags.map(t => (
+                          <span key={t} style={{ background:`${T.gold}18`, border:`1px solid ${T.gold}44`, color:T.gold, fontSize:8, padding:"1px 5px", borderRadius:3, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:0.5, whiteSpace:"nowrap" }}>{t}</span>
+                        ))}
+                      </div>
+                    ) : <span style={{ color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>—</span>}
+                  </td>
                   <td style={{ padding:"8px 6px", textAlign:"right", fontFamily:"'IBM Plex Mono',monospace", color:T.textDim }}>{row.races}</td>
                 </tr>
               ))}
