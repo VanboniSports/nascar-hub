@@ -7,6 +7,7 @@ import { InfoLegend } from "./ui.jsx";
 import { Ic } from "./icons.jsx";
 import { getTier } from "../lib/tiers.js";
 import { FULL_TIMER_NAMES } from "../data/drivers.js";
+import { loopAverages } from "../lib/loopMetrics.js";
 
 export const SS_SUBTABS = [
   { id:"standings",    label:"Season Standings",     icon:"Trophy"  },
@@ -573,6 +574,7 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
     // Career stats: all years EXCEPT the selected year
     const careerByDriver = {};
     const currentByDriver = {};
+    const currentRowsByDriver = {};
 
     for (const r of csvData) {
       const name = r[0];
@@ -583,6 +585,8 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
       if (r[2] === yearFilter) {
         if (!currentByDriver[name]) currentByDriver[name] = [];
         currentByDriver[name].push(fin);
+        if (!currentRowsByDriver[name]) currentRowsByDriver[name] = [];
+        currentRowsByDriver[name].push(r);
       } else {
         if (!careerByDriver[name]) careerByDriver[name] = [];
         careerByDriver[name].push(fin);
@@ -605,11 +609,13 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
       const trending = last3Avg < currentAvg ? "improving" : last3Avg > currentAvg ? "declining" : "flat";
 
       const info = drivers.find(d => d.name === name);
+      const loop = loopAverages(currentRowsByDriver[name] || []);
       results.push({
         name, careerAvg, currentAvg, diff, last3Avg, trending,
         races: current.length, careerRaces: career.length,
         team: info?.team || "", mfg: info?.mfg || "",
         overall: info?.overall || 0,
+        arp: loop.arp, top15Pct: loop.top15Pct, driverRating: loop.driverRating,
       });
     }
 
@@ -620,6 +626,9 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
     const arr = [...sleepers];
     arr.sort((a,b) => {
       const av = a[sortKey], bv = b[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
       if (typeof av === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortAsc ? av - bv : bv - av;
     });
@@ -666,6 +675,9 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
               { label:"Current Avg", desc:"Average finish in the selected year only" },
               { label:"Diff", desc:"Current − Career (positive = underperforming, negative = overperforming)" },
               { label:"Last 3", desc:"Average finish of the 3 most recent races this season" },
+              { label:"ARP", desc:"Average running position in the selected year (loop data, lower is better)" },
+              { label:"Top15%", desc:"Share of laps run in the top 15 in the selected year" },
+              { label:"Rating", desc:"NASCAR driver rating averaged over the selected year" },
             ].map(m => (
               <div key={m.label}>
                 <span style={{ fontWeight:700, color:T.accentText }}>{m.label}:</span> {m.desc}
@@ -776,6 +788,9 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
                 { k:"diff",       l:"Diff",         asc:false },
                 { k:"last3Avg",   l:"Last 3",       asc:true  },
                 { k:"races",      l:"Races",        asc:false },
+                { k:"arp",        l:"ARP",          asc:true  },
+                { k:"top15Pct",   l:"Top15%",       asc:false },
+                { k:"driverRating", l:"Rating",     asc:false },
               ].map(c => (
                 <th key={c.l} onClick={()=>handleSort(c.k,c.asc)} style={{ padding:"8px 8px", fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", color:sortKey===c.k?T.accent:T.textDim, textAlign:c.k==="name"?"left":"center", cursor:"pointer", whiteSpace:"nowrap" }}>
                   {c.l}{sortKey===c.k?(sortAsc?" ▲":" ▼"):""}
@@ -794,6 +809,9 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
                   <td style={{ textAlign:"center", fontFamily:"'IBM Plex Mono',monospace", fontWeight:700, color:diffColor }}>{r.diff > 0 ? "+" : ""}{r.diff.toFixed(1)}</td>
                   <td style={{ textAlign:"center", fontFamily:"'IBM Plex Mono',monospace", color:r.trending==="improving"?T.green:r.trending==="declining"?T.red:T.textMid }}>{r.last3Avg.toFixed(1)}</td>
                   <td style={{ textAlign:"center", fontFamily:"'IBM Plex Mono',monospace", color:T.textDim }}>{r.races}</td>
+                  <td style={{ textAlign:"center", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{r.arp == null ? "—" : r.arp.toFixed(1)}</td>
+                  <td style={{ textAlign:"center", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{r.top15Pct == null ? "—" : r.top15Pct.toFixed(1) + "%"}</td>
+                  <td style={{ textAlign:"center", fontFamily:"'IBM Plex Mono',monospace", color:T.textMid }}>{r.driverRating == null ? "—" : r.driverRating.toFixed(1)}</td>
                 </tr>
               );
             })}
