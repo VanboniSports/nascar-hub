@@ -496,6 +496,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
   const [battleView, setBattleView] = useState("list"); // "list" | "add" | "edit"
   const [editingRaceId, setEditingRaceId] = useState(null);
   const [editActuals, setEditActuals] = useState(Array(10).fill(""));
+  const [confirmDeleteRaceId, setConfirmDeleteRaceId] = useState(null); // two-step inline delete confirm (window.confirm is auto-dismissed by browser automation)
   const [backupModal, setBackupModal] = useState({ open: false, mode: null, text: "" });
   const textareaRef = useRef(null);
   const [backupCopied, setBackupCopied] = useState(false);
@@ -558,9 +559,10 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
     setBattleView("list");
   };
 
-  // Battle — delete race
+  // Battle — delete race (two-step inline confirm; native window.confirm is auto-dismissed by browser automation)
   const handleDeleteRace = async (raceId) => {
-    if (!window.confirm("Delete this race from battle tracker?")) return;
+    if (confirmDeleteRaceId !== raceId) { setConfirmDeleteRaceId(raceId); return; }
+    setConfirmDeleteRaceId(null);
     await onBattleSave(battleRaces.filter((r) => r.id !== raceId));
     setEditingRaceId(null);
     setBattleView("list");
@@ -815,7 +817,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                                   const a = [...(race.actualResults||[])]; while(a.length<10) a.push(""); setEditActuals(a);
                                   setBattleView("edit");
                                 }} style={{ ...btnStyle(hasResults?"#475569":T.accent), padding:"5px 12px", fontSize:10 }}>{hasResults?"Edit Results":"Enter Results"}</button>
-                                <button onClick={()=>handleDeleteRace(race.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>Delete</button>
+                                <button onClick={()=>handleDeleteRace(race.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>{confirmDeleteRaceId===race.id?"Confirm?":"Delete"}</button>
                               </div>
                             );
                           })}
@@ -1612,6 +1614,7 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
   const [blogStatus, setBlogStatus] = useState("draft");
   const [blogSaving, setBlogSaving] = useState(false);
   const [blogMsg, setBlogMsg] = useState("");
+  const [confirmDeletePostId, setConfirmDeletePostId] = useState(null); // two-step inline delete confirm (window.confirm is auto-dismissed by browser automation)
   const editorRef = useRef(null);
 
   const inputStyle = { width:"100%", background:T.surface2, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"8px 12px", fontSize:13, outline:"none", fontFamily:"'Barlow',sans-serif" };
@@ -1760,7 +1763,9 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
   };
 
   const handleDeletePost = async (postId) => {
-    if (!window.confirm("Delete this blog post?")) return;
+    // Two-step inline confirm; native window.confirm is auto-dismissed by browser automation
+    if (confirmDeletePostId !== postId) { setConfirmDeletePostId(postId); return; }
+    setConfirmDeletePostId(null);
     const updated = (blogPosts || []).filter(p => p.id !== postId);
     await onBlogSave(updated);
   };
@@ -1800,7 +1805,7 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
                   </div>
                 </div>
                 <button onClick={() => openEditor(post)} style={{ ...btnStyle(T.accent), padding:"5px 12px", fontSize:10 }}>Edit</button>
-                <button onClick={() => handleDeletePost(post.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>Delete</button>
+                <button onClick={() => handleDeletePost(post.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>{confirmDeletePostId===post.id?"Confirm?":"Delete"}</button>
               </div>
             ))}
           </div>
