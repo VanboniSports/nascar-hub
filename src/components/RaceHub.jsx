@@ -259,6 +259,8 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
   const disagreements = hasAnyPredictions ? topDisagreements(hubPredictions) : [];
   const darkHorse = battleRace && battleRace.darkHorse;
   const suckPick = battleRace && battleRace.suckPick;
+  const darkHorseReason = battleRace && battleRace.darkHorseReason;
+  const suckPickReason = battleRace && battleRace.suckPickReason;
   const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
   const winner = battleWinnerFor(battleRace, HUB_PREDICTORS);
   const typeColor = TC[hub.trackType] || T.accent;
@@ -341,7 +343,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
             <div style={{ fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>Biggest disagreements</div>
             {disagreements.map((x, i) => (
               <div key={i} style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", lineHeight: 1.7 }}>
-                <span style={{ color: T.text, fontWeight: 700 }}>{x.driver}</span>: {x.high[0]} has {x.high[0] === "My Gut" ? "me" : "them"} P{x.high[1]}, {x.low[0]} has {x.low[0] === "My Gut" ? "me" : "them"} P{x.low[1]}
+                <span style={{ color: T.text, fontWeight: 700 }}>{x.driver}</span>: {x.high[0]} has him P{x.high[1]}, {x.low[0]} has him P{x.low[1]}
               </div>
             ))}
           </div>
@@ -355,13 +357,19 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
           <div style={{ ...card, borderLeft: `3px solid ${T.green}` }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: T.green, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Dark Horse</div>
             {darkHorse
-              ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{darkHorse}</div>
+              ? <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{darkHorse}</div>
+                  {darkHorseReason && <div style={{ fontSize: 12, color: T.textMid, marginTop: 6, lineHeight: 1.5 }}>{darkHorseReason}</div>}
+                </div>
               : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my dark horse Wednesday morning.</div>}
           </div>
           <div style={{ ...card, borderLeft: `3px solid ${T.red}` }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Suck Pick</div>
             {suckPick
-              ? <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{suckPick}</div>
+              ? <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{suckPick}</div>
+                  {suckPickReason && <div style={{ fontSize: 12, color: T.textMid, marginTop: 6, lineHeight: 1.5 }}>{suckPickReason}</div>}
+                </div>
               : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my suck pick Wednesday morning.</div>}
           </div>
         </div>

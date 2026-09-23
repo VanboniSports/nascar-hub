@@ -486,6 +486,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
   // Battle Tracker admin state
   const blankBattleForm = () => ({
     raceName: "", track: "", date: "", trackType: "Intermediate",
+    darkHorse: "", suckPick: "", darkHorseReason: "", suckPickReason: "",
     predictions: Object.fromEntries(PREDICTORS.map((p) => [p, Array(10).fill("")])),
     actualResults: Array(10).fill(""),
   });
@@ -541,6 +542,8 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
     const race = {
       id: Date.now().toString(),
       raceName: battleForm.raceName, track: battleForm.track, date: battleForm.date, trackType: battleForm.trackType,
+      darkHorse: battleForm.darkHorse, suckPick: battleForm.suckPick,
+      darkHorseReason: battleForm.darkHorseReason, suckPickReason: battleForm.suckPickReason,
       predictions: Object.fromEntries(activePredictors.map((p) => [p, battleForm.predictions[p].filter(Boolean)])),
       actualResults: battleForm.actualResults.filter(Boolean),
       createdAt: new Date().toISOString(),
@@ -890,6 +893,17 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                             </div>
                           );
                         })}
+                      </div>
+
+                      {/* My Calls */}
+                      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:18, marginBottom:12 }}>
+                        <div style={{ fontSize:10, color:T.textDim, letterSpacing:"0.12em", textTransform:"uppercase", fontWeight:700, marginBottom:12, fontFamily:"'Barlow Condensed',sans-serif" }}>My Calls <span style={{ color:T.textDim }}>(optional — added Wednesday)</span></div>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                          <input value={battleForm.darkHorse} placeholder="Dark horse driver" onChange={e=>setBattleForm({...battleForm,darkHorse:e.target.value})} style={inputStyle} />
+                          <input value={battleForm.suckPick} placeholder="Suck pick driver" onChange={e=>setBattleForm({...battleForm,suckPick:e.target.value})} style={inputStyle} />
+                          <textarea value={battleForm.darkHorseReason} placeholder="Dark horse reasoning…" onChange={e=>setBattleForm({...battleForm,darkHorseReason:e.target.value})} style={{ ...inputStyle, minHeight:54 }} />
+                          <textarea value={battleForm.suckPickReason} placeholder="Suck pick reasoning…" onChange={e=>setBattleForm({...battleForm,suckPickReason:e.target.value})} style={{ ...inputStyle, minHeight:54 }} />
+                        </div>
                       </div>
 
                       {/* Actual results (optional) */}
