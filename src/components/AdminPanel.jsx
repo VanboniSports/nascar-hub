@@ -8,7 +8,7 @@ import { SCHEDULE } from "../data/schedule.js";
 import { BattleDriverInput } from "./ui.jsx";
 import { getTier } from "../lib/tiers.js";
 import { sb } from "../lib/supabase.js";
-import { INITIAL_DRIVERS, normalizeCsvDriverName } from "../data/drivers.js";
+import { INITIAL_DRIVERS, normalizeCsvDriverName, FULL_TIMER_NAMES } from "../data/drivers.js";
 import { parseCSVData } from "../lib/csv.js";
 import { parsePaste, findDriver } from "../lib/pasteParser.js";
 

@@ -380,9 +380,9 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         {sectionTitle("Race Weekend")}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[
-            { label: "Practice", when: "Friday 6:00 PM", done: pracCount > 0, note: pracCount > 0 ? `${pracCount} drivers logged` : "Scheduled" },
-            { label: "Qualifying", when: "Saturday 3:00 PM", done: qualCount > 0, note: qualCount > 0 ? `${qualCount} drivers logged` : "Scheduled" },
-            { label: "Race", when: hub.dateLabel, done: status !== "upcoming", note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
+            { label: "Practice", when: "Saturday 10:00 AM ET", done: pracCount > 0, note: pracCount > 0 ? `${pracCount} drivers logged` : "Scheduled" },
+            { label: "Qualifying", when: "Saturday 11:10 AM ET", done: qualCount > 0, note: qualCount > 0 ? `${qualCount} drivers logged` : "Scheduled" },
+            { label: "Race", when: `${hub.dateLabel}, 3:00 PM ET`, done: status !== "upcoming", note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
           ].map((row, i) => (
             <div key={i} style={{ ...card, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: row.done ? T.green : T.textDim, flexShrink: 0 }} />
