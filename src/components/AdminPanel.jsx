@@ -1,5 +1,5 @@
 // Admin panel (season points, usage, DFS, blog, global). Extracted from NASCARHub.jsx (phase 2).
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { T, TC, TL } from "../theme.js";
 import { Ic } from "./icons.jsx";
