@@ -47,11 +47,12 @@ export const H2H_COLORS = ["#1e90ff","#ef4444","#22c55e","#a855f7"];
 // 2026 Team Roster
 
 
-export const BLOG_CATEGORIES = ["Race Recaps", "DFS Picks & Strategy", "Weekly Predictions", "1/75", "General"];
+export const BLOG_CATEGORIES = ["Race Recaps", "Daily Universe", "DFS Picks & Strategy", "Weekly Predictions", "1/75", "General"];
 
 
 export const BLOG_CAT_COLORS = {
   "Race Recaps": "#3b82f6",
+  "Daily Universe": "#a855f7",
   "DFS Picks & Strategy": "#22c55e",
   "Weekly Predictions": "#f97316",
   "1/75": "#d4a017",
