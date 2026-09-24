@@ -13,7 +13,7 @@ import { runPureStatsPrediction, runEnhancedPureStatsPrediction, runPowerRanking
 import { VBS_LOGO } from "./src/data/logo.js";
 import { T } from "./src/theme.js";
 import { Ic } from "./src/components/icons.jsx";
-import { sb, loadFromSupabase, saveToSupabase } from "./src/lib/supabase.js";
+import { sb } from "./src/lib/supabase.js";
 import { logUsageEvent, tabIdFromPath, raceSlugFromPath, pathForTab, applyTabMeta, trackRacePageView, trackRaceTabView, applyRaceMeta } from "./src/lib/analytics.js";
 import { hubBySlug, findBattleForHub, currentHub, RacesTab, RaceHubPage, RaceHeroCard } from "./src/components/RaceHub.jsx";
 // Code-split: tabs are lazy-loaded so first paint ships only the Race Hub shell.
@@ -318,10 +318,15 @@ export default function NASCARHub() {
   }, []);
 
   const saveBlogPosts = useCallback(async (updated) => {
-    setBlogPosts(updated);
     try {
-      await sb.from("app_state").upsert({ key:"blogPosts", value:updated }, { onConflict:"key" });
-    } catch (e) { console.error("Blog posts save:", e); }
+      const { error } = await sb.from("app_state").upsert({ key:"blogPosts", value:updated }, { onConflict:"key" });
+      if (error) throw error;
+    } catch (e) {
+      console.error("Blog posts save:", e);
+      return false;
+    }
+    setBlogPosts(updated);
+    return true;
   }, []);
 
   // Increment a tool usage counter — queues if Supabase hasn't loaded yet

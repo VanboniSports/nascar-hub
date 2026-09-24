@@ -1,5 +1,5 @@
 // Admin panel (season points, usage, DFS, blog, global). Extracted from NASCARHub.jsx (phase 2).
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { T, TC, TL } from "../theme.js";
 import { Ic } from "./icons.jsx";
@@ -8,7 +8,7 @@ import { SCHEDULE } from "../data/schedule.js";
 import { BattleDriverInput } from "./ui.jsx";
 import { getTier } from "../lib/tiers.js";
 import { sb } from "../lib/supabase.js";
-import { INITIAL_DRIVERS, normalizeCsvDriverName, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { INITIAL_DRIVERS, normalizeCsvDriverName } from "../data/drivers.js";
 import { parseCSVData } from "../lib/csv.js";
 import { parsePaste, findDriver } from "../lib/pasteParser.js";
 
@@ -486,7 +486,6 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
   // Battle Tracker admin state
   const blankBattleForm = () => ({
     raceName: "", track: "", date: "", trackType: "Intermediate",
-    darkHorse: "", suckPick: "", darkHorseReason: "", suckPickReason: "",
     predictions: Object.fromEntries(PREDICTORS.map((p) => [p, Array(10).fill("")])),
     actualResults: Array(10).fill(""),
   });
@@ -497,7 +496,6 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
   const [battleView, setBattleView] = useState("list"); // "list" | "add" | "edit"
   const [editingRaceId, setEditingRaceId] = useState(null);
   const [editActuals, setEditActuals] = useState(Array(10).fill(""));
-  const [confirmDeleteRaceId, setConfirmDeleteRaceId] = useState(null); // two-step inline delete confirm (window.confirm is auto-dismissed by browser automation)
   const [backupModal, setBackupModal] = useState({ open: false, mode: null, text: "" });
   const textareaRef = useRef(null);
   const [backupCopied, setBackupCopied] = useState(false);
@@ -542,8 +540,6 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
     const race = {
       id: Date.now().toString(),
       raceName: battleForm.raceName, track: battleForm.track, date: battleForm.date, trackType: battleForm.trackType,
-      darkHorse: battleForm.darkHorse, suckPick: battleForm.suckPick,
-      darkHorseReason: battleForm.darkHorseReason, suckPickReason: battleForm.suckPickReason,
       predictions: Object.fromEntries(activePredictors.map((p) => [p, battleForm.predictions[p].filter(Boolean)])),
       actualResults: battleForm.actualResults.filter(Boolean),
       createdAt: new Date().toISOString(),
@@ -562,10 +558,9 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
     setBattleView("list");
   };
 
-  // Battle — delete race (two-step inline confirm; native window.confirm is auto-dismissed by browser automation)
+  // Battle — delete race
   const handleDeleteRace = async (raceId) => {
-    if (confirmDeleteRaceId !== raceId) { setConfirmDeleteRaceId(raceId); return; }
-    setConfirmDeleteRaceId(null);
+    if (!window.confirm("Delete this race from battle tracker?")) return;
     await onBattleSave(battleRaces.filter((r) => r.id !== raceId));
     setEditingRaceId(null);
     setBattleView("list");
@@ -820,7 +815,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                                   const a = [...(race.actualResults||[])]; while(a.length<10) a.push(""); setEditActuals(a);
                                   setBattleView("edit");
                                 }} style={{ ...btnStyle(hasResults?"#475569":T.accent), padding:"5px 12px", fontSize:10 }}>{hasResults?"Edit Results":"Enter Results"}</button>
-                                <button onClick={()=>handleDeleteRace(race.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>{confirmDeleteRaceId===race.id?"Confirm?":"Delete"}</button>
+                                <button onClick={()=>handleDeleteRace(race.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>Delete</button>
                               </div>
                             );
                           })}
@@ -893,17 +888,6 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                             </div>
                           );
                         })}
-                      </div>
-
-                      {/* My Calls */}
-                      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:18, marginBottom:12 }}>
-                        <div style={{ fontSize:10, color:T.textDim, letterSpacing:"0.12em", textTransform:"uppercase", fontWeight:700, marginBottom:12, fontFamily:"'Barlow Condensed',sans-serif" }}>My Calls <span style={{ color:T.textDim }}>(optional — added Wednesday)</span></div>
-                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                          <input value={battleForm.darkHorse} placeholder="Dark horse driver" onChange={e=>setBattleForm({...battleForm,darkHorse:e.target.value})} style={inputStyle} />
-                          <input value={battleForm.suckPick} placeholder="Suck pick driver" onChange={e=>setBattleForm({...battleForm,suckPick:e.target.value})} style={inputStyle} />
-                          <textarea value={battleForm.darkHorseReason} placeholder="Dark horse reasoning…" onChange={e=>setBattleForm({...battleForm,darkHorseReason:e.target.value})} style={{ ...inputStyle, minHeight:54 }} />
-                          <textarea value={battleForm.suckPickReason} placeholder="Suck pick reasoning…" onChange={e=>setBattleForm({...battleForm,suckPickReason:e.target.value})} style={{ ...inputStyle, minHeight:54 }} />
-                        </div>
                       </div>
 
                       {/* Actual results (optional) */}
@@ -1628,7 +1612,6 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
   const [blogStatus, setBlogStatus] = useState("draft");
   const [blogSaving, setBlogSaving] = useState(false);
   const [blogMsg, setBlogMsg] = useState("");
-  const [confirmDeletePostId, setConfirmDeletePostId] = useState(null); // two-step inline delete confirm (window.confirm is auto-dismissed by browser automation)
   const editorRef = useRef(null);
 
   const inputStyle = { width:"100%", background:T.surface2, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"8px 12px", fontSize:13, outline:"none", fontFamily:"'Barlow',sans-serif" };
@@ -1769,17 +1752,19 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
     } else {
       updated = [...(blogPosts || []), post];
     }
-    await onBlogSave(updated);
+    const saved = await onBlogSave(updated);
     setBlogSaving(false);
+    if (!saved) {
+      setBlogMsg("⚠ Couldn't save to the database. Your post is still in the editor — check your connection and try saving again.");
+      return;
+    }
     setBlogMsg(`✓ Post ${editingPost ? "updated" : "created"} as ${blogStatus}.`);
     resetEditor();
     setBlogView("list");
   };
 
   const handleDeletePost = async (postId) => {
-    // Two-step inline confirm; native window.confirm is auto-dismissed by browser automation
-    if (confirmDeletePostId !== postId) { setConfirmDeletePostId(postId); return; }
-    setConfirmDeletePostId(null);
+    if (!window.confirm("Delete this blog post?")) return;
     const updated = (blogPosts || []).filter(p => p.id !== postId);
     await onBlogSave(updated);
   };
@@ -1819,7 +1804,7 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
                   </div>
                 </div>
                 <button onClick={() => openEditor(post)} style={{ ...btnStyle(T.accent), padding:"5px 12px", fontSize:10 }}>Edit</button>
-                <button onClick={() => handleDeletePost(post.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>{confirmDeletePostId===post.id?"Confirm?":"Delete"}</button>
+                <button onClick={() => handleDeletePost(post.id)} style={{ ...btnStyle(T.red), padding:"5px 12px", fontSize:10 }}>Delete</button>
               </div>
             ))}
           </div>
