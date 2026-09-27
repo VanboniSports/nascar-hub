@@ -1,6 +1,7 @@
 // Race-hub pages (/race/<slug>) + hub helpers. Extracted from NASCARHub.jsx (phase 2).
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { T, TC, TL } from "../theme.js";
+import { sb } from "../lib/supabase.js";
 import { PREDICTORS, PREDICTOR_COLORS } from "../data/siteMeta.js";
 import { HubStatusBadge, sectionTitle } from "./ui.jsx";
 import { Ic } from "./icons.jsx";
@@ -177,15 +178,37 @@ export function RacesTab({ battleRaces, onOpenRace }) {
   );
 }
 
-// LIVE RUNNING ORDER — shown on a race hub while that race is actually live.
+// LIVE RUNNING ORDER + TIMELINE — shown on a race hub while that race is actually live.
 // Data comes from /api/live-leaderboard, a Vercel serverless proxy for
 // NASCAR's official live feed (the CDN sends no CORS headers, so the browser
-// cannot fetch it directly). Polls every 45 seconds. Renders nothing when
+// cannot fetch it directly). Polls every 35 seconds. Renders nothing when
 // the race is not live or the feed is unreachable: no errors, no boxes.
+// The timeline is derived client-side by diffing each poll against the previous
+// one (passes for position, lead changes, cautions/restarts, pit stops), so it
+// starts from the moment the page is opened and has no history before that.
 
+const liveOrdinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
 
 export function LiveRunningOrder({ hub }) {
   const [data, setData] = useState(null);
+  const [timeline, setTimeline] = useState([]);
+  const prevRef = useRef(null);
+  const seenRef = useRef(new Set());
+  // Load the recorder's back-history so the timeline is complete even when
+  // the page is opened mid-race. Live-derived events below dedupe against it.
+  useEffect(() => {
+    if (!hub || !hub.nascarRaceId) return;
+    let alive = true;
+    sb.from("app_state").select("value").eq("key", `livetimeline:${hub.nascarRaceId}`).maybeSingle()
+      .then(({ data: row }) => {
+        if (!alive || !row || !row.value || !Array.isArray(row.value.events)) return;
+        const evs = row.value.events.filter(e => e && e.text).slice(0, 200);
+        evs.forEach(e => seenRef.current.add(`${e.lap}:${e.text}`));
+        setTimeline(evs);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [hub ? hub.slug : null]);
   useEffect(() => {
     if (!hub || !hub.nascarRaceId) return;
     let alive = true;
@@ -193,11 +216,51 @@ export function LiveRunningOrder({ hub }) {
       try {
         const r = await fetch(`/api/live-leaderboard?race_id=${hub.nascarRaceId}`);
         const j = await r.json();
-        if (alive) setData(j && j.live ? j : null);
+        if (!alive) return;
+        if (!(j && j.live)) { setData(null); return; }
+        setData(j);
+        const prev = prevRef.current;
+        if (prev && prev.order && prev.order.length) {
+          const events = [];
+          const oldPos = new Map(prev.order.map(o => [o.number, o.pos]));
+          const oldPit = new Map(prev.order.map(o => [o.number, o.pitStops || 0]));
+          for (const o of j.order) {
+            const op = oldPos.get(o.number);
+            if (op == null || o.pos >= op) continue;
+            if (op - o.pos === 1) {
+              const passed = j.order.find(c => c.number !== o.number && oldPos.get(c.number) === o.pos && c.pos === o.pos + 1);
+              events.push(passed ? `${o.name} passes ${passed.name} for ${liveOrdinal(o.pos)}` : `${o.name} moves up to ${liveOrdinal(o.pos)}`);
+            } else {
+              events.push(`${o.name} gains ${op - o.pos} spots to ${liveOrdinal(o.pos)}`);
+            }
+          }
+          const oldLeader = prev.order.find(o => o.pos === 1);
+          const newLeader = j.order.find(o => o.pos === 1);
+          if (oldLeader && newLeader && oldLeader.number !== newLeader.number) events.push(`${newLeader.name} takes the lead from ${oldLeader.name}`);
+          for (const o of j.order) {
+            if ((o.pitStops || 0) > (oldPit.get(o.number) || 0)) {
+              const op2 = oldPos.get(o.number);
+              events.push(`${o.name} pits from ${liveOrdinal(op2 || o.pos)}`);
+            }
+          }
+          if (prev.flag === "GREEN" && j.flag === "CAUTION") events.push("Caution is out");
+          else if (prev.flag === "CAUTION" && j.flag === "GREEN") events.push("Back to green");
+          else if (prev.flag !== "RED FLAG" && j.flag === "RED FLAG") events.push("Red flag is out");
+          if (events.length) {
+            const seen = seenRef.current;
+            const fresh = [];
+            for (const text of events) {
+              const k = `${j.lap}:${text}`;
+              if (!seen.has(k)) { seen.add(k); fresh.push({ lap: j.lap, text }); }
+            }
+            if (fresh.length) setTimeline(t => [...fresh.reverse(), ...t].slice(0, 300));
+          }
+        }
+        prevRef.current = { order: j.order, flag: j.flag };
       } catch (e) { if (alive) setData(null); }
     };
     load();
-    const t = setInterval(load, 45000);
+    const t = setInterval(load, 35000);
     return () => { alive = false; clearInterval(t); };
   }, [hub ? hub.slug : null]);
   if (!data) return null;
@@ -216,10 +279,10 @@ export function LiveRunningOrder({ hub }) {
         {data.stage != null && (
           <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Stage {data.stage}</span>
         )}
-        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>auto-refreshes</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>refreshes every 35s</span>
       </div>
-      <div>
-        {data.order.slice(0, 10).map(o => (
+      <div style={{ maxHeight: 420, overflowY: "auto" }}>
+        {data.order.map(o => (
           <div key={o.pos} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: `1px solid ${T.border}` }}>
             <span style={{ width: 22, fontSize: 11, fontWeight: 800, color: o.pos <= 3 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{o.pos}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", minWidth: 28 }}>#{o.number}</span>
@@ -229,6 +292,22 @@ export function LiveRunningOrder({ hub }) {
           </div>
         ))}
       </div>
+      {timeline.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, marginBottom: 8 }}>LIVE TIMELINE</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 420, overflowY: "auto" }}>
+            {timeline.map((e, i) => (
+              <div key={i} style={{ background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: T.green }} />
+                  <span style={{ fontSize: 11, fontWeight: 800, color: T.text, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>LAP {e.lap}</span>
+                </div>
+                <div style={{ padding: "8px 10px", fontSize: 12, color: T.textMid }}>{e.text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
