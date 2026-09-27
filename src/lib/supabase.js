@@ -31,7 +31,16 @@ export async function loadFromSupabase() {
     const { data:dsRows }   = await sb.from("app_state").select("*").eq("key","dfsSalaries");
     const { data:ddRows }   = await sb.from("app_state").select("*").eq("key","dfsDisabled");
     const { data:qpRows }   = await sb.from("app_state").select("*").eq("key","dfsQualifying");
-    const { data:bpRows }   = await sb.from("app_state").select("*").eq("key","blogPosts");
+    // Blog posts: one small row per post (blogpost:<id>). Falls back to the
+    // legacy single blogPosts array row when per-post rows are absent or older.
+    const { data:bpPostRows }   = await sb.from("app_state").select("*").like("key","blogpost:*");
+    const { data:bpLegacyRows } = await sb.from("app_state").select("*").eq("key","blogPosts");
+    const legacyArr = bpLegacyRows?.[0]?.value;
+    const legacyTs = bpLegacyRows?.[0]?.updated_at ? +new Date(bpLegacyRows[0].updated_at) : 0;
+    const perPostTs = (bpPostRows||[]).reduce((m,r)=>Math.max(m, r.updated_at ? +new Date(r.updated_at) : 0), 0);
+    const bpRows = (bpPostRows?.length && perPostTs >= legacyTs)
+      ? [{ value: bpPostRows.map(r=>r.value) }]
+      : (Array.isArray(legacyArr) ? [{ value: legacyArr }] : []);
     return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
