@@ -268,6 +268,25 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
   const qpMatch = qualPractice && qualPractice.week === hub.week;
   const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
   const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
+  const pracCanceled = qpMatch && !!qualPractice.practiceCanceled;
+  const qualCanceled = qpMatch && !!qualPractice.qualifyingCanceled;
+  const practiceList = (qpMatch && qualPractice.practice)
+    ? Object.entries(qualPractice.practice)
+        .map(([name, v]) => ({ name, pos: typeof v === "number" ? v : (v.speedRank || 9999), overall: (v && typeof v === "object") ? v.overall : null }))
+        .sort((a, b) => a.pos - b.pos)
+    : [];
+  const qualList = (qpMatch && qualPractice.qualifying)
+    ? Object.entries(qualPractice.qualifying).map(([name, pos]) => ({ name, pos })).sort((a, b) => a.pos - b.pos)
+    : [];
+  const resultTabs = [
+    { id: "practice", label: "Practice" },
+    { id: "qualifying", label: "Qualifying" },
+    ...(status === "live" ? [{ id: "live", label: "Live" }] : []),
+    ...(actuals ? [{ id: "race", label: "Race Results" }] : []),
+  ];
+  const [resultsTab, setResultsTab] = useState(
+    status === "live" ? "live" : actuals ? "race" : qualCount > 0 ? "qualifying" : "practice"
+  );
 
   const idx = RACE_HUBS.findIndex(h => h.slug === hub.slug);
   const olderHub = idx >= 0 ? RACE_HUBS[idx + 1] : null;
@@ -292,7 +311,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
       </div>
 
       {/* LIVE RUNNING ORDER — only renders while the race is actually live */}
-      {status === "live" && <LiveRunningOrder hub={hub} />}
+      {/* LIVE RUNNING ORDER now lives in the Official Results tabs during the race */}
 
       {/* INTRO — per-race editorial, above the predictions */}
       {hub.intro && hub.intro.length > 0 && (
@@ -380,15 +399,15 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         {sectionTitle("Race Weekend")}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[
-            { label: "Practice", when: "Saturday 10:00 AM ET", done: pracCount > 0, note: pracCount > 0 ? `${pracCount} drivers logged` : "Scheduled" },
-            { label: "Qualifying", when: "Saturday 11:10 AM ET", done: qualCount > 0, note: qualCount > 0 ? `${qualCount} drivers logged` : "Scheduled" },
-            { label: "Race", when: `${hub.dateLabel}, 3:00 PM ET`, done: status !== "upcoming", note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
+            { label: "Practice", when: "Saturday 10:00 AM ET", done: pracCount > 0, canceled: pracCount === 0 && pracCanceled, note: pracCount > 0 ? `${pracCount} drivers logged` : pracCanceled ? "Canceled" : "Scheduled" },
+            { label: "Qualifying", when: "Saturday 11:10 AM ET", done: qualCount > 0, canceled: qualCount === 0 && qualCanceled, note: qualCount > 0 ? `${qualCount} drivers logged` : qualCanceled ? "Canceled" : "Scheduled" },
+            { label: "Race", when: `${hub.dateLabel}, 3:00 PM ET`, done: status !== "upcoming", canceled: false, note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
           ].map((row, i) => (
             <div key={i} style={{ ...card, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: row.done ? T.green : T.textDim, flexShrink: 0 }} />
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: row.canceled ? T.red : row.done ? T.green : T.textDim, flexShrink: 0 }} />
               <span style={{ fontSize: 13, fontWeight: 800, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", minWidth: 90 }}>{row.label}</span>
               <span style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{row.when}</span>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: row.done ? T.green : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{row.note}</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: row.canceled ? T.red : row.done ? T.green : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{row.note}</span>
             </div>
           ))}
         </div>
@@ -405,10 +424,63 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         </button>
       </div>
 
-      {/* RESULTS */}
+      {/* RESULTS — tabbed: practice / qualifying before the race, live during, race results after */}
       <div>
         {sectionTitle("Official Results")}
-        {actuals ? (
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          {resultTabs.map(t => (
+            <button key={t.id} onClick={() => setResultsTab(t.id)} style={{
+              padding: "7px 16px", borderRadius: 8, cursor: "pointer",
+              fontSize: 11, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif",
+              letterSpacing: 1.5, textTransform: "uppercase",
+              background: resultsTab === t.id ? T.accentSoft : T.surface3,
+              border: `1px solid ${resultsTab === t.id ? T.accent : T.border}`,
+              color: resultsTab === t.id ? T.accentText : T.textDim,
+            }}>{t.label}</button>
+          ))}
+        </div>
+        {resultsTab === "practice" && (
+          practiceList.length > 0 ? (
+            <div style={card}>
+              {practiceList.map((p, i) => (
+                <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: i < practiceList.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                  <span style={{ width: 24, fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>P{i + 1}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: T.text }}>{p.name}</span>
+                  {p.overall != null && <span style={{ marginLeft: "auto", fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{p.overall}</span>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ ...card, textAlign: "center", color: T.textDim, padding: "30px 20px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: pracCanceled ? T.red : T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{pracCanceled ? "Practice canceled" : "No practice data yet"}</div>
+              <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>{pracCanceled ? "This session was canceled and no practice running took place." : "Practice results will appear here once logged."}</div>
+            </div>
+          )
+        )}
+        {resultsTab === "qualifying" && (
+          qualList.length > 0 ? (
+            <div style={card}>
+              {qualList.map((q, i) => (
+                <div key={q.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: i < qualList.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                  <span style={{ width: 24, fontSize: 11, fontWeight: 800, color: i === 0 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>P{i + 1}</span>
+                  <span style={{ fontSize: 13, fontWeight: i === 0 ? 800 : 500, color: T.text }}>{q.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ ...card, textAlign: "center", color: T.textDim, padding: "30px 20px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: qualCanceled ? T.red : T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>{qualCanceled ? "Qualifying canceled" : "No qualifying data yet"}</div>
+              <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>{qualCanceled ? "The starting grid will appear here once it is set." : "Qualifying results will appear here once logged."}</div>
+            </div>
+          )
+        )}
+        {resultsTab === "live" && (
+          <div>
+            <LiveRunningOrder hub={hub} />
+            <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 8, textAlign: "center" }}>Live timing appears automatically once NASCAR's feed starts flowing.</div>
+          </div>
+        )}
+        {resultsTab === "race" && actuals && (
           <div style={card}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
               <span style={{ fontSize: 22 }}>🏆</span>
@@ -428,12 +500,6 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
                 <span style={{ fontSize: 13, fontWeight: i === 0 ? 800 : 500, color: T.text }}>{d}</span>
               </div>
             ))}
-          </div>
-        ) : (
-          <div style={{ ...card, textAlign: "center", color: T.textDim, padding: "30px 20px" }}>
-            <div style={{ marginBottom: 10, opacity: 0.7 }}>{Ic.Lock()}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>Results locked</div>
-            <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>This section unlocks after the checkered flag on race day.</div>
           </div>
         )}
       </div>
