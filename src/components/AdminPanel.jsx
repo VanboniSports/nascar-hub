@@ -1040,6 +1040,14 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
   const [practiceText, setPracticeText]     = useState("");
   const [qualWeek, setQualWeek]             = useState("");
   const [qualMsg, setQualMsg]               = useState("");
+  const [practiceCanceled, setPracticeCanceled]     = useState(false);
+  const [qualifyingCanceled, setQualifyingCanceled] = useState(false);
+
+  // Keep the canceled checkboxes in sync with the saved week data
+  useEffect(() => {
+    setPracticeCanceled(!!qualPractice?.practiceCanceled);
+    setQualifyingCanceled(!!qualPractice?.qualifyingCanceled);
+  }, [qualPractice]);
 
   const inputStyle = { width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", fontFamily: "'Barlow',sans-serif" };
   const btnStyle = (c) => ({ padding: "8px 18px", background: c, border: "none", color: "#fff", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" });
@@ -1335,27 +1343,39 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
 
   const handleQualImport = () => {
     if (!qualWeek) { setQualMsg("❌ Select a race week first"); return; }
-    const { results: qualResults, unmatched: qualUnmatched } = parseQualPracticeText(qualText);
+    const { results: qualParsed, unmatched: qualUnmatched } = parseQualPracticeText(qualText);
     // Try rich timing parser first for practice; fall back to position-only
     const currentSalaryData = dfsSalaries?.[activePlatform] || {};
-    const { results: practiceRich, unmatched: practiceUnmatched, isParsedTiming } =
+    const { results: practiceRich, unmatched: practiceUnmatched, isParsedTiming: parsedTiming } =
       parsePracticeTimingText(practiceText, currentSalaryData);
-    let practiceResults;
-    if (isParsedTiming) {
-      practiceResults = practiceRich;
+    let practiceParsed;
+    let practiceIsTiming;
+    if (parsedTiming) {
+      practiceParsed = practiceRich;
+      practiceIsTiming = true;
     } else {
-      practiceResults = parseQualPracticeText(practiceText).results;
+      practiceParsed = parseQualPracticeText(practiceText).results;
+      practiceIsTiming = false;
     }
-    if (Object.keys(qualResults).length === 0 && Object.keys(practiceResults).length === 0) {
+    const weekVal = qualWeek === "allstar" ? "allstar" : parseInt(qualWeek);
+    const weekMatches = qualPractice && qualPractice.week === weekVal;
+    // An empty text box preserves that session's already-saved data for the
+    // same week, so flag-only saves (e.g. marking practice canceled) never
+    // wipe the other session.
+    const qualResults = Object.keys(qualParsed).length > 0 ? qualParsed : (weekMatches ? (qualPractice.qualifying || {}) : {});
+    const practiceResults = Object.keys(practiceParsed).length > 0 ? practiceParsed : (weekMatches ? (qualPractice.practice || {}) : {});
+    if (!parsedTiming && Object.keys(practiceParsed).length === 0 && weekMatches) practiceIsTiming = !!qualPractice.practiceIsTiming;
+    if (Object.keys(qualResults).length === 0 && Object.keys(practiceResults).length === 0 && !practiceCanceled && !qualifyingCanceled) {
       setQualMsg("❌ No drivers matched from either text area");
       return;
     }
-    const weekVal = qualWeek === "allstar" ? "allstar" : parseInt(qualWeek);
     const updated = {
       week: weekVal,
       qualifying: qualResults,
       practice: practiceResults,
-      practiceIsTiming: isParsedTiming,
+      practiceIsTiming,
+      practiceCanceled,
+      qualifyingCanceled,
       updated: new Date().toISOString(),
     };
     onQualPracticeSave(updated);
@@ -1363,7 +1383,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
     const qCount = Object.keys(qualResults).length;
     const pCount = Object.keys(practiceResults).length;
     let msg = `✓ Imported ${qCount} qualifying`;
-    if (pCount > 0) msg += ` + ${pCount} practice${isParsedTiming ? " (timing data ✓)" : ""}`;
+    if (pCount > 0) msg += ` + ${pCount} practice${practiceIsTiming ? " (timing data ✓)" : ""}`;
     msg += " drivers";
     if (allUnmatched.length > 0) msg += ` · Unmatched: ${allUnmatched.join(", ")}`;
     setQualMsg(msg);
@@ -1529,6 +1549,18 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
           <textarea value={practiceText} onChange={e => setPracticeText(e.target.value)} rows={5}
             placeholder={"Paste practice results…\nFormat A (timing): POS\\tDRIVER\\tOVERALL\\t5-LAP\\t10-LAP\\t15-LAP\\t20-LAP\\t25-LAP\\t30-LAP\nFormat B (positions): standard name/position list"}
             style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "10px 12px", fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", outline: "none", resize: "vertical", lineHeight: 1.6 }} />
+        </div>
+
+        {/* Canceled-session flags */}
+        <div style={{ display: "flex", gap: 20, marginBottom: 12, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", cursor: "pointer" }}>
+            <input type="checkbox" checked={practiceCanceled} onChange={e => setPracticeCanceled(e.target.checked)} style={{ accentColor: T.red, width: 15, height: 15, cursor: "pointer" }} />
+            Practice canceled
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", cursor: "pointer" }}>
+            <input type="checkbox" checked={qualifyingCanceled} onChange={e => setQualifyingCanceled(e.target.checked)} style={{ accentColor: T.red, width: 15, height: 15, cursor: "pointer" }} />
+            Qualifying canceled
+          </label>
         </div>
 
         {/* Import button + status */}
