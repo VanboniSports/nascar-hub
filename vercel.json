@@ -33,6 +33,18 @@
       "destination": "/og-image.png"
     },
     {
+      "source": "/sw.js",
+      "destination": "/sw.js"
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "destination": "/manifest.webmanifest"
+    },
+    {
+      "source": "/icon-:size.png",
+      "destination": "/icon-:size.png"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },
