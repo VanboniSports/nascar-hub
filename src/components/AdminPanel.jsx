@@ -462,7 +462,7 @@ export function UsageAdminSection({ toolUsage }) {
 }
 
 
-export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSave }) {
+export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -1013,7 +1013,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
               {adminSection === "usage" && <UsageAdminSection toolUsage={toolUsage} />}
 
               {adminSection === "blog" && (
-                <BlogAdminSection blogPosts={blogPosts} onBlogSave={onBlogSave} />
+                <BlogAdminSection blogPosts={blogPosts} onBlogSavePost={onBlogSavePost} onBlogDeletePost={onBlogDeletePost} />
               )}
 
             </div>
@@ -1650,7 +1650,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
 // ─────────────────────────────────────────────────────────────
 
 
-export function BlogAdminSection({ blogPosts, onBlogSave }) {
+export function BlogAdminSection({ blogPosts, onBlogSavePost, onBlogDeletePost }) {
   const [blogView, setBlogView] = useState("list"); // "list" | "editor"
   const [editingPost, setEditingPost] = useState(null);
   const [blogTitle, setBlogTitle] = useState("");
@@ -1773,7 +1773,23 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
       if (!file) return;
       if (file.size > 4 * 1024 * 1024) { setBlogMsg("⚠ Image too large — max 4MB."); return; }
       const reader = new FileReader();
-      reader.onload = (ev) => { setBlogFeaturedImage(ev.target.result); };
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          // Downscale huge uploads: keeps each post small so saves stay fast.
+          const MAX = 1400;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          if (scale >= 1) { setBlogFeaturedImage(ev.target.result); setBlogMsg("✓ Featured image attached."); return; }
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          setBlogFeaturedImage(canvas.toDataURL("image/jpeg", 0.82));
+          setBlogMsg("✓ Featured image attached (resized for fast saving).");
+        };
+        img.onerror = () => { setBlogFeaturedImage(ev.target.result); setBlogMsg("✓ Featured image attached."); };
+        img.src = ev.target.result;
+      };
       reader.readAsDataURL(file);
     };
     fileInput.click();
@@ -1795,16 +1811,10 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
       created_at: editingPost?.created_at || now,
       updated_at: now,
     };
-    let updated;
-    if (editingPost) {
-      updated = (blogPosts || []).map(p => p.id === editingPost.id ? post : p);
-    } else {
-      updated = [...(blogPosts || []), post];
-    }
-    const saved = await onBlogSave(updated);
+    const res = await onBlogSavePost(post);
     setBlogSaving(false);
-    if (!saved) {
-      setBlogMsg("⚠ Couldn't save to the database. Your post is still in the editor — check your connection and try saving again.");
+    if (!res.ok) {
+      setBlogMsg(`⚠ Couldn't save to the database${res.detail ? ` (${res.detail})` : ""}. Your post is still in the editor, nothing was lost.`);
       return;
     }
     setBlogMsg(`✓ Post ${editingPost ? "updated" : "created"} as ${blogStatus}.`);
@@ -1816,8 +1826,8 @@ export function BlogAdminSection({ blogPosts, onBlogSave }) {
     // Two-step inline confirm; native window.confirm is auto-dismissed by browser automation
     if (confirmDeletePostId !== postId) { setConfirmDeletePostId(postId); return; }
     setConfirmDeletePostId(null);
-    const updated = (blogPosts || []).filter(p => p.id !== postId);
-    await onBlogSave(updated);
+    const delRes = await onBlogDeletePost(postId);
+    if (!delRes.ok) setBlogMsg("⚠ Couldn't delete the post. Please try again.");
   };
 
   // Posts list view
