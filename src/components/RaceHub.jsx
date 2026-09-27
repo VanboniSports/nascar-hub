@@ -184,8 +184,9 @@ export function RacesTab({ battleRaces, onOpenRace }) {
 // cannot fetch it directly). Polls every 35 seconds. Renders nothing when
 // the race is not live or the feed is unreachable: no errors, no boxes.
 // The timeline is derived client-side by diffing each poll against the previous
-// one (passes for position, lead changes, cautions/restarts, pit stops), so it
-// starts from the moment the page is opened and has no history before that.
+// one (passes for position, lead changes, cautions/restarts, pit stops, stage
+// ends) and merged with the recorder's back-history, so opening mid-race still
+// shows everything captured since the recorder started.
 
 const liveOrdinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
 
@@ -194,6 +195,7 @@ export function LiveRunningOrder({ hub }) {
   const [timeline, setTimeline] = useState([]);
   const prevRef = useRef(null);
   const seenRef = useRef(new Set());
+  const [nowTs, setNowTs] = useState(() => Date.now());
   // Load the recorder's back-history so the timeline is complete even when
   // the page is opened mid-race. Live-derived events below dedupe against it.
   useEffect(() => {
@@ -224,9 +226,22 @@ export function LiveRunningOrder({ hub }) {
           const events = [];
           const oldPos = new Map(prev.order.map(o => [o.number, o.pos]));
           const oldPit = new Map(prev.order.map(o => [o.number, o.pitStops || 0]));
+          const newPit = new Map(j.order.map(o => [o.number, o.pitStops || 0]));
+          const oldLeader = prev.order.find(o => o.pos === 1);
+          const newLeader = j.order.find(o => o.pos === 1);
+          const leadPair = new Set();
+          if (oldLeader && newLeader && oldLeader.number !== newLeader.number) {
+            leadPair.add(oldLeader.number); leadPair.add(newLeader.number);
+            events.push(`${newLeader.name} takes the lead from ${oldLeader.name}`);
+          }
+          if (prev.stage != null && j.stage != null && j.stage > prev.stage) {
+            events.push(`End of Stage ${prev.stage}: ${newLeader ? newLeader.name : "Unknown"} wins the stage`);
+          }
           for (const o of j.order) {
             const op = oldPos.get(o.number);
-            if (op == null || o.pos >= op) continue;
+            if (op == null || o.pos >= op || leadPair.has(o.number)) continue;
+            const overtaken = prev.order.filter(c => c.number !== o.number && c.pos >= o.pos && c.pos < op);
+            if (overtaken.length && overtaken.every(c => (newPit.get(c.number) || 0) > (c.pitStops || 0))) continue;
             if (op - o.pos === 1) {
               const passed = j.order.find(c => c.number !== o.number && oldPos.get(c.number) === o.pos && c.pos === o.pos + 1);
               events.push(passed ? `${o.name} passes ${passed.name} for ${liveOrdinal(o.pos)}` : `${o.name} moves up to ${liveOrdinal(o.pos)}`);
@@ -234,9 +249,6 @@ export function LiveRunningOrder({ hub }) {
               events.push(`${o.name} gains ${op - o.pos} spots to ${liveOrdinal(o.pos)}`);
             }
           }
-          const oldLeader = prev.order.find(o => o.pos === 1);
-          const newLeader = j.order.find(o => o.pos === 1);
-          if (oldLeader && newLeader && oldLeader.number !== newLeader.number) events.push(`${newLeader.name} takes the lead from ${oldLeader.name}`);
           for (const o of j.order) {
             if ((o.pitStops || 0) > (oldPit.get(o.number) || 0)) {
               const op2 = oldPos.get(o.number);
@@ -256,12 +268,13 @@ export function LiveRunningOrder({ hub }) {
             if (fresh.length) setTimeline(t => [...fresh.reverse(), ...t].slice(0, 300));
           }
         }
-        prevRef.current = { order: j.order, flag: j.flag };
-      } catch (e) { if (alive) setData(null); }
+        prevRef.current = { order: j.order, flag: j.flag, stage: j.stage };
+      } catch (e) { /* keep last good data; the FEED DELAYED banner covers outages */ }
     };
     load();
     const t = setInterval(load, 35000);
-    return () => { alive = false; clearInterval(t); };
+    const tick = setInterval(() => { if (alive) setNowTs(Date.now()); }, 30000);
+    return () => { alive = false; clearInterval(t); clearInterval(tick); };
   }, [hub ? hub.slug : null]);
   if (!data) return null;
   const flagColors = { GREEN: T.green, CAUTION: "#f59e0b", "RED FLAG": T.red, CHECKERED: T.textDim };
@@ -278,6 +291,9 @@ export function LiveRunningOrder({ hub }) {
         )}
         {data.stage != null && (
           <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Stage {data.stage}</span>
+        )}
+        {data.updatedAt && (nowTs - Date.parse(data.updatedAt) > 180000) && (
+          <span style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>FEED DELAYED</span>
         )}
         <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>refreshes every 35s</span>
       </div>
