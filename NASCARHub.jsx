@@ -198,8 +198,9 @@ export default function NASCARHub() {
   const [dfsDisabled, setDfsDisabled] = useState([]);
   const [qualPractice, setQualPractice] = useState(null);
 
-  // Blog state — persisted via Supabase
+  // Blog state — persisted via Supabase (one small row per post)
   const [blogPosts, setBlogPosts] = useState([]);
+  const blogPostsRef = useRef([]);
 
   // Tool Usage — per-tool counters, persisted via Supabase
   const [toolUsage, setToolUsage] = useState({});
@@ -317,16 +318,49 @@ export default function NASCARHub() {
     } catch (e) { console.error("DFS qualifying save:", e); }
   }, []);
 
-  const saveBlogPosts = useCallback(async (updated) => {
+  // Save a single blog post: one small row (blogpost:<id>) instead of
+  // rewriting the entire posts array on every save.
+  const saveBlogPost = useCallback(async (post) => {
     try {
-      const { error } = await sb.from("app_state").upsert({ key:"blogPosts", value:updated }, { onConflict:"key" });
+      // Self-heal: if the legacy array row is newer than the per-post rows
+      // (e.g. written by older code), backfill per-post rows from it first.
+      const { data: legacy } = await sb.from("app_state").select("*").eq("key","blogPosts");
+      const legacyArr = legacy?.[0]?.value;
+      const legacyTs = legacy?.[0]?.updated_at ? +new Date(legacy[0].updated_at) : 0;
+      const { data: existing } = await sb.from("app_state").select("key,updated_at").like("key","blogpost:*");
+      const perPostTs = (existing||[]).reduce((m,r)=>Math.max(m, r.updated_at ? +new Date(r.updated_at) : 0), 0);
+      if (Array.isArray(legacyArr) && legacyTs > perPostTs) {
+        for (const lp of legacyArr) {
+          if (!lp?.id) continue;
+          const { error: be } = await sb.from("app_state").upsert({ key:`blogpost:${lp.id}`, value:lp }, { onConflict:"key" });
+          if (be) throw be;
+        }
+      }
+      const { error } = await sb.from("app_state").upsert({ key:`blogpost:${post.id}`, value:post }, { onConflict:"key" });
       if (error) throw error;
+      const arr = blogPostsRef.current || [];
+      const next = arr.some(q=>q.id===post.id) ? arr.map(q=>q.id===post.id?post:q) : [...arr, post];
+      blogPostsRef.current = next;
+      setBlogPosts(next);
+      return { ok:true };
     } catch (e) {
-      console.error("Blog posts save:", e);
-      return false;
+      console.error("Blog post save:", e);
+      return { ok:false, detail:(e?.message || String(e)).slice(0,140) };
     }
-    setBlogPosts(updated);
-    return true;
+  }, []);
+
+  const deleteBlogPost = useCallback(async (postId) => {
+    try {
+      const { error } = await sb.from("app_state").delete().eq("key",`blogpost:${postId}`);
+      if (error) throw error;
+      const next = (blogPostsRef.current||[]).filter(q=>q.id!==postId);
+      blogPostsRef.current = next;
+      setBlogPosts(next);
+      return { ok:true };
+    } catch (e) {
+      console.error("Blog post delete:", e);
+      return { ok:false };
+    }
   }, []);
 
   // Increment a tool usage counter — queues if Supabase hasn't loaded yet
@@ -410,7 +444,7 @@ export default function NASCARHub() {
       if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
       if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
       if (qpRows?.[0]) setQualPractice(qpRows[0].value||null);
-      if (bpRows?.[0]) setBlogPosts(bpRows[0].value||[]);
+      if (bpRows?.[0]) { const bv = bpRows[0].value||[]; blogPostsRef.current = bv; setBlogPosts(bv); }
       setSbStatus("live");
     });
     // Load tool usage separately (it's also in app_state)
@@ -662,7 +696,8 @@ export default function NASCARHub() {
           qualPractice={qualPractice}
           onQualPracticeSave={saveQualPractice}
           blogPosts={blogPosts}
-          onBlogSave={saveBlogPosts}
+          onBlogSavePost={saveBlogPost}
+          onBlogDeletePost={deleteBlogPost}
         />
         </Suspense>
 
