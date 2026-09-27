@@ -195,21 +195,37 @@ export function LiveRunningOrder({ hub }) {
   const [timeline, setTimeline] = useState([]);
   const prevRef = useRef(null);
   const seenRef = useRef(new Set());
+  const historyLoadedRef = useRef(false);
+  // Backfill the recorder's timeline history. Retries on failure: a single
+  // flaky read must not leave the timeline permanently empty. Also called
+  // from the poll loop below until it succeeds (self-healing).
+  const loadHistory = () => {
+    if (!hub || !hub.nascarRaceId || historyLoadedRef.current) return;
+    let tries = 0;
+    const attempt = () => {
+      tries++;
+      sb.from("app_state").select("value").eq("key", `livetimeline:${hub.nascarRaceId}`).maybeSingle()
+        .then(({ data: row }) => {
+          if (row && row.value && Array.isArray(row.value.events)) {
+            const evs = row.value.events.filter(e => e && e.text).slice(0, 200);
+            evs.forEach(e => seenRef.current.add(`${e.lap}:${e.text}`));
+            setTimeline(evs);
+            historyLoadedRef.current = true;
+          } else if (tries < 4) {
+            setTimeout(attempt, 2500 * tries);
+          }
+        })
+        .catch(() => { if (tries < 4) setTimeout(attempt, 2500 * tries); });
+    };
+    attempt();
+  };
   const [nowTs, setNowTs] = useState(() => Date.now());
   // Load the recorder's back-history so the timeline is complete even when
   // the page is opened mid-race. Live-derived events below dedupe against it.
   useEffect(() => {
     if (!hub || !hub.nascarRaceId) return;
-    let alive = true;
-    sb.from("app_state").select("value").eq("key", `livetimeline:${hub.nascarRaceId}`).maybeSingle()
-      .then(({ data: row }) => {
-        if (!alive || !row || !row.value || !Array.isArray(row.value.events)) return;
-        const evs = row.value.events.filter(e => e && e.text).slice(0, 200);
-        evs.forEach(e => seenRef.current.add(`${e.lap}:${e.text}`));
-        setTimeline(evs);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
+    historyLoadedRef.current = false;
+    loadHistory();
   }, [hub ? hub.slug : null]);
   useEffect(() => {
     if (!hub || !hub.nascarRaceId) return;
@@ -221,6 +237,7 @@ export function LiveRunningOrder({ hub }) {
         if (!alive) return;
         if (!(j && j.live)) { setData(null); return; }
         setData(j);
+        if (!historyLoadedRef.current) loadHistory();
         const prev = prevRef.current;
         if (prev && prev.order && prev.order.length) {
           const events = [];
