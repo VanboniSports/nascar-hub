@@ -1,0 +1,17 @@
+{
+  "appId": "com.vanbonisports.hub",
+  "appName": "Vanboni Sports",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#090e14",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#090e14"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+import{b}from"./index-D5MaO8M0.js";function g(r){return r>=85?{bg:"rgba(255,193,7,0.08)",border:b.gold}:r>=75?{bg:"rgba(30,144,255,0.08)",border:b.accent}:r>=68?{bg:"rgba(106,155,191,0.06)",border:b.textMid}:r>=63?{bg:"rgba(30,60,90,0.06)",border:"#4a7a9b"}:{bg:"rgba(20,40,60,0.04)",border:"#3d6a85"}}export{g};
