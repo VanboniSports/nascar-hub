@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     const vehicles = (f.vehicles || [])
       .slice()
       .sort((a, b) => (a.running_position || 999) - (b.running_position || 999));
-    const order = vehicles.slice(0, 15).map((v) => ({
+    const order = vehicles.map((v) => ({
       pos: v.running_position,
       number: v.vehicle_number,
       name: cleanName(v.driver && v.driver.full_name),
@@ -71,6 +71,7 @@ export default async function handler(req, res) {
             ? "+" + Number(v.delta).toFixed(2) + "s"
             : "",
       running: v.status === 1,
+      pitStops: (v.pit_stops || []).filter(s => (s.pit_in_lap_count || 0) > 0).length,
     }));
 
     res.status(200).json({
