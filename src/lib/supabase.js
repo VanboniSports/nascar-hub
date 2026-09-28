@@ -37,8 +37,10 @@ export async function loadFromSupabase() {
       sb.from("season_stats").select("*"),
       sb.from("rating_history").select("*").order("created_at",{ascending:true}),
       // Every app_state key in one round trip. Excludes the legacy ~9MB
-      // blogPosts blob; its timestamp is checked separately below.
-      sb.from("app_state").select("*").neq("key","blogPosts"),
+      // blogPosts blob AND the individual blogpost:* rows (~26MB total);
+      // the page loads only the 7KB blogIndex, full bodies lazy-load on open.
+      // Timestamps are checked separately below.
+      sb.from("app_state").select("*").neq("key","blogPosts").not("key","like","blogpost:*"),
       // Legacy row: fetch ONLY its timestamp for the freshness check. The old
       // single-blob value is downloaded only if the fallback is needed.
       sb.from("app_state").select("key,updated_at").eq("key","blogPosts"),
