@@ -1,0 +1,36 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', 'ios/**', 'capacitor.config.json', 'dist/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build web app
+        run: |
+          npm ci
+          npm run build
+      - name: Capacitor sync
+        run: npx cap sync android
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vanboni-sports-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
