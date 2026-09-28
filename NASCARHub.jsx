@@ -48,6 +48,7 @@ const TabLoading = () => (
 
 
 
+const isNativeApp = typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.() === true;
 const CSV_URL = "https://raw.githubusercontent.com/VanboniSports/nascar-hub/main/nascar_scraped_data.csv";
 
 
@@ -697,7 +698,8 @@ export default function NASCARHub() {
           )}
         </div>
 
-        {/* GLOBAL ADMIN */}
+        {/* GLOBAL ADMIN — hidden in native app */}
+        {!isNativeApp && (
         <Suspense fallback={null}>
         <GlobalAdminPanel
           drivers={drivers}
@@ -729,6 +731,7 @@ export default function NASCARHub() {
           onBlogDeletePost={deleteBlogPost}
         />
         </Suspense>
+        )}
 
         {/* FOOTER */}
         <footer className="nascar-footer" style={{ borderTop:`1px solid ${T.border}`, padding:"7px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", background:T.footerBg }}>
