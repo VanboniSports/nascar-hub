@@ -1,12 +1,10 @@
 name: Android Build
 
-
 on:
   push:
     branches: [main]
     paths: ['android/**', 'ios/**', 'capacitor.config.json', 'dist/**']
   workflow_dispatch:
-
 
 jobs:
   build:
@@ -24,8 +22,11 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Capacitor sync
-        run: ./node_modules/.bin/cap sync android
+      - name: Copy web assets to Android
+        run: |
+          rm -rf android/app/src/main/assets/public
+          mkdir -p android/app/src/main/assets
+          cp -r dist android/app/src/main/assets/public
       - name: Build APK
         run: |
           cd android
