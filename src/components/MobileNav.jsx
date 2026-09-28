@@ -22,13 +22,14 @@ export function useIsMobile() {
   return mobile;
 }
 
-// 5 primary tabs + a "More" sheet for the rest. Tab ids match TABS in NASCARHub.jsx.
+// 6 primary tabs + a "More" sheet for the rest. Tab ids match TABS in NASCARHub.jsx.
 const PRIMARY_TABS = [
   { id: "race",      label: "Race Hub",  icon: "Car"    },
+  { id: "sessions",  label: "Sessions",  icon: "Flag"   },
   { id: "races",     label: "Races",     icon: "Flag"   },
   { id: "predictor", label: "Predictor", icon: "Trend"  },
   { id: "dfs",       label: "DFS",       icon: "Trophy" },
-  { id: "blog",      label: "Blog",      icon: "Edit"   },
+  { id: "season",    label: "Season",    icon: "Chart"  },
 ];
 const MORE_TABS = [
   { id: "power",     label: "Power Rankings", icon: "Trophy" },
@@ -36,7 +37,7 @@ const MORE_TABS = [
   { id: "scorecard", label: "Scorecard",      icon: "Trophy" },
   { id: "tracks",    label: "Track Stats",    icon: "Flag"   },
   { id: "analytics", label: "Driver Analytics", icon: "Trend"},
-  { id: "season",    label: "Season Stats",   icon: "Chart"  },
+  { id: "blog",      label: "Blog",           icon: "Edit"   },
 ];
 
 function BarButton({ tab, active, onTab }) {
