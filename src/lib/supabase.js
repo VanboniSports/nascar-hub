@@ -46,11 +46,7 @@ export async function loadFromSupabase() {
     // Partition the app_state rows by key.
     const byKey = {};
     (stateRows||[]).forEach(r => {
-      if (r.key && r.key.startsWith("blogpost:")) {
-        (byKey["blogpost:*"] = byKey["blogpost:*"] || []).push(r);
-      } else {
-        byKey[r.key] = [r];
-      }
+      byKey[r.key] = [r];
     });
     const prRows = byKey["prevRanks"] || [];
     const rfRows = byKey["recentFinishes"] || [];
@@ -60,19 +56,26 @@ export async function loadFromSupabase() {
     const dsRows = byKey["dfsSalaries"] || [];
     const ddRows = byKey["dfsDisabled"] || [];
     const qpRows = byKey["dfsQualifying"] || [];
-    const bpPostRows = byKey["blogpost:*"] || [];
-    // Blog posts: one small row per post (blogpost:<id>). Falls back to the
-    // legacy single blogPosts array row when per-post rows are absent or older.
-    const legacyTs = bpLegacyMeta?.[0]?.updated_at ? +new Date(bpLegacyMeta[0].updated_at) : 0;
-    const perPostTs = (bpPostRows||[]).reduce((m,r)=>Math.max(m, r.updated_at ? +new Date(r.updated_at) : 0), 0);
+    // Blog posts: page load fetches ONLY the lightweight index (id/title/date/
+    // excerpt, ~7KB). Full post bodies (which total ~26MB with images) are
+    // lazy-loaded when a post is opened. Falls back to per-post rows, then to
+    // the legacy single blogPosts blob, if the index is missing.
+    const biRows = byKey["blogIndex"] || [];
     let bpRows;
-    if (bpPostRows?.length && perPostTs >= legacyTs) {
-      bpRows = [{ value: bpPostRows.map(r=>r.value) }];
+    if (biRows?.[0]?.value) {
+      bpRows = [{ value: biRows[0].value, indexOnly: true }];
     } else {
-      // Rare fallback path: per-post rows missing or stale, fetch legacy blob.
-      const { data:bpLegacyRows } = await sb.from("app_state").select("*").eq("key","blogPosts");
-      const legacyArr = bpLegacyRows?.[0]?.value;
-      bpRows = Array.isArray(legacyArr) ? [{ value: legacyArr }] : [];
+      const bpPostRows = (stateRows||[]).filter(r => r.key && r.key.startsWith("blogpost:"));
+      const legacyTs = bpLegacyMeta?.[0]?.updated_at ? +new Date(bpLegacyMeta[0].updated_at) : 0;
+      const perPostTs = (bpPostRows||[]).reduce((m,r)=>Math.max(m, r.updated_at ? +new Date(r.updated_at) : 0), 0);
+      if (bpPostRows?.length && perPostTs >= legacyTs) {
+        bpRows = [{ value: bpPostRows.map(r=>r.value) }];
+      } else {
+        // Rare fallback path: per-post rows missing or stale, fetch legacy blob.
+        const { data:bpLegacyRows } = await sb.from("app_state").select("*").eq("key","blogPosts");
+        const legacyArr = bpLegacyRows?.[0]?.value;
+        bpRows = Array.isArray(legacyArr) ? [{ value: legacyArr }] : [];
+      }
     }
     return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
