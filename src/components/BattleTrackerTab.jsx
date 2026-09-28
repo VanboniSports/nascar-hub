@@ -234,7 +234,7 @@ export function BattleTrackerTab({ battleRaces, incrementTool }) {
           </div>
         </div>
       </InfoLegend>
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16, alignItems: "start" }}>
+      <div className="vbs-battle-grid" style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16, alignItems: "start" }}>
       {/* Races sidebar */}
       <div>
         <div style={{ fontSize: 10, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8, paddingLeft: 4, fontFamily: "'Barlow Condensed',sans-serif" }}>
