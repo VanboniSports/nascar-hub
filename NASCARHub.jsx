@@ -44,7 +44,7 @@ const TabLoading = () => (
 
 
 
-const CSV_URL = "https://vanbonisports.com/nascar_scraped_data.csv";
+const CSV_URL = "/nascar_scraped_data.csv";
 
 
 // ─────────────────────────────────────────────────────────────
