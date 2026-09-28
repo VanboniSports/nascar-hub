@@ -21,41 +21,48 @@ export async function loadFromSupabase() {
   try {
     // All independent queries fire at once instead of one-after-another:
     // on a phone each sequential round trip was adding its full latency.
+    // app_state is fetched as ONE query (all keys except the legacy blog
+    // blob) instead of a separate request per key, which matters most on
+    // high-latency cellular connections.
     const [
       { data:drvRows },
       { data:logRows },
       { data:statRows },
       { data:histRows },
-      { data:prRows },
-      { data:rfRows },
-      { data:raRows },
-      { data:spRows },
-      { data:btRows },
-      { data:dsRows },
-      { data:ddRows },
-      { data:qpRows },
-      { data:bpPostRows },
+      { data:stateRows },
       { data:bpLegacyMeta },
     ] = await Promise.all([
       sb.from("drivers").select("*"),
       sb.from("race_log").select("*").order("created_at",{ascending:false}),
       sb.from("season_stats").select("*"),
       sb.from("rating_history").select("*").order("created_at",{ascending:true}),
-      sb.from("app_state").select("*").eq("key","prevRanks"),
-      sb.from("app_state").select("*").eq("key","recentFinishes"),
-      sb.from("app_state").select("*").eq("key","raceArchive"),
-      sb.from("app_state").select("*").eq("key","seasonPoints"),
-      sb.from("app_state").select("*").eq("key","battleRaces"),
-      sb.from("app_state").select("*").eq("key","dfsSalaries"),
-      sb.from("app_state").select("*").eq("key","dfsDisabled"),
-      sb.from("app_state").select("*").eq("key","dfsQualifying"),
-      // Blog posts: one small row per post (blogpost:<id>). Falls back to the
-      // legacy single blogPosts array row when per-post rows are absent or older.
-      sb.from("app_state").select("*").like("key","blogpost:*"),
+      // Every app_state key in one round trip. Excludes the legacy ~9MB
+      // blogPosts blob; its timestamp is checked separately below.
+      sb.from("app_state").select("*").neq("key","blogPosts"),
       // Legacy row: fetch ONLY its timestamp for the freshness check. The old
-      // ~9MB single-blob value is downloaded only if the fallback is needed.
+      // single-blob value is downloaded only if the fallback is needed.
       sb.from("app_state").select("key,updated_at").eq("key","blogPosts"),
     ]);
+    // Partition the app_state rows by key.
+    const byKey = {};
+    (stateRows||[]).forEach(r => {
+      if (r.key && r.key.startsWith("blogpost:")) {
+        (byKey["blogpost:*"] = byKey["blogpost:*"] || []).push(r);
+      } else {
+        byKey[r.key] = [r];
+      }
+    });
+    const prRows = byKey["prevRanks"] || [];
+    const rfRows = byKey["recentFinishes"] || [];
+    const raRows = byKey["raceArchive"] || [];
+    const spRows = byKey["seasonPoints"] || [];
+    const btRows = byKey["battleRaces"] || [];
+    const dsRows = byKey["dfsSalaries"] || [];
+    const ddRows = byKey["dfsDisabled"] || [];
+    const qpRows = byKey["dfsQualifying"] || [];
+    const bpPostRows = byKey["blogpost:*"] || [];
+    // Blog posts: one small row per post (blogpost:<id>). Falls back to the
+    // legacy single blogPosts array row when per-post rows are absent or older.
     const legacyTs = bpLegacyMeta?.[0]?.updated_at ? +new Date(bpLegacyMeta[0].updated_at) : 0;
     const perPostTs = (bpPostRows||[]).reduce((m,r)=>Math.max(m, r.updated_at ? +new Date(r.updated_at) : 0), 0);
     let bpRows;
