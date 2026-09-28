@@ -6,17 +6,62 @@ import { PREDICTORS, PREDICTOR_COLORS } from "../data/siteMeta.js";
 import { HubStatusBadge, sectionTitle } from "./ui.jsx";
 import { MobileSection, MobileJumpNav, BackToTop } from "./MobileNav.jsx";
 import { Ic } from "./icons.jsx";
-import { getThisWeeksRace } from "../data/schedule.js";
+import { SCHEDULE, SCHEDULE_YEAR, getThisWeeksRace } from "../data/schedule.js";
 import { scoreEntry } from "../models/battle.js";
 
-export const RACE_HUBS = [
-  { slug:"kansas-2026", name:"Kansas II", officialName:"Hollywood Casino 400", track:"Kansas Speedway", date:"2026-09-27", dateLabel:"Sun Sep 27", trackType:"intermediate", length:1.5, laps:267, week:30,
+// ── RACE HUBS: auto-generated from the season schedule ─────────────────────────
+// Every week gets a hub automatically from src/data/schedule.js — no more
+// hardcoding one race at a time. Races with rich extras (editorial intro,
+// official race name, NASCAR live-feed race id) declare them in HUB_OVERRIDES;
+// every other week gets a fully working hub with a generic preview.
+// Newest week first, so olderHub/newerHub navigation keeps working.
+const HUB_OVERRIDES = {
+  30: {
+    slug:"kansas-2026",
+    officialName:"Hollywood Casino 400",
     nascarRaceId:5628,
     intro:[
       "Kansas Speedway is a 1.5-mile tri-oval outside Kansas City, and it has quietly become one of the best pure racing tracks in the Cup Series. The progressive banking gives drivers three or four usable grooves, so restarts get chaotic in the best way and track position is never quite safe. Long green-flag runs are the norm here, which means tire management decides about as many races as raw speed does.",
       "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
-    ] },
-];
+    ],
+  },
+  31: {
+    officialName:"South Point 400",
+    intro:[
+      "Las Vegas Motor Speedway is a 1.5-mile tri-oval in the Nevada desert, and the fall race is where the playoffs start to get serious. The progressive banking opens up multiple grooves, and as the desert sun drops the track gets slick — handling matters more here than outright speed. With the playoffs on the line, expect desperation to show up early.",
+      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
+    ],
+  },
+};
+
+const MONTH_IDX = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+const DAY_ABBR = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function hubFromSchedule(r) {
+  const ov = HUB_OVERRIDES[r.week] || {};
+  const [mon, day] = r.date.split(" ");
+  const d = new Date(SCHEDULE_YEAR, MONTH_IDX[mon], parseInt(day, 10));
+  const officialName = ov.officialName || r.name;
+  return {
+    slug: ov.slug || (r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-" + SCHEDULE_YEAR),
+    name: r.name,
+    officialName,
+    track: r.track,
+    date: `${SCHEDULE_YEAR}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+    dateLabel: `${DAY_ABBR[d.getDay()]} ${mon} ${d.getDate()}`,
+    trackType: r.type,
+    length: r.length,
+    laps: r.laps,
+    week: r.week,
+    ...(ov.nascarRaceId ? { nascarRaceId: ov.nascarRaceId } : {}),
+    intro: ov.intro || [
+      `${r.track} hosts the ${officialName}, a ${r.laps}-lap run on a ${r.length}-mile ${r.type} track. The full preview for this one is still coming together — check back through the week as practice, qualifying, and the race itself fill in the blanks.`,
+      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest.",
+    ],
+  };
+}
+
+export const RACE_HUBS = SCHEDULE.map(hubFromSchedule).reverse();
 // Predictors shown on race hub pages. The ML model is retired from hubs.
 
 
