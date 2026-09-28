@@ -70,6 +70,31 @@ export function findBattleForHub(battleRaces, hub) {
   }
   return byTrack[0] || null;
 }
+// Match a power-rankings race archive entry to a hub, so the race page can
+// show the full official results. Name match first, then closest date.
+
+// NASCAR Cup points for a finishing position: 40 for the win, 35 for 2nd,
+// then 34 down to 1 for the rest of the field.
+export function raceFinishPoints(fin) {
+  if (fin === 1) return 40;
+  if (fin >= 2 && fin <= 40) return 37 - fin;
+  return 0;
+}
+export function findArchiveForHub(raceArchive, hub) {
+  if (!hub || !raceArchive || !raceArchive.length) return null;
+  const norm = s => (s || "").toLowerCase().trim();
+  const byName = raceArchive.find(a => norm(a.raceName) === norm(hub.officialName) || norm(a.raceName) === norm(hub.name));
+  if (byName) return byName;
+  if (hub.date) {
+    const t = new Date(hub.date + "T12:00:00").getTime();
+    const close = raceArchive
+      .map(a => ({ a, dist: Math.abs(new Date(a.date).getTime() - t) }))
+      .filter(x => !isNaN(x.dist) && x.dist <= 3 * 86400000)
+      .sort((x, y) => x.dist - y.dist);
+    if (close.length) return close[0].a;
+  }
+  return null;
+}
 // Highest-scoring predictor for a race that has actual results.
 // `models` limits which predictors are eligible (race hubs exclude the
 // retired ML model; the Battle Tracker tab keeps its own list).
@@ -349,7 +374,7 @@ export function LiveRunningOrder({ hub }) {
 // RACE HUB PAGE — /race/<slug>
 
 
-export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab }) {
+export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab, raceArchive, drivers }) {
   if (!hub) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
@@ -376,6 +401,16 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
   const suckPickReason = battleRace && battleRace.suckPickReason;
   const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
   const winner = battleWinnerFor(battleRace, HUB_PREDICTORS);
+  // Full official results with points, from the power-rankings race archive.
+  // Falls back to the battle top-10 list until the archive has this race.
+  const archiveEntry = findArchiveForHub(raceArchive, hub);
+  const fullResults = archiveEntry && archiveEntry.results ? archiveEntry.results
+    .filter(r => r.fin > 0)
+    .map(r => {
+      const d = (drivers || []).find(x => String(x.num) === String(r.num));
+      return { ...r, name: d ? d.name : `Car #${r.num}`, pts: raceFinishPoints(r.fin) + (r.sp || 0) };
+    })
+    .sort((a, b) => a.fin - b.fin) : null;
   const typeColor = TC[hub.trackType] || T.accent;
 
   const qpMatch = qualPractice && qualPractice.week === hub.week;
@@ -631,7 +666,29 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
                 </div>
               )}
             </div>
-            {actuals.slice(0, 10).map((d, i) => (
+            {fullResults ? (
+              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 4 }}>
+                <thead>
+                  <tr style={{ borderBottom: `2px solid ${T.border}` }}>
+                    {[["Pos", 44], ["Driver", null], ["Start", 52], ["Led", 48], ["Stage", 56], ["Pts", 52]].map(([h, w]) => (
+                      <th key={h} style={{ textAlign: h === "Driver" ? "left" : "center", fontSize: 10, fontWeight: 800, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1.5, textTransform: "uppercase", padding: "6px 4px", width: w || undefined }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {fullResults.map((r, i) => (
+                    <tr key={r.num} style={{ borderBottom: i < fullResults.length - 1 ? `1px solid ${T.border}` : "none", background: r.fin === 1 ? `${T.gold}0d` : "none" }}>
+                      <td data-label="Pos" style={{ textAlign: "center", fontSize: 11, fontWeight: 800, color: r.fin === 1 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>P{r.fin}</td>
+                      <td data-label="Driver" style={{ fontSize: 13, fontWeight: r.fin === 1 ? 800 : 500, color: T.text, padding: "6px 4px" }}>{r.name}</td>
+                      <td data-label="Start" style={{ textAlign: "center", fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.st > 0 ? `P${r.st}` : "—"}</td>
+                      <td data-label="Led" style={{ textAlign: "center", fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.led || 0}</td>
+                      <td data-label="Stage" style={{ textAlign: "center", fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.sp || 0}</td>
+                      <td data-label="Pts" style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: T.accentText, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.pts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : actuals.slice(0, 10).map((d, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: i < 9 ? `1px solid ${T.border}` : "none" }}>
                 <span style={{ width: 24, fontSize: 11, fontWeight: 800, color: i === 0 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>P{i + 1}</span>
                 <span style={{ fontSize: 13, fontWeight: i === 0 ? 800 : 500, color: T.text }}>{d}</span>
