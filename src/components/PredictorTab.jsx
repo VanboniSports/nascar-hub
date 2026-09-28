@@ -110,16 +110,6 @@ export function PredictorTab({ drivers, csvData, incrementTool }) {
           </div>
         </div>
       </InfoLegend>
-      {needsCsv && (
-        <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:10 }}>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", marginBottom:2 }}>CSV Data Source</div>
-            <div style={{ fontSize:12, color:hasCsv ? T.green : T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>
-              {hasCsv ? `✓ ${csvData.length.toLocaleString()} records loaded` : "No data — CSV loads automatically from GitHub. Use Admin Panel to upload manually."}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Race selector + generate button */}
       <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"flex-end" }}>
