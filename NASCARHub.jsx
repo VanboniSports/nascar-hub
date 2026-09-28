@@ -339,6 +339,20 @@ export default function NASCARHub() {
       }
       const { error } = await sb.from("app_state").upsert({ key:`blogpost:${post.id}`, value:post }, { onConflict:"key" });
       if (error) throw error;
+      // Maintain the lightweight blog index (used for fast page loads).
+      const toIndexEntry = (p) => {
+        const txt = (p.body||"").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
+        return { id:p.id, title:p.title||"", status:p.status||"", created_at:p.created_at||"",
+          category:p.category||"", excerpt: txt.length>150 ? txt.slice(0,150)+"..." : txt,
+          has_image: !!(p.featured_image||p.image) };
+      };
+      try {
+        const { data: biData } = await sb.from("app_state").select("value").eq("key","blogIndex");
+        const biArr = Array.isArray(biData?.[0]?.value) ? biData[0].value : [];
+        const entry = toIndexEntry(post);
+        const biNext = biArr.some(e=>e.id===post.id) ? biArr.map(e=>e.id===post.id?entry:e) : [...biArr, entry];
+        await sb.from("app_state").upsert({ key:"blogIndex", value:biNext }, { onConflict:"key" });
+      } catch (ie) { console.warn("blogIndex update failed:", ie); }
       const arr = blogPostsRef.current || [];
       const next = arr.some(q=>q.id===post.id) ? arr.map(q=>q.id===post.id?post:q) : [...arr, post];
       blogPostsRef.current = next;
@@ -354,6 +368,13 @@ export default function NASCARHub() {
     try {
       const { error } = await sb.from("app_state").delete().eq("key",`blogpost:${postId}`);
       if (error) throw error;
+      // Maintain the lightweight blog index.
+      try {
+        const { data: biData } = await sb.from("app_state").select("value").eq("key","blogIndex");
+        const biArr = Array.isArray(biData?.[0]?.value) ? biData[0].value : [];
+        const biNext = biArr.filter(e=>e.id!==postId);
+        await sb.from("app_state").upsert({ key:"blogIndex", value:biNext }, { onConflict:"key" });
+      } catch (ie) { console.warn("blogIndex delete failed:", ie); }
       const next = (blogPostsRef.current||[]).filter(q=>q.id!==postId);
       blogPostsRef.current = next;
       setBlogPosts(next);
