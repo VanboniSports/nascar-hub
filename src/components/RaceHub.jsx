@@ -74,9 +74,10 @@ export function findBattleForHub(battleRaces, hub) {
 // show the full official results. Name match first, then closest date.
 
 // NASCAR Cup points for a finishing position: 40 for the win, 35 for 2nd,
-// then 34 down to 1 for the rest of the field.
+// then 34 down to 1 for the rest of the field. 2026 rules add a 15-point
+// win bonus and 1 point for the fastest lap of the race.
 export function raceFinishPoints(fin) {
-  if (fin === 1) return 40;
+  if (fin === 1) return 40 + 15;
   if (fin >= 2 && fin <= 40) return 37 - fin;
   return 0;
 }
@@ -408,7 +409,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
     .filter(r => r.fin > 0)
     .map(r => {
       const d = (drivers || []).find(x => String(x.num) === String(r.num));
-      return { ...r, name: d ? d.name : `Car #${r.num}`, pts: raceFinishPoints(r.fin) + (r.sp || 0) };
+      return { ...r, name: d ? d.name : `Car #${r.num}`, pts: raceFinishPoints(r.fin) + (r.sp || 0) + (r.fl ? 1 : 0) };
     })
     .sort((a, b) => a.fin - b.fin) : null;
   const typeColor = TC[hub.trackType] || T.accent;
