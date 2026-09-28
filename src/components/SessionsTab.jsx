@@ -5,7 +5,7 @@ import { T } from "../theme.js";
 import { currentHub, hubStatus, LiveRunningOrder, findArchiveForHub, findBattleForHub } from "./RaceHub.jsx";
 import { HubStatusBadge, sectionTitle } from "./ui.jsx";
 
-export function SessionsTab({ qualPractice, raceArchive, battleRaces, drivers }) {
+export default function SessionsTab({ qualPractice, raceArchive, battleRaces, drivers }) {
   const hub = currentHub();
   if (!hub) {
     return (
