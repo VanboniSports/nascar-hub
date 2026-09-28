@@ -481,6 +481,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
   const [starts, setStarts] = useState({});
   const [lapsLed, setLapsLed] = useState({});
   const [stagePts, setStagePts] = useState({});
+  const [fastLap, setFastLap] = useState({});
   const [msg, setMsg] = useState("");
 
   // Battle Tracker admin state
@@ -528,10 +529,11 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
     const results = drivers.map(d => ({
       num:d.num, fin:parseInt(finishes[d.num])||0,
       st:parseInt(starts[d.num])||0, led:parseInt(lapsLed[d.num])||0, sp:parseInt(stagePts[d.num])||0,
+      fl:fastLap[d.num]?1:0,
     })).filter(r => r.fin > 0);
     if (results.length === 0) { setMsg("No finish positions entered."); return; }
     onRaceApplied({ raceName, trackType, totalLaps:parseInt(totalLaps)||200, results });
-    setFinishes({}); setStarts({}); setLapsLed({}); setStagePts({});
+    setFinishes({}); setStarts({}); setLapsLed({}); setStagePts({}); setFastLap({});
     setRaceName(""); setMsg(`✓ ${raceName} applied — ${results.length} drivers updated.`);
   };
 
@@ -729,7 +731,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                     <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
                       <thead>
                         <tr style={{ borderBottom:`1px solid ${T.border}` }}>
-                          {["Driver","Finish","Start","Laps Led","Stage Pts"].map(h => (
+                          {["Driver","Finish","Start","Laps Led","Stage Pts","Fast Lap"].map(h => (
                             <th key={h} style={{ padding:"10px 10px", fontSize:10, fontWeight:700, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif", textAlign:h==="Driver"?"left":"center" }}>{h}</th>
                           ))}
                         </tr>
@@ -748,6 +750,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                               <td style={{ textAlign:"center", padding:"6px 8px" }}>{numInp(starts[d.num], setStarts, 40, false)}</td>
                               <td style={{ textAlign:"center", padding:"6px 8px" }}>{numInp(lapsLed[d.num], setLapsLed, 999, false)}</td>
                               <td style={{ textAlign:"center", padding:"6px 8px" }}>{numInp(stagePts[d.num], setStagePts, 20, false)}</td>
+                              <td style={{ textAlign:"center", padding:"6px 8px" }}><input type="checkbox" checked={!!fastLap[d.num]} onChange={e=>setFastLap(prev=>({...prev,[d.num]:e.target.checked?1:0}))} style={{ width:18, height:18, accentColor:T.gold }} /></td>
                             </tr>
                           );
                         })}
