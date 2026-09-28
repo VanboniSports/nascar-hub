@@ -384,7 +384,7 @@ export function HubStatusBadge({ status }) {
 
 export function sectionTitle(text, sub) {
   return (
-    <div style={{ marginBottom: 10 }}>
+    <div className="vbs-sectitle" style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 13, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>{text}</div>
       {sub && <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 2 }}>{sub}</div>}
     </div>

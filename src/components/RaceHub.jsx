@@ -4,6 +4,7 @@ import { T, TC, TL } from "../theme.js";
 import { sb } from "../lib/supabase.js";
 import { PREDICTORS, PREDICTOR_COLORS } from "../data/siteMeta.js";
 import { HubStatusBadge, sectionTitle } from "./ui.jsx";
+import { MobileSection, MobileJumpNav, BackToTop } from "./MobileNav.jsx";
 import { Ic } from "./icons.jsx";
 import { getThisWeeksRace } from "../data/schedule.js";
 import { scoreEntry } from "../models/battle.js";
@@ -406,6 +407,15 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
 
   const card = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" };
 
+  // Mobile jump-nav sections (rendered by MobileJumpNav, mobile only)
+  const jumpSections = [
+    ...(hub.intro && hub.intro.length > 0 ? [{ id: "preview", label: "Preview" }] : []),
+    { id: "predictions", label: "Predictions" },
+    { id: "calls", label: "My Calls" },
+    { id: "weekend", label: "Weekend" },
+    { id: "results", label: "Results" },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%" }}>
       {/* HERO */}
@@ -422,19 +432,25 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         </div>
       </div>
 
+      {/* MOBILE SECTION JUMP NAV — renders null on desktop */}
+      <MobileJumpNav sections={jumpSections} />
+
       {/* LIVE RUNNING ORDER — only renders while the race is actually live */}
       {/* LIVE RUNNING ORDER now lives in the Official Results tabs during the race */}
 
       {/* INTRO — per-race editorial, above the predictions */}
       {hub.intro && hub.intro.length > 0 && (
+      <MobileSection id="preview" title="Race Preview">
         <div style={{ ...card }}>
           {hub.intro.map((p, i) => (
             <p key={i} style={{ fontSize: 13, color: T.textMid, lineHeight: 1.75, margin: i > 0 ? "12px 0 0" : 0 }}>{p}</p>
           ))}
         </div>
+      </MobileSection>
       )}
 
       {/* PREDICTIONS */}
+      <MobileSection id="predictions" title="Model Predictions">
       <div>
         {sectionTitle("Model Predictions", hasAnyPredictions ? "Top 10 from each predictor, via the Battle Tracker" : null)}
         {!hasAnyPredictions ? (
@@ -481,7 +497,10 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         )}
       </div>
 
+      </MobileSection>
+
       {/* DARK HORSE + SUCK PICK */}
+      <MobileSection id="calls" title="My Calls">
       <div>
         {sectionTitle("My Calls")}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
@@ -506,7 +525,10 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         </div>
       </div>
 
+      </MobileSection>
+
       {/* WEEKEND TIMELINE */}
+      <MobileSection id="weekend" title="Race Weekend">
       <div>
         {sectionTitle("Race Weekend")}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -525,6 +547,8 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         </div>
       </div>
 
+      </MobileSection>
+
       {/* DFS CALLOUT */}
       <div style={{ ...card, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: `linear-gradient(135deg, ${T.goldBg}, ${T.surface} 70%)` }}>
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -537,6 +561,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
       </div>
 
       {/* RESULTS — tabbed: practice / qualifying before the race, live during, race results after */}
+      <MobileSection id="results" title="Official Results">
       <div>
         {sectionTitle("Official Results")}
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
@@ -616,6 +641,8 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         )}
       </div>
 
+      </MobileSection>
+
       {/* PREV / NEXT */}
       <div style={{ display: "flex", gap: 10 }}>
         <button disabled={!olderHub} onClick={() => olderHub && onOpenRace(olderHub.slug)} style={{ flex: 1, padding: "10px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: olderHub ? T.textMid : T.textDim, fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", cursor: olderHub ? "pointer" : "default", opacity: olderHub ? 1 : 0.5 }}>
@@ -625,6 +652,9 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
           {newerHub ? `${newerHub.name} →` : "No newer race →"}
         </button>
       </div>
+
+      {/* MOBILE BACK-TO-TOP — renders null on desktop */}
+      <BackToTop />
     </div>
   );
 }

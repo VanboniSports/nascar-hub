@@ -29,6 +29,7 @@ const DFSTab = lazy(() => import("./src/components/DFSTab.jsx"));
 const BlogTab = lazy(() => import("./src/components/BlogTab.jsx"));
 const GlobalAdminPanel = lazy(() => import("./src/components/AdminPanel.jsx"));
 import { WelcomeModal } from "./src/components/ui.jsx";
+import { MobileBottomBar } from "./src/components/MobileNav.jsx";
 
 const TabLoading = () => (
   <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10, padding:"60px 24px", color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", fontSize:12 }}>
@@ -583,32 +584,32 @@ export default function NASCARHub() {
 
         {/* HEADER */}
         <header style={{ background:T.headerBg, borderBottom:`1px solid ${T.border}`, padding:"12px 24px 0", position:"sticky", top:0, zIndex:100 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:14, paddingBottom:10 }}>
+          <div className="nascar-brandrow" style={{ display:"flex", alignItems:"center", gap:14, paddingBottom:10 }}>
             <div style={{ width:32, height:32, background:"linear-gradient(135deg,#1e90ff,#0066cc)", clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff" }}><Ic.Car /></div>
             <div>
-              <div style={{ fontSize:20, fontWeight:900, lineHeight:1, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:3, textTransform:"uppercase" }}>NASCAR <span style={{ color:T.accent }}>HUB</span></div>
+              <div className="nascar-brandtitle" style={{ fontSize:20, fontWeight:900, lineHeight:1, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:3, textTransform:"uppercase" }}>NASCAR <span style={{ color:T.accent }}>HUB</span></div>
               <div style={{ fontSize:8, color:T.textDim, letterSpacing:3, textTransform:"uppercase", fontFamily:"'IBM Plex Mono',monospace" }}>2026 ANALYTICS SYSTEM</div>
             </div>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:4, paddingLeft:14, borderLeft:`1px solid ${T.border}` }}>
+            <div className="nascar-bybadge" style={{ display:"flex", alignItems:"center", gap:8, marginLeft:4, paddingLeft:14, borderLeft:`1px solid ${T.border}` }}>
               <span style={{ fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1.5, textTransform:"uppercase", whiteSpace:"nowrap" }}>by</span>
               <img src={VBS_LOGO} alt="Vanboni Sports" style={{ height:28, opacity:0.9 }} />
             </div>
             <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:12 }}>
               {(() => { const total = Object.values(toolUsage).reduce((a,b)=>a+b,0); return total > 0 ? (
-                <div style={{ display:"flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:6, background:T.accentSoft, border:`1px solid ${T.accent}30` }}>
+                <div className="nascar-toolsbadge" style={{ display:"flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:6, background:T.accentSoft, border:`1px solid ${T.accent}30` }}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
                   <span style={{ fontSize:11, fontWeight:700, color:T.accent, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5 }}>{total.toLocaleString()}</span>
                   <span style={{ fontSize:9, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1, textTransform:"uppercase" }}>tools used</span>
                 </div>
               ) : null; })()}
               {saving && <span style={{ fontSize:10, color:T.textDim, display:"flex", alignItems:"center", gap:5 }}><Ic.Spinner />Saving…</span>}
-              <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:10, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1 }}>
+              <div className="nascar-connstatus" style={{ display:"flex", alignItems:"center", gap:5, fontSize:10, fontFamily:"'IBM Plex Mono',monospace", letterSpacing:1 }}>
                 <span style={{ color:sbColor, fontSize:8 }}>●</span>
-                <span style={{ color:sbColor }}>{sbLabel}</span>
+                <span className="nascar-conntext" style={{ color:sbColor }}>{sbLabel}</span>
               </div>
             </div>
           </div>
-          <nav style={{ display:"flex", overflowX:"auto", msOverflowStyle:"none", scrollbarWidth:"none" }}>
+          <nav className="nascar-topnav" style={{ display:"flex", overflowX:"auto", msOverflowStyle:"none", scrollbarWidth:"none" }}>
             {TABS.map(tab => {
               const active = tab.id === activeTab;
               return (
@@ -702,9 +703,9 @@ export default function NASCARHub() {
         </Suspense>
 
         {/* FOOTER */}
-        <footer style={{ borderTop:`1px solid ${T.border}`, padding:"7px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", background:T.footerBg }}>
+        <footer className="nascar-footer" style={{ borderTop:`1px solid ${T.border}`, padding:"7px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", background:T.footerBg }}>
           <span>NASCAR HUB v2.6 · Vanboni Sports</span>
-          <span>{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {(blogPosts||[]).filter(p=>p.status==="published").length} blog post{(blogPosts||[]).filter(p=>p.status==="published").length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {Object.keys(dfsSalaries?.dk||{}).length + Object.keys(dfsSalaries?.fd||{}).length > 0 ? `${Object.keys(dfsSalaries?.dk||{}).length}DK/${Object.keys(dfsSalaries?.fd||{}).length}FD salaries` : "no DFS salaries"} · {drivers.length} drivers</span>
+          <span className="nascar-footerstats">{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {(blogPosts||[]).filter(p=>p.status==="published").length} blog post{(blogPosts||[]).filter(p=>p.status==="published").length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {Object.keys(dfsSalaries?.dk||{}).length + Object.keys(dfsSalaries?.fd||{}).length > 0 ? `${Object.keys(dfsSalaries?.dk||{}).length}DK/${Object.keys(dfsSalaries?.fd||{}).length}FD salaries` : "no DFS salaries"} · {drivers.length} drivers</span>
           <span style={{ display:"flex", alignItems:"center", gap:10 }}>
             <span>2026 Cup Series</span>
             <a
@@ -728,6 +729,9 @@ export default function NASCARHub() {
             </a>
           </span>
         </footer>
+
+        {/* MOBILE BOTTOM TAB BAR — renders null on desktop */}
+        <MobileBottomBar activeTab={activeTab} onTab={handleTabChange} />
       </div>
     </>
   );
