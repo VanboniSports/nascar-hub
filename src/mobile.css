@@ -86,7 +86,8 @@
 
   /* ── Battle Tracker: stack sidebar + content vertically ──────────── */
   .vbs-battle-grid { grid-template-columns: 1fr !important; }
-  .vbs-battle-chart { padding: 14px 10px !important; overflow: hidden; }
+  .vbs-battle-grid > div { min-width: 0; max-width: 100%; }
+  .vbs-battle-chart { padding: 14px 10px !important; overflow: hidden; max-width: 100%; }
 
   /* ── Labeled stat rows in card tables ───────────────────────────── */
   .nascar-main td[data-label]::before {
