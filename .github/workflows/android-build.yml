@@ -1,11 +1,16 @@
 name: Android Build
 
 
+
+
 on:
   push:
     branches: [main]
     paths: ['android/**', 'ios/**', 'capacitor.config.json', 'dist/**']
   workflow_dispatch:
+
+
+
 
 
 jobs:
@@ -23,6 +28,7 @@ jobs:
       - name: Build web app
         run: |
           npm ci
+          cp nascar_scraped_data.csv public/nascar_scraped_data.csv
           npm run build
       - name: Copy web assets to Android
         run: |
