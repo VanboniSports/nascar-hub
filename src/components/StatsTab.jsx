@@ -202,14 +202,14 @@ export function SSStandingsTab({ csvData, drivers, seasonPoints }) {
                       <span style={{ color:mfgColor, fontWeight:600 }}>{r.mfg}</span>
                     </div>
                   </td>
-                  <td style={{ textAlign:"center", fontWeight:800, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, color:r.seasonPts!=null?T.accent:T.textDim }}>{r.seasonPts != null ? r.seasonPts : "—"}</td>
-                  <td style={{ textAlign:"center", fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, color:r.avgFinish<=10?T.green:r.avgFinish<=20?T.gold:T.red }}>{r.avgFinish.toFixed(1)}</td>
-                  <td style={{ textAlign:"center", fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", color:r.wins>0?T.gold:T.textDim }}>{r.wins||"—"}</td>
-                  <td style={{ textAlign:"center", color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.top5||"—"}</td>
-                  <td style={{ textAlign:"center", color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.top10||"—"}</td>
-                  <td style={{ textAlign:"center", color:r.lapsLed>0?"#a855f7":T.textDim, fontFamily:"monospace" }}>{r.lapsLed||"—"}</td>
-                  <td style={{ textAlign:"center", fontWeight:700, color:r.bestFinish===1?T.gold:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.bestFinish||"—"}</td>
-                  <td style={{ textAlign:"center", color:T.textMid, fontFamily:"monospace" }}>{r.races}</td>
+                  <td data-label="Pts" style={{ textAlign:"center", fontWeight:800, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, color:r.seasonPts!=null?T.accent:T.textDim }}>{r.seasonPts != null ? r.seasonPts : "—"}</td>
+                  <td data-label="Avg Fin" style={{ textAlign:"center", fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, color:r.avgFinish<=10?T.green:r.avgFinish<=20?T.gold:T.red }}>{r.avgFinish.toFixed(1)}</td>
+                  <td data-label="Wins" style={{ textAlign:"center", fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", color:r.wins>0?T.gold:T.textDim }}>{r.wins||"—"}</td>
+                  <td data-label="Top 5" style={{ textAlign:"center", color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.top5||"—"}</td>
+                  <td data-label="Top 10" style={{ textAlign:"center", color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.top10||"—"}</td>
+                  <td data-label="Laps Led" style={{ textAlign:"center", color:r.lapsLed>0?"#a855f7":T.textDim, fontFamily:"monospace" }}>{r.lapsLed||"—"}</td>
+                  <td data-label="Best Fin" style={{ textAlign:"center", fontWeight:700, color:r.bestFinish===1?T.gold:T.textMid, fontFamily:"'Barlow Condensed',sans-serif" }}>{r.bestFinish||"—"}</td>
+                  <td data-label="Races" style={{ textAlign:"center", color:T.textMid, fontFamily:"monospace" }}>{r.races}</td>
                 </tr>
               );
             })}

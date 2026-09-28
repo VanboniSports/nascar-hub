@@ -241,6 +241,19 @@ export function ComingSoon({ title, items=[] }) {
 
 export function WelcomeModal({ onDismiss }) {
   const [dontShow, setDontShow] = useState(false);
+  // Lock background scroll while the modal is open (desktop + mobile).
+  // Targets both html and body: mobile browsers vary on which element scrolls.
+  useEffect(() => {
+    const html = document.documentElement;
+    const prevHtml = html.style.overflow;
+    const prevBody = document.body.style.overflow;
+    html.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
   const handleDismiss = () => {
     if (dontShow) {
       try { localStorage.setItem("nascar_hub_welcome_dismissed", "1"); } catch {}
@@ -384,7 +397,7 @@ export function HubStatusBadge({ status }) {
 
 export function sectionTitle(text, sub) {
   return (
-    <div style={{ marginBottom: 10 }}>
+    <div className="vbs-sectitle" style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 13, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>{text}</div>
       {sub && <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 2 }}>{sub}</div>}
     </div>
