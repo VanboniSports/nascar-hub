@@ -44,7 +44,7 @@ const TabLoading = () => (
 
 
 
-const CSV_URL = "/nascar_scraped_data.csv";
+const CSV_URL = "https://raw.githubusercontent.com/VanboniSports/nascar-hub/main/nascar_scraped_data.csv";
 
 
 // ─────────────────────────────────────────────────────────────
