@@ -651,7 +651,7 @@ export default function NASCARHub() {
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
-              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} />}
+              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
