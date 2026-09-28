@@ -241,11 +241,18 @@ export function ComingSoon({ title, items=[] }) {
 
 export function WelcomeModal({ onDismiss }) {
   const [dontShow, setDontShow] = useState(false);
-  // Lock background scroll while the modal is open (desktop + mobile)
+  // Lock background scroll while the modal is open (desktop + mobile).
+  // Targets both html and body: mobile browsers vary on which element scrolls.
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const html = document.documentElement;
+    const prevHtml = html.style.overflow;
+    const prevBody = document.body.style.overflow;
+    html.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      html.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
   }, []);
   const handleDismiss = () => {
     if (dontShow) {

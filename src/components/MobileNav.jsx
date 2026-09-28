@@ -58,9 +58,38 @@ function BarButton({ tab, active, onTab }) {
   );
 }
 
+// Auto-labels every table cell from its thead on mobile, so card-style
+// tables show "Pts 2206" instead of a bare "2206". Runs only on mobile;
+// desktop tables are untouched.
+function useLabeledTables(active) {
+  useEffect(() => {
+    if (!active) return;
+    const labelTables = () => {
+      document.querySelectorAll("table").forEach(table => {
+        const heads = Array.from(table.querySelectorAll("thead th")).map(th =>
+          th.textContent.replace(/[▲▼]/g, "").trim()
+        );
+        if (heads.length === 0) return;
+        table.querySelectorAll("tbody tr").forEach(tr => {
+          Array.from(tr.children).forEach((td, i) => {
+            if (td.tagName === "TD" && !td.hasAttribute("data-label") && heads[i]) {
+              td.setAttribute("data-label", heads[i]);
+            }
+          });
+        });
+      });
+    };
+    labelTables();
+    const obs = new MutationObserver(labelTables);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, [active]);
+}
+
 export function MobileBottomBar({ activeTab, onTab }) {
   const mobile = useIsMobile();
   const [moreOpen, setMoreOpen] = useState(false);
+  useLabeledTables(mobile);
   if (!mobile) return null;
   const moreActive = MORE_TABS.some(t => t.id === activeTab);
   const go = (id) => { setMoreOpen(false); onTab(id); };
