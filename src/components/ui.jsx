@@ -241,6 +241,12 @@ export function ComingSoon({ title, items=[] }) {
 
 export function WelcomeModal({ onDismiss }) {
   const [dontShow, setDontShow] = useState(false);
+  // Lock background scroll while the modal is open (desktop + mobile)
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
   const handleDismiss = () => {
     if (dontShow) {
       try { localStorage.setItem("nascar_hub_welcome_dismissed", "1"); } catch {}
