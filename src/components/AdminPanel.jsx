@@ -1683,6 +1683,19 @@ export function BlogAdminSection({ blogPosts, onBlogSavePost, onBlogDeletePost }
 
   const openEditor = (post) => {
     if (post) {
+      // If this is an index-only entry (no body), fetch the full post first.
+      if (!post.body && post.id) {
+        setBlogMsg("Loading post…");
+        import("../lib/supabase.js").then(({ sb }) => {
+          if (!sb) { openEditor({ ...post, body: "" }); return; }
+          sb.from("app_state").select("value").eq("key", `blogpost:${post.id}`).then(({ data }) => {
+            const full = data?.[0]?.value;
+            setBlogMsg("");
+            openEditor(full && full.body ? full : { ...post, body: "" });
+          }).catch(() => { setBlogMsg(""); openEditor({ ...post, body: "" }); });
+        }).catch(() => { setBlogMsg(""); openEditor({ ...post, body: "" }); });
+        return;
+      }
       setEditingPost(post);
       setBlogTitle(post.title || "");
       setBlogCategory(post.category || "General");
