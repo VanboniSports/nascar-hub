@@ -4,6 +4,9 @@
 
 @media (max-width: 768px) {
 
+   /* ── Safe area for Android status bar / notch ───────────────────── */
+  .nascar-brandrow { padding-top: max(12px, env(safe-area-inset-top)) !important; }
+
   /* ── 5. Slimmer header: one compact row ─────────────────────────── */
   .nascar-topnav { display: none !important; }
   .nascar-bybadge { display: none !important; }
@@ -17,7 +20,6 @@
   .nascar-main { padding: 16px 14px 110px !important; }
   .nascar-footer { margin-bottom: 72px; }
   .nascar-footer .nascar-footerstats { display: none !important; }
-
   /* ── 2. Readable type: 11-13px UI text -> 14px+ on mobile ────────── */
   .nascar-main { font-size: 16px; }
   .nascar-main [style*="font-size: 10px"],
