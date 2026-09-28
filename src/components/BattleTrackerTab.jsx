@@ -36,8 +36,8 @@ export function BattleAccuracyChart({ races }) {
   });
 
   return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+    <div className="vbs-battle-chart" style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
         <div style={{ fontSize: 10, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif" }}>Accuracy Over Time</div>
         <div style={{ display: "flex", gap: 6 }}>
           {[["cumulative", "Cumulative"], ["perrace", "Per Race"]].map(([val, lbl]) => (
@@ -230,15 +230,20 @@ export function BattleTrackerTab({ battleRaces, incrementTool }) {
           <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
             <span><span style={{ color:T.green }}>●</span> Green dot = actual race results entered &nbsp;|&nbsp; <span style={{ color:T.textDim }}>●</span> Gray dot = results pending</span>
             <span>Leaderboard ranks predictors by cumulative points across all scored races.</span>
-            <span>Click any race in the sidebar to see per-predictor breakdowns and which picks hit.</span>
+            <span>Use the race dropdown to see per-predictor breakdowns and which picks hit.</span>
           </div>
         </div>
       </InfoLegend>
       <div className="vbs-battle-grid" style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16, alignItems: "start" }}>
-      {/* Races sidebar */}
-      <div>
+      {/* Accuracy chart on top */}
+      <div style={{ gridColumn: "1 / -1" }}>
+        <BattleAccuracyChart races={battleRaces} />
+      </div>
+
+      {/* Race selector dropdown */}
+      <div style={{ gridColumn: "1 / -1" }}>
         <div style={{ fontSize: 10, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8, paddingLeft: 4, fontFamily: "'Barlow Condensed',sans-serif" }}>
-          Races ({battleRaces.length})
+          Select Race ({battleRaces.length})
         </div>
         {battleRaces.length === 0 ? (
           <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, textAlign: "center", padding: 28, color: T.textDim }}>
@@ -246,30 +251,34 @@ export function BattleTrackerTab({ battleRaces, incrementTool }) {
             <div style={{ fontSize: 13 }}>No races yet. Add your first race in the Admin panel below.</div>
           </div>
         ) : (
-          [...battleRaces].reverse().map((race) => {
-            const hasResults = race.actualResults?.length > 0;
-            const typeColor = BATTLE_TRACK_COLORS[race.trackType] || T.textDim;
-            return (
-              <div key={race.id} onClick={() => { setSelectedRace(race); setView("race"); }}
-                style={{ padding: "10px 14px", borderRadius: 10, cursor: "pointer", transition: "all 0.15s", border: `1px solid ${selectedRace?.id === race.id ? `${T.gold}40` : "transparent"}`, background: selectedRace?.id === race.id ? `${T.gold}08` : "transparent", display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}
-                onMouseEnter={e => { if (selectedRace?.id !== race.id) e.currentTarget.style.background = T.surface2; }}
-                onMouseLeave={e => { if (selectedRace?.id !== race.id) e.currentTarget.style.background = "transparent"; }}
-              >
-                <div style={{ width: 3, height: 30, borderRadius: 2, background: typeColor, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{race.raceName}</div>
-                  <div style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 1 }}>{race.date || "Date TBD"} · {race.trackType}</div>
-                </div>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: hasResults ? T.green : T.textDim, flexShrink: 0 }} />
-              </div>
-            );
-          })
+          <select
+            value=""
+            onChange={(e) => {
+              const race = battleRaces.find(r => String(r.id) === e.target.value);
+              if (race) { setSelectedRace(race); setView("race"); }
+            }}
+            style={{
+              width: "100%", minHeight: 48, padding: "0 14px", borderRadius: 10,
+              background: T.surface, border: `1px solid ${T.border}`, color: T.text,
+              fontSize: 15, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 600,
+              letterSpacing: 0.5, cursor: "pointer", marginBottom: 4,
+            }}
+          >
+            <option value="" disabled>Choose a race to see picks & results…</option>
+            {[...battleRaces].reverse().map((race) => {
+              const hasResults = race.actualResults?.length > 0;
+              return (
+                <option key={race.id} value={String(race.id)}>
+                  {hasResults ? "✓ " : ""}{race.raceName} · {race.date || "Date TBD"} · {race.trackType}
+                </option>
+              );
+            })}
+          </select>
         )}
       </div>
 
       {/* Main content */}
-      <div>
-        <BattleAccuracyChart races={battleRaces} />
+      <div style={{ gridColumn: "1 / -1" }}>
         <div style={{ fontSize: 10, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8, paddingLeft: 4, fontFamily: "'Barlow Condensed',sans-serif" }}>Predictor Leaderboard</div>
 
         {/* Scoring legend */}
