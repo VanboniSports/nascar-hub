@@ -34,10 +34,19 @@ export function BlogTab({ blogPosts, incrementTool }) {
     return text.length > 150 ? text.slice(0, 150) + "…" : text;
   };
 
-  // Handle clicking into a post — track the individual post view
+  // Handle clicking into a post — track the individual post view.
+  // Full bodies are lazy-loaded: the page-load index has only metadata.
   const openPost = useCallback((post) => {
-    setViewingPost(post);
     incrementTool?.("blog_post", { post_title: post.title, post_id: post.id });
+    if (post.body) { setViewingPost(post); return; }
+    setViewingPost({ ...post, _loadingBody: true });
+    import("../lib/supabase.js").then(({ sb }) => {
+      if (!sb) { setViewingPost(post); return; }
+      sb.from("app_state").select("value").eq("key", `blogpost:${post.id}`).then(({ data }) => {
+        const full = data?.[0]?.value;
+        setViewingPost(full && full.body ? full : post);
+      }).catch(() => setViewingPost(post));
+    }).catch(() => setViewingPost(post));
   }, [incrementTool]);
 
   // Load third-party embed scripts when the viewed post contains rich embeds.
@@ -73,6 +82,19 @@ export function BlogTab({ blogPosts, incrementTool }) {
 
   // Full article view
   if (viewingPost) {
+    if (viewingPost._loadingBody) {
+      return (
+        <div style={{ maxWidth:780, margin:"0 auto", animation:"fadeIn 0.2s ease" }}>
+          <button onClick={() => setViewingPost(null)} style={{
+            display:"flex", alignItems:"center", gap:6, padding:"8px 0", marginBottom:16,
+            background:"none", border:"none", color:T.accent, cursor:"pointer",
+            fontSize:13, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase",
+          }}><Ic.ArrowLeft /> Back to Blog</button>
+          <h1 style={{ fontSize:32, fontFamily:"'Barlow Condensed',sans-serif", margin:"0 0 16px" }}>{viewingPost.title}</h1>
+          <p style={{ color:T.textDim }}>Loading article…</p>
+        </div>
+      );
+    }
     return (
       <div style={{ maxWidth:780, margin:"0 auto", animation:"fadeIn 0.2s ease" }}>
         <button onClick={() => setViewingPost(null)} style={{
@@ -195,7 +217,7 @@ export function BlogTab({ blogPosts, incrementTool }) {
                 <h3 style={{ fontSize:18, fontWeight:800, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:0.5, color:T.text, margin:0, lineHeight:1.3 }}>
                   {post.title}
                 </h3>
-                <p style={{ fontSize:13, color:T.textDim, lineHeight:1.5, margin:0 }}>{getSnippet(post.body)}</p>
+                <p style={{ fontSize:13, color:T.textDim, lineHeight:1.5, margin:0 }}>{post.excerpt || getSnippet(post.body)}</p>
               </div>
             </button>
           ))}
