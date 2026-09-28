@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 
+
 // ── Phase-1 module split: pure logic lives in src/ (see src/*/<module>.js) ──
 import { TRACK_KEYS, INITIAL_DRIVERS, FULL_TIMER_NAMES, normalizeCsvDriverName } from "./src/data/drivers.js";
 import { processRace } from "./src/models/ratings.js";
@@ -16,6 +17,8 @@ import { Ic } from "./src/components/icons.jsx";
 import { sb, loadFromSupabase, saveToSupabase } from "./src/lib/supabase.js";
 import { logUsageEvent, tabIdFromPath, raceSlugFromPath, pathForTab, applyTabMeta, trackRacePageView, trackRaceTabView, applyRaceMeta } from "./src/lib/analytics.js";
 import { hubBySlug, findBattleForHub, currentHub, RacesTab, RaceHubPage, RaceHeroCard } from "./src/components/RaceHub.jsx";
+
+
 // Code-split: tabs are lazy-loaded so first paint ships only the Race Hub shell.
 // RaceHub.jsx stays eager (it renders the default Race Hub tab and the hero card).
 const PowerRankingsTab = lazy(() => import("./src/components/PowerRankingsTab.jsx"));
@@ -28,6 +31,7 @@ const DriverAnalyticsTab = lazy(() => import("./src/components/DriverAnalyticsTa
 const DFSTab = lazy(() => import("./src/components/DFSTab.jsx"));
 const BlogTab = lazy(() => import("./src/components/BlogTab.jsx"));
 const GlobalAdminPanel = lazy(() => import("./src/components/AdminPanel.jsx"));
+const SessionsTab = lazy(() => import("./src/components/SessionsTab.jsx"));
 import { WelcomeModal } from "./src/components/ui.jsx";
 import { MobileBottomBar } from "./src/components/MobileNav.jsx";
 
@@ -51,7 +55,9 @@ const CSV_URL = "https://raw.githubusercontent.com/VanboniSports/nascar-hub/main
 // SCHEDULE
 // ─────────────────────────────────────────────────────────────
 const TABS = [
+
   { id:"race",      label:"Race Hub",       icon:"Car"     },
+  { id:"sessions",  label:"Sessions",       icon:"Flag"    },
   { id:"power",     label:"Power Rankings", icon:"Trophy"  },
   { id:"predictor", label:"Race Predictor", icon:"Flag"    },
   { id:"tracker",   label:"Battle Tracker", icon:"Chart"   },
@@ -673,6 +679,7 @@ export default function NASCARHub() {
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
               {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
+              {activeTab === "sessions"  && <SessionsTab qualPractice={qualPractice} raceArchive={raceArchive} battleRaces={battleRaces} drivers={drivers} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
