@@ -28,6 +28,7 @@ export const TAB_ROUTES = {
   "/season": "season",
   "/dfs": "dfs",
   "/blog": "blog",
+  "/privacy": "privacy",
 };
 // NOTE: /race/<slug> pages are handled separately (tab id "race") via
 // raceSlugFromPath / applyRaceMeta / trackRacePageView below.
@@ -44,6 +45,7 @@ export const TAB_META = {
   season:    { title: "NASCAR Cup Series Season Stats & Standings | Vanboni Sports", desc: "2026 NASCAR Cup Series points standings and season-long driver statistics, updated weekly." },
   dfs:       { title: "NASCAR DFS Optimizer: DraftKings & FanDuel Lineups | Vanboni Sports", desc: "Build optimal NASCAR DFS lineups with projections, salaries and value plays for DraftKings and FanDuel." },
   blog:      { title: "Vanboni Sports Blog: NASCAR Predictions & Race Recaps | Vanboni Sports", desc: "Weekly NASCAR predictions, race recaps and model scorecards from Vanboni Sports." },
+  privacy:   { title: "Privacy Policy | Vanboni Sports", desc: "Privacy policy for vanbonisports.com and the Vanboni Sports mobile app: what data we collect and how it is used." },
 };
 
 

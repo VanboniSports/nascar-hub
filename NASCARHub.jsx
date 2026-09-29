@@ -32,6 +32,7 @@ const DFSTab = lazy(() => import("./src/components/DFSTab.jsx"));
 const BlogTab = lazy(() => import("./src/components/BlogTab.jsx"));
 const GlobalAdminPanel = lazy(() => import("./src/components/AdminPanel.jsx"));
 const SessionsTab = lazy(() => import("./src/components/SessionsTab.jsx"));
+const PrivacyTab = lazy(() => import("./src/components/PrivacyTab.jsx"));
 import { WelcomeModal } from "./src/components/ui.jsx";
 import { MobileBottomBar } from "./src/components/MobileNav.jsx";
 
@@ -701,6 +702,7 @@ export default function NASCARHub() {
               {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
               {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} qualPractice={qualPractice} incrementTool={incrementTool} />}
               {activeTab === "blog"      && <BlogTab blogPosts={blogPosts} incrementTool={incrementTool} />}
+              {activeTab === "privacy"   && <PrivacyTab />}
             </div>
             </Suspense>
           </main>
@@ -755,6 +757,13 @@ export default function NASCARHub() {
           <span className="nascar-footerstats">{raceArchive.length} race{raceArchive.length!==1?"s":""} archived · {battleRaces.length} battle race{battleRaces.length!==1?"s":""} · {(blogPosts||[]).filter(p=>p.status==="published").length} blog post{(blogPosts||[]).filter(p=>p.status==="published").length!==1?"s":""} · {csvLoading ? "loading CSV…" : csvData.length > 0 ? `${csvData.length} CSV records` : "no CSV"} · {Object.keys(dfsSalaries?.dk||{}).length + Object.keys(dfsSalaries?.fd||{}).length > 0 ? `${Object.keys(dfsSalaries?.dk||{}).length}DK/${Object.keys(dfsSalaries?.fd||{}).length}FD salaries` : "no DFS salaries"} · {drivers.length} drivers</span>
           <span style={{ display:"flex", alignItems:"center", gap:10 }}>
             <span>2026 Cup Series</span>
+            <a
+              href="/privacy"
+              onClick={(e) => { e.preventDefault(); handleTabChange("privacy"); try { window.scrollTo(0, 0); } catch (err) {} }}
+              style={{ color: T.textDim, fontSize: 11, textDecoration: "underline", cursor: "pointer" }}
+            >
+              Privacy
+            </a>
             <a
               href="https://docs.google.com/forms/d/e/1FAIpQLSclS_CfKMfb8MuCkeW1uLH6RSImBJTXSlF4FqfFjvjqPHn9uQ/viewform?usp=publish-editor"
               target="_blank"
