@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { T, TC, TL } from "../theme.js";
 import { Ic } from "./icons.jsx";
 import { TOOL_USAGE_KEYS, BLOG_CATEGORIES, BLOG_CAT_COLORS, BATTLE_TRACK_COLORS, PREDICTORS, PREDICTOR_COLORS, PREDICTOR_DESCRIPTIONS, DFS_PLATFORMS } from "../data/siteMeta.js";
-import { SCHEDULE } from "../data/schedule.js";
+import { SCHEDULE, getThisWeeksRace } from "../data/schedule.js";
 import { BattleDriverInput } from "./ui.jsx";
 import { getTier } from "../lib/tiers.js";
 import { sb } from "../lib/supabase.js";
@@ -462,7 +462,7 @@ export function UsageAdminSection({ toolUsage }) {
 }
 
 
-export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost }) {
+export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost, onHubEditorialSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -663,7 +663,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
               {/* Admin sub-nav */}
               <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, paddingBottom:0 }}>
-                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"},{id:"dfs",label:"DFS Salaries",icon:"Flag"},{id:"blog",label:"Blog",icon:"Edit"},{id:"usage",label:"Tool Usage",icon:"Trend"}].map(tab => {
+                {[{id:"power",label:"Power Rankings",icon:"Trophy"},{id:"battle",label:"Battle Tracker",icon:"Chart"},{id:"csv",label:"CSV Data",icon:"Import"},{id:"points",label:"Season Points",icon:"Flag"},{id:"dfs",label:"DFS Salaries",icon:"Flag"},{id:"blog",label:"Blog",icon:"Edit"},{id:"hubs",label:"Race Hubs",icon:"Flag"},{id:"usage",label:"Tool Usage",icon:"Trend"}].map(tab => {
                   const active = adminSection === tab.id;
                   return (
                     <button key={tab.id} onClick={()=>setAdminSection(tab.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 14px", fontSize:11, fontWeight:active?700:500, background:active?T.accentSoft:"transparent", color:active?T.accent:T.textDim, border:"none", borderBottom:`2px solid ${active?T.accent:"transparent"}`, marginBottom:-1, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>
@@ -1019,10 +1019,147 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                 <BlogAdminSection blogPosts={blogPosts} onBlogSavePost={onBlogSavePost} onBlogDeletePost={onBlogDeletePost} />
               )}
 
+              {adminSection === "hubs" && (
+                <HubEditorialAdminSection onHubEditorialSave={onHubEditorialSave} />
+              )}
+
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// RACE HUB EDITORIAL — per-week hub overrides (official race name, page
+// slug, NASCAR live-feed race id, editorial preview paragraphs) stored in
+// Supabase (app_state key "hubEditorial"). Weeks with no saved row get the
+// generic auto-generated preview. Saves apply on the site and in the app
+// with no code push.
+// ─────────────────────────────────────────────────────────────
+export function HubEditorialAdminSection({ onHubEditorialSave }) {
+  const inputStyle = { width:"100%", background:T.surface2, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"8px 12px", fontSize:13, outline:"none", fontFamily:"'Barlow',sans-serif" };
+  const btnStyle = (col) => ({ padding:"8px 18px", background:col, border:"none", color:"#fff", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" });
+  const labelStyle = { fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" };
+  const [week, setWeek] = useState(() => { try { return (getThisWeeksRace() || {}).week ?? 31; } catch (e) { return 31; } });
+  const [officialName, setOfficialName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [nascarRaceId, setNascarRaceId] = useState("");
+  const [introText, setIntroText] = useState("");
+  const [msg, setMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [hasRow, setHasRow] = useState(false);
+
+  const loadWeek = useCallback(async (w) => {
+    setMsg("Loading…");
+    try {
+      const { data } = await sb.from("app_state").select("value").eq("key", "hubEditorial").maybeSingle();
+      const ov = (data && data.value && (data.value[w] || data.value[String(w)])) || null;
+      setOfficialName(ov?.officialName || "");
+      setSlug(ov?.slug || "");
+      setNascarRaceId(ov?.nascarRaceId ? String(ov.nascarRaceId) : "");
+      setIntroText(Array.isArray(ov?.intro) ? ov.intro.join("\n\n") : "");
+      setHasRow(!!ov);
+      setMsg(ov ? "" : "No override saved for this week yet — the hub shows the generic preview.");
+    } catch (e) {
+      setMsg("Load failed: " + (e.message || e));
+    }
+  }, []);
+
+  useEffect(() => { loadWeek(week); }, [week, loadWeek]);
+
+  const readAll = async () => {
+    const { data } = await sb.from("app_state").select("value").eq("key", "hubEditorial").maybeSingle();
+    return { ...((data && data.value) || {}) };
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg("");
+    try {
+      const all = await readAll();
+      const paras = introText.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+      const entry = {};
+      if (officialName.trim()) entry.officialName = officialName.trim();
+      if (slug.trim()) entry.slug = slug.trim();
+      const rid = parseInt(nascarRaceId, 10);
+      if (Number.isFinite(rid) && rid > 0) entry.nascarRaceId = rid;
+      if (paras.length) entry.intro = paras;
+      if (!Object.keys(entry).length) { setMsg("Nothing to save — fill in at least one field."); setSaving(false); return; }
+      all[week] = entry;
+      const { error } = await sb.from("app_state").upsert({ key:"hubEditorial", value:all }, { onConflict:"key" });
+      if (error) throw error;
+      setHasRow(true);
+      setMsg("Saved — the hub updates everywhere on next load.");
+      if (onHubEditorialSave) await onHubEditorialSave();
+    } catch (e) {
+      setMsg("Save failed: " + (e.message || e));
+    }
+    setSaving(false);
+  };
+
+  const handleRemove = async () => {
+    if (!window.confirm(`Remove the saved override for week ${week}? The hub will fall back to the generic preview.`)) return;
+    setSaving(true);
+    setMsg("");
+    try {
+      const all = await readAll();
+      delete all[week];
+      delete all[String(week)];
+      const { error } = await sb.from("app_state").upsert({ key:"hubEditorial", value:all }, { onConflict:"key" });
+      if (error) throw error;
+      setHasRow(false);
+      setOfficialName(""); setSlug(""); setNascarRaceId(""); setIntroText("");
+      setMsg("Override removed — the hub now shows the generic preview.");
+      if (onHubEditorialSave) await onHubEditorialSave();
+    } catch (e) {
+      setMsg("Remove failed: " + (e.message || e));
+    }
+    setSaving(false);
+  };
+
+  const schedRow = SCHEDULE.find(r => r.week === week);
+  const generatedSlug = schedRow ? (schedRow.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-2026") : "";
+  const weekOptions = [...SCHEDULE].sort((a, b) => b.week - a.week);
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16, maxWidth:760 }}>
+      <div style={{ fontSize:13, color:T.textDim, lineHeight:1.6 }}>
+        Each race week can override the auto-generated hub: the official race name, the page slug, the NASCAR live-feed race id, and the editorial preview paragraphs. Weeks with no saved override show the generic preview. Changes apply on the website and in the app with no rebuild.
+      </div>
+      <div>
+        <label style={labelStyle}>Race week</label>
+        <select value={week} onChange={e => setWeek(parseInt(e.target.value, 10))} style={{ ...inputStyle, cursor:"pointer" }}>
+          {weekOptions.map(r => (
+            <option key={r.week} value={r.week}>Week {r.week} — {r.name} ({r.date})</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+        <div>
+          <label style={labelStyle}>Official race name</label>
+          <input value={officialName} onChange={e => setOfficialName(e.target.value)} placeholder={schedRow ? schedRow.name : ""} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>NASCAR live-feed race id</label>
+          <input value={nascarRaceId} onChange={e => setNascarRaceId(e.target.value)} placeholder="e.g. 5628" inputMode="numeric" style={inputStyle} />
+        </div>
+      </div>
+      <div>
+        <label style={labelStyle}>Page slug (leave blank for the generated one)</label>
+        <input value={slug} onChange={e => setSlug(e.target.value)} placeholder={generatedSlug} style={inputStyle} />
+        {generatedSlug && <div style={{ fontSize:11, color:T.textDim, marginTop:4, fontFamily:"'IBM Plex Mono',monospace" }}>Generated slug: {generatedSlug}</div>}
+      </div>
+      <div>
+        <label style={labelStyle}>Editorial preview (blank line between paragraphs)</label>
+        <textarea value={introText} onChange={e => setIntroText(e.target.value)} rows={9} placeholder={"First paragraph…\n\nSecond paragraph…"} style={{ ...inputStyle, fontFamily:"'Barlow',sans-serif", lineHeight:1.6, resize:"vertical" }} />
+      </div>
+      <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+        <button onClick={handleSave} disabled={saving} style={{ ...btnStyle(T.accent), opacity:saving ? 0.6 : 1 }}>{saving ? "Saving…" : "Save override"}</button>
+        {hasRow && <button onClick={handleRemove} disabled={saving} style={btnStyle("#7f1d1d")}>Remove override</button>}
+        {msg && <span style={{ fontSize:12, color: msg.startsWith("Saved") || msg.startsWith("Override removed") ? T.green : T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{msg}</span>}
+      </div>
     </div>
   );
 }

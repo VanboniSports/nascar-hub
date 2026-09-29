@@ -16,7 +16,7 @@ import { T } from "./src/theme.js";
 import { Ic } from "./src/components/icons.jsx";
 import { sb, loadFromSupabase, saveToSupabase } from "./src/lib/supabase.js";
 import { logUsageEvent, tabIdFromPath, raceSlugFromPath, pathForTab, applyTabMeta, trackRacePageView, trackRaceTabView, applyRaceMeta } from "./src/lib/analytics.js";
-import { hubBySlug, findBattleForHub, currentHub, RacesTab, RaceHubPage, RaceHeroCard } from "./src/components/RaceHub.jsx";
+import { hubBySlug, findBattleForHub, currentHub, RacesTab, RaceHubPage, RaceHeroCard, loadHubEditorial } from "./src/components/RaceHub.jsx";
 
 
 // Code-split: tabs are lazy-loaded so first paint ships only the Race Hub shell.
@@ -298,6 +298,14 @@ export default function NASCARHub() {
     } catch (e) { console.error("Battle races save error:", e); }
   }, []);
 
+  // Re-pull hub editorial rows (e.g. right after an admin save) and bump a
+  // tick so every hub consumer re-renders with the patched RACE_HUBS.
+  const [, setHubEdTick] = useState(0);
+  const refreshHubEditorial = useCallback(async () => {
+    await loadHubEditorial();
+    setHubEdTick(t => t + 1);
+  }, []);
+
   const saveSeasonPoints = useCallback(async (updated) => {
     setSeasonPoints(updated);
     try {
@@ -454,11 +462,12 @@ export default function NASCARHub() {
     flushToolUsage(toolUsageRef.current, [toolKey]);
   }, [flushToolUsage]);
 
-  // Load from Supabase on mount
+  // Load from Supabase on mount (hub editorial rides along so official
+  // names and intro copy are current before the first data render)
   useEffect(() => {
     if (!sb) return;
     setSbStatus("loading");
-    loadFromSupabase().then(data => {
+    Promise.all([loadFromSupabase(), loadHubEditorial()]).then(([data]) => {
       if (!data) { setSbStatus("error"); return; }
       const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.filter(r=>r.name!=="Kyle Busch").map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
@@ -475,6 +484,12 @@ export default function NASCARHub() {
       if (qpRows?.[0]) setQualPractice(qpRows[0].value||null);
       if (bpRows?.[0]) { const bv = bpRows[0].value||[]; blogPostsRef.current = bv; setBlogPosts(bv); }
       setSbStatus("live");
+      // Hub editorial (official names, intro copy) may have landed with the
+      // boot load; refresh the tab title/meta without firing another pageview.
+      if (tabIdFromPath() === "race") {
+        const rslug = raceSlugFromPath();
+        applyRaceMeta(rslug ? hubBySlug(rslug) : currentHub());
+      }
     });
     // Load tool usage separately (it's also in app_state)
     sb.from("app_state").select("*").eq("key","toolUsage").then(({ data: tuRows }) => {
@@ -729,6 +744,7 @@ export default function NASCARHub() {
           blogPosts={blogPosts}
           onBlogSavePost={saveBlogPost}
           onBlogDeletePost={deleteBlogPost}
+          onHubEditorialSave={refreshHubEditorial}
         />
         </Suspense>
         )}

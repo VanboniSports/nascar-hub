@@ -12,38 +12,50 @@ import { scoreEntry } from "../models/battle.js";
 // ── RACE HUBS: auto-generated from the season schedule ─────────────────────────
 // Every week gets a hub automatically from src/data/schedule.js — no more
 // hardcoding one race at a time. Races with rich extras (editorial intro,
-// official race name, NASCAR live-feed race id) declare them in HUB_OVERRIDES;
-// every other week gets a fully working hub with a generic preview.
+// official race name, NASCAR live-feed race id, slug) are stored in Supabase
+// (app_state key "hubEditorial", one entry per race week) and applied at boot
+// by loadHubEditorial(); every other week gets a fully working hub with a
+// generic preview. Editing copy in the admin panel's Race Hubs tab updates the
+// site (and the app) with no code push.
 // Newest week first, so olderHub/newerHub navigation keeps working.
-const HUB_OVERRIDES = {
-  30: {
-    slug:"kansas-2026",
-    officialName:"Hollywood Casino 400",
-    nascarRaceId:5628,
-    intro:[
-      "Kansas Speedway is a 1.5-mile tri-oval outside Kansas City, and it has quietly become one of the best pure racing tracks in the Cup Series. The progressive banking gives drivers three or four usable grooves, so restarts get chaotic in the best way and track position is never quite safe. Long green-flag runs are the norm here, which means tire management decides about as many races as raw speed does.",
-      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
-    ],
-  },
-  31: {
-    officialName:"South Point 400",
-    intro:[
-      "Las Vegas Motor Speedway is a 1.5-mile tri-oval in the Nevada desert, and the fall race is where the playoffs start to get serious. The progressive banking opens up multiple grooves, and as the desert sun drops the track gets slick — handling matters more here than outright speed. With the playoffs on the line, expect desperation to show up early.",
-      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest. Check back through the week as practice, qualifying, and the race itself fill in the blanks.",
-    ],
-  },
-};
+let hubEditorial = {};
+let editorialReady = false;
+export function hubEditorialReady() { return editorialReady; }
+// Apply Supabase editorial rows to the generated hubs, in place so every
+// existing hubBySlug/currentHub reference picks them up.
+export function setHubEditorialData(rows) {
+  hubEditorial = rows || {};
+  for (const hub of RACE_HUBS) {
+    const ov = hubEditorial[hub.week];
+    if (!ov) continue;
+    if (ov.slug) hub.slug = ov.slug;
+    if (ov.officialName) hub.officialName = ov.officialName;
+    if (ov.nascarRaceId) hub.nascarRaceId = ov.nascarRaceId; else delete hub.nascarRaceId;
+    if (Array.isArray(ov.intro) && ov.intro.length) hub.intro = ov.intro;
+  }
+  editorialReady = true;
+}
+export async function loadHubEditorial() {
+  try {
+    const { data } = await sb.from("app_state").select("value").eq("key", "hubEditorial").maybeSingle();
+    setHubEditorialData(data && data.value);
+    return Object.keys(hubEditorial).length;
+  } catch (e) {
+    console.error("hubEditorial load error:", e);
+    editorialReady = true;
+    return 0;
+  }
+}
 
 const MONTH_IDX = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
 const DAY_ABBR = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 function hubFromSchedule(r) {
-  const ov = HUB_OVERRIDES[r.week] || {};
   const [mon, day] = r.date.split(" ");
   const d = new Date(SCHEDULE_YEAR, MONTH_IDX[mon], parseInt(day, 10));
-  const officialName = ov.officialName || r.name;
+  const officialName = r.name;
   return {
-    slug: ov.slug || (r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-" + SCHEDULE_YEAR),
+    slug: (r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-" + SCHEDULE_YEAR),
     name: r.name,
     officialName,
     track: r.track,
@@ -53,8 +65,7 @@ function hubFromSchedule(r) {
     length: r.length,
     laps: r.laps,
     week: r.week,
-    ...(ov.nascarRaceId ? { nascarRaceId: ov.nascarRaceId } : {}),
-    intro: ov.intro || [
+    intro: [
       `${r.track} hosts the ${officialName}, a ${r.laps}-lap run on a ${r.length}-mile ${r.type} track. The full preview for this one is still coming together — check back through the week as practice, qualifying, and the race itself fill in the blanks.`,
       "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest.",
     ],
@@ -261,8 +272,8 @@ export function RacesTab({ battleRaces, onOpenRace }) {
 // shows everything captured since the recorder started.
 // Live mode is automatic: hubs near their race date poll the proxy without a
 // race id and show whichever Cup race is currently live, so no per-week race
-// id is needed. A hub can still declare nascarRaceId in HUB_OVERRIDES to pin
-// the panel to one specific race.
+// id is needed. A hub's Supabase editorial row can still set nascarRaceId to
+// pin the panel to one specific race.
 
 const liveOrdinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
 
@@ -445,6 +456,16 @@ export function LiveRunningOrder({ hub }) {
 
 export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab, raceArchive, drivers }) {
   if (!hub) {
+    // Direct /race/<slug> links for weeks whose slug comes from the Supabase
+    // editorial rows resolve on the first paint after boot loads them.
+    if (!editorialReady) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>Loading race hub…</div>
+          <div style={{ fontSize: 13, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Pulling the latest race info.</div>
+        </div>
+      );
+    }
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
         <div style={{ fontSize: 22, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>Unknown race hub</div>
