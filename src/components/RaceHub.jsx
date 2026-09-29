@@ -259,6 +259,10 @@ export function RacesTab({ battleRaces, onOpenRace }) {
 // one (passes for position, lead changes, cautions/restarts, pit stops, stage
 // ends) and merged with the recorder's back-history, so opening mid-race still
 // shows everything captured since the recorder started.
+// Live mode is automatic: hubs near their race date poll the proxy without a
+// race id and show whichever Cup race is currently live, so no per-week race
+// id is needed. A hub can still declare nascarRaceId in HUB_OVERRIDES to pin
+// the panel to one specific race.
 
 const liveOrdinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
 
@@ -268,15 +272,27 @@ export function LiveRunningOrder({ hub }) {
   const prevRef = useRef(null);
   const seenRef = useRef(new Set());
   const historyLoadedRef = useRef(false);
+  // Explicit (hub declares nascarRaceId) vs automatic (hub is near race day:
+  // raced within the last 4 days or starts within 36h). Auto mode asks the
+  // proxy which Cup race is live instead of needing a pre-configured id.
+  const explicitId = hub && hub.nascarRaceId ? String(hub.nascarRaceId) : null;
+  const autoEligible = (() => {
+    if (!hub || !hub.date || explicitId) return false;
+    const t = new Date(hub.date + "T12:00:00").getTime();
+    if (!Number.isFinite(t)) return false;
+    const now = Date.now();
+    return now - t < 4 * 864e5 && t - now < 36 * 36e5;
+  })();
+  const liveActive = !!(hub && (explicitId || autoEligible));
   // Backfill the recorder's timeline history. Retries on failure: a single
   // flaky read must not leave the timeline permanently empty. Also called
   // from the poll loop below until it succeeds (self-healing).
-  const loadHistory = () => {
-    if (!hub || !hub.nascarRaceId || historyLoadedRef.current) return;
+  const loadHistory = (rid) => {
+    if (!hub || !rid || historyLoadedRef.current) return;
     let tries = 0;
     const attempt = () => {
       tries++;
-      sb.from("app_state").select("value").eq("key", `livetimeline:${hub.nascarRaceId}`).maybeSingle()
+      sb.from("app_state").select("value").eq("key", `livetimeline:${rid}`).maybeSingle()
         .then(({ data: row }) => {
           if (row && row.value && Array.isArray(row.value.events)) {
             const evs = row.value.events.filter(e => e && e.text).slice(0, 200);
@@ -295,21 +311,28 @@ export function LiveRunningOrder({ hub }) {
   // Load the recorder's back-history so the timeline is complete even when
   // the page is opened mid-race. Live-derived events below dedupe against it.
   useEffect(() => {
-    if (!hub || !hub.nascarRaceId) return;
+    if (!liveActive) return;
     historyLoadedRef.current = false;
-    loadHistory();
+    prevRef.current = null;
+    seenRef.current = new Set();
+    setData(null);
+    setTimeline([]);
+    if (explicitId) loadHistory(explicitId);
   }, [hub ? hub.slug : null]);
   useEffect(() => {
-    if (!hub || !hub.nascarRaceId) return;
+    if (!liveActive) return;
     let alive = true;
+    const feedUrl = explicitId
+      ? `https://www.vanbonisports.com/api/live-leaderboard?race_id=${explicitId}`
+      : "https://www.vanbonisports.com/api/live-leaderboard";
     const load = async () => {
       try {
-        const r = await fetch(`https://www.vanbonisports.com/api/live-leaderboard?race_id=${hub.nascarRaceId}`);
+        const r = await fetch(feedUrl);
         const j = await r.json();
         if (!alive) return;
         if (!(j && j.live)) { setData(null); return; }
         setData(j);
-        if (!historyLoadedRef.current) loadHistory();
+        if (!historyLoadedRef.current) loadHistory(j.raceId || explicitId);
         const prev = prevRef.current;
         if (prev && prev.order && prev.order.length) {
           const events = [];

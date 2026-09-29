@@ -7,8 +7,12 @@
 // compact running order. When the race is not live it answers
 // { live: false } and the race page renders nothing (no errors, no boxes).
 //
+// Two modes: explicit (?race_id=5628) requires the feed's race_id to match;
+// auto (no race_id) reports whichever Cup race is currently live. Auto mode
+// is how race hubs show live running order every week with no per-race setup.
+//
 // "Live" requires ALL of:
-//   - the feed's race_id matches the requested race_id
+//   - the feed's race_id matches the requested race_id (explicit mode only)
 //   - run_type is 3 (race session, not practice/qualifying)
 //   - laps_to_go > 0 (the race has not finished)
 //   - the feed timestamp is fresh (updated within the last 15 minutes),
@@ -32,11 +36,8 @@ function cleanName(full) {
 
 export default async function handler(req, res) {
   const raceId = parseInt((req.query && req.query.race_id) || "", 10);
+  const explicit = Number.isFinite(raceId) && raceId > 0;
   res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=30");
-  if (!raceId) {
-    res.status(200).json({ live: false });
-    return;
-  }
   try {
     const r = await fetch(LIVE_FEED, {
       headers: { "User-Agent": "vanbonisports-racehub/1.0" },
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
 
     const updatedAt = Date.parse(f.time_of_day_os);
     const fresh = Number.isFinite(updatedAt) && Date.now() - updatedAt < FRESH_MS;
-    const matches = Number(f.race_id) === raceId;
+    const matches = !explicit || Number(f.race_id) === raceId;
     const isRace = Number(f.run_type) === 3;
     const inProgress = Number(f.laps_to_go) > 0;
 
