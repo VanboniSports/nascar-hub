@@ -76,7 +76,7 @@ export function PrivacyTab() {
       </Section>
 
       <Section title="Contact">
-        <p style={p}>Questions about this policy: <a style={link} href="mailto:morgan.t.squires@gmail.com">morgan.t.squires@gmail.com</a>. You can also reach us through the feedback form linked in the site footer.</p>
+        <p style={p}>Questions about this policy: <a style={link} href="mailto:vanbonisports@gmail.com">vanbonisports@gmail.com</a>. You can also reach us through the feedback form linked in the site footer.</p>
       </Section>
     </div>
   );
