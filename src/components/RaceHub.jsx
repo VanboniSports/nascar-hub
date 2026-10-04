@@ -264,7 +264,7 @@ export function RacesTab({ battleRaces, onOpenRace }) {
 // LIVE RUNNING ORDER + TIMELINE — shown on a race hub while that race is actually live.
 // Data comes from /api/live-leaderboard, a Vercel serverless proxy for
 // NASCAR's official live feed (the CDN sends no CORS headers, so the browser
-// cannot fetch it directly). Polls every 35 seconds. Renders nothing when
+// cannot fetch it directly). Polls every 20 seconds. Renders nothing when
 // the race is not live or the feed is unreachable: no errors, no boxes.
 // The timeline is derived client-side by diffing each poll against the previous
 // one (passes for position, lead changes, cautions/restarts, pit stops, stage
@@ -395,7 +395,7 @@ export function LiveRunningOrder({ hub }) {
       } catch (e) { /* keep last good data; the FEED DELAYED banner covers outages */ }
     };
     load();
-    const t = setInterval(load, 35000);
+    const t = setInterval(load, 20000);
     const tick = setInterval(() => { if (alive) setNowTs(Date.now()); }, 30000);
     return () => { alive = false; clearInterval(t); clearInterval(tick); };
   }, [hub ? hub.slug : null]);
@@ -418,7 +418,7 @@ export function LiveRunningOrder({ hub }) {
         {data.updatedAt && (nowTs - Date.parse(data.updatedAt) > 180000) && (
           <span style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>FEED DELAYED</span>
         )}
-        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>refreshes every 35s</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>refreshes every 20s</span>
       </div>
       <div style={{ maxHeight: 420, overflowY: "auto" }}>
         {data.order.map(o => (
