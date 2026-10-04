@@ -34,6 +34,20 @@ function cleanName(full) {
     .trim();
 }
 
+// Gap display: the feed reports seconds behind for cars on the lead lap and a
+// negative lap count for lapped cars (e.g. -1 = one lap down). Render the
+// latter as "N LAP(S) DOWN" instead of a bogus "+-1.00s".
+function fmtDelta(pos, raw) {
+  if (pos === 1) return "Leader";
+  if (raw == null || !isFinite(Number(raw))) return "";
+  const d = Number(raw);
+  if (d < 0) {
+    const laps = Math.abs(Math.round(d));
+    return laps + (laps === 1 ? " LAP DOWN" : " LAPS DOWN");
+  }
+  return "+" + d.toFixed(2) + "s";
+}
+
 export default async function handler(req, res) {
   const raceId = parseInt((req.query && req.query.race_id) || "", 10);
   const explicit = Number.isFinite(raceId) && raceId > 0;
@@ -69,12 +83,7 @@ export default async function handler(req, res) {
       number: v.vehicle_number,
       name: cleanName(v.driver && v.driver.full_name),
       mfr: v.vehicle_manufacturer,
-      delta:
-        v.running_position === 1
-          ? "Leader"
-          : v.delta != null && isFinite(Number(v.delta))
-            ? "+" + Number(v.delta).toFixed(2) + "s"
-            : "",
+      delta: fmtDelta(v.running_position, v.delta),
       running: v.status === 1,
       pitStops: (v.pit_stops || []).filter(s => (s.pit_in_lap_count || 0) > 0).length,
     }));
