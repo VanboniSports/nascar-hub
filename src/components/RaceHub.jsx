@@ -434,14 +434,11 @@ export function LiveRunningOrder({ hub }) {
       {timeline.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, marginBottom: 8 }}>LIVE TIMELINE</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 420, overflowY: "auto" }}>
+          <div style={{ maxHeight: 420, overflowY: "auto" }}>
             {timeline.map((e, i) => (
-              <div key={i} style={{ background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: T.green }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: T.text, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>LAP {e.lap}</span>
-                </div>
-                <div style={{ padding: "8px 10px", fontSize: 12, color: T.textMid }}>{e.text}</div>
+              <div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${T.border}` }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: T.green, fontFamily: "'IBM Plex Mono',monospace", minWidth: 46, paddingTop: 1 }}>LAP {e.lap}</span>
+                <span style={{ fontSize: 12, color: T.textMid }}>{e.text}</span>
               </div>
             ))}
           </div>
