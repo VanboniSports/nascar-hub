@@ -38,6 +38,10 @@ export default async function handler(req, res) {
   const raceId = parseInt((req.query && req.query.race_id) || "", 10);
   const explicit = Number.isFinite(raceId) && raceId > 0;
   res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=30");
+  // CORS: the native app's WebView fetches this endpoint cross-origin, so it
+  // needs an explicit allow-origin (the site itself is same-origin and worked
+  // without it, which is why the app's live panel never loaded).
+  res.setHeader("Access-Control-Allow-Origin", "*");
   try {
     const r = await fetch(LIVE_FEED, {
       headers: { "User-Agent": "vanbonisports-racehub/1.0" },
