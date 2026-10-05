@@ -69,8 +69,13 @@ export default async function handler(req, res) {
     const matches = !explicit || Number(f.race_id) === raceId;
     const isRace = Number(f.run_type) === 3;
     const inProgress = Number(f.laps_to_go) > 0;
+    // After the checkered flag the feed freezes on the final running order.
+    // Keep serving it (flagged final) so the hub shows the unofficial results
+    // until the official Race Results tab lands (~90 min for inspection).
+    const isCheckered = Number(f.flag_state) === 4;
+    const final = isCheckered && !inProgress;
 
-    if (!(matches && isRace && inProgress && fresh)) {
+    if (!(matches && isRace && (inProgress || isCheckered) && (fresh || isCheckered))) {
       res.status(200).json({ live: false });
       return;
     }
@@ -90,6 +95,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       live: true,
+      final,
       raceId: f.race_id,
       trackName: f.track_name,
       runName: f.run_name,
