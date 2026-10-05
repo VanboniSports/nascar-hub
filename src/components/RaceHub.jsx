@@ -266,6 +266,9 @@ export function RacesTab({ battleRaces, onOpenRace }) {
 // NASCAR's official live feed (the CDN sends no CORS headers, so the browser
 // cannot fetch it directly). Polls every 20 seconds. Renders nothing when
 // the race is not live or the feed is unreachable: no errors, no boxes.
+// After the checkered flag the proxy keeps serving the frozen feed flagged
+// final: the panel shows a FINAL header, stops polling, and stays up until
+// the official Race Results tab appears.
 // The timeline is derived client-side by diffing each poll against the previous
 // one (passes for position, lead changes, cautions/restarts, pit stops, stage
 // ends) and merged with the recorder's back-history, so opening mid-race still
@@ -283,6 +286,7 @@ export function LiveRunningOrder({ hub }) {
   const prevRef = useRef(null);
   const seenRef = useRef(new Set());
   const historyLoadedRef = useRef(false);
+  const finalRef = useRef(false);
   // Explicit (hub declares nascarRaceId) vs automatic (hub is near race day:
   // raced within the last 4 days or starts within 36h). Auto mode asks the
   // proxy which Cup race is live instead of needing a pre-configured id.
@@ -324,6 +328,7 @@ export function LiveRunningOrder({ hub }) {
   useEffect(() => {
     if (!liveActive) return;
     historyLoadedRef.current = false;
+    finalRef.current = false;
     prevRef.current = null;
     seenRef.current = new Set();
     setData(null);
@@ -343,6 +348,8 @@ export function LiveRunningOrder({ hub }) {
         if (!alive) return;
         if (!(j && j.live)) { setData(null); return; }
         setData(j);
+        // Once the final order arrives, stop polling: the data is frozen.
+        if (j.final) finalRef.current = true;
         if (!historyLoadedRef.current) loadHistory(j.raceId || explicitId);
         const prev = prevRef.current;
         if (prev && prev.order && prev.order.length) {
@@ -395,30 +402,47 @@ export function LiveRunningOrder({ hub }) {
       } catch (e) { /* keep last good data; the FEED DELAYED banner covers outages */ }
     };
     load();
-    const t = setInterval(load, 20000);
+    const t = setInterval(() => { if (alive && !finalRef.current) load(); }, 20000);
     const tick = setInterval(() => { if (alive) setNowTs(Date.now()); }, 30000);
     return () => { alive = false; clearInterval(t); clearInterval(tick); };
   }, [hub ? hub.slug : null]);
-  if (!data) return null;
+  if (!data) return (
+    <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 8, textAlign: "center" }}>Live timing appears automatically once NASCAR's feed starts flowing.</div>
+  );
   const flagColors = { GREEN: T.green, CAUTION: "#f59e0b", "RED FLAG": T.red, CHECKERED: T.textDim };
   return (
-    <div style={{ background: T.surface, border: `1px solid ${T.red}55`, borderRadius: 12, padding: "16px 18px" }}>
+    <div style={{ background: T.surface, border: `1px solid ${data.final ? T.border : `${T.red}55`}`, borderRadius: 12, padding: "16px 18px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.red, animation: "hubBlink 1.2s infinite" }} />
-        <span style={{ fontSize: 12, fontWeight: 900, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2 }}>LIVE</span>
-        <span style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
-          Lap {data.lap} of {data.lapsTotal}
-        </span>
-        {data.flag && (
-          <span style={{ fontSize: 10, fontWeight: 800, color: flagColors[data.flag] || T.textMid, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{data.flag}</span>
+        {data.final ? (
+          <>
+            <span style={{ fontSize: 13 }}>🏁</span>
+            <span style={{ fontSize: 12, fontWeight: 900, color: T.gold, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2 }}>FINAL</span>
+            <span style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+              Lap {data.lap} of {data.lapsTotal}
+            </span>
+            {data.flag && (
+              <span style={{ fontSize: 10, fontWeight: 800, color: flagColors[data.flag] || T.textMid, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{data.flag}</span>
+            )}
+          </>
+        ) : (
+          <>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.red, animation: "hubBlink 1.2s infinite" }} />
+            <span style={{ fontSize: 12, fontWeight: 900, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2 }}>LIVE</span>
+            <span style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace" }}>
+              Lap {data.lap} of {data.lapsTotal}
+            </span>
+            {data.flag && (
+              <span style={{ fontSize: 10, fontWeight: 800, color: flagColors[data.flag] || T.textMid, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{data.flag}</span>
+            )}
+            {data.stage != null && (
+              <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Stage {data.stage}</span>
+            )}
+            {data.updatedAt && (nowTs - Date.parse(data.updatedAt) > 180000) && (
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>FEED DELAYED</span>
+            )}
+          </>
         )}
-        {data.stage != null && (
-          <span style={{ fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>Stage {data.stage}</span>
-        )}
-        {data.updatedAt && (nowTs - Date.parse(data.updatedAt) > 180000) && (
-          <span style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>FEED DELAYED</span>
-        )}
-        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>refreshes every 20s</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{data.final ? "final" : "refreshes every 20s"}</span>
       </div>
       <div style={{ maxHeight: 420, overflowY: "auto" }}>
         {data.order.map(o => (
@@ -513,15 +537,25 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
   const qualList = (qpMatch && qualPractice.qualifying)
     ? Object.entries(qualPractice.qualifying).map(([name, pos]) => ({ name, pos })).sort((a, b) => a.pos - b.pos)
     : [];
+  // The Live tab stays up after the checkered flag until official results land:
+  // it shows the final running order in the gap between the feed ending and
+  // the Race Results tab appearing (~90 min for post-race inspection).
+  const liveTabOpen = status === "live" || (status === "completed" && !actuals);
   const resultTabs = [
     { id: "practice", label: "Practice" },
     { id: "qualifying", label: "Qualifying" },
-    ...(status === "live" ? [{ id: "live", label: "Live" }] : []),
+    ...(liveTabOpen ? [{ id: "live", label: "Live" }] : []),
     ...(actuals ? [{ id: "race", label: "Race Results" }] : []),
   ];
   const [resultsTab, setResultsTab] = useState(
-    status === "live" ? "live" : actuals ? "race" : qualCount > 0 ? "qualifying" : "practice"
+    liveTabOpen ? "live" : actuals ? "race" : qualCount > 0 ? "qualifying" : "practice"
   );
+  // When official results land mid-session, hand off from the Live tab.
+  const sawActualsRef = useRef(false);
+  useEffect(() => {
+    if (actuals && !sawActualsRef.current) setResultsTab("race");
+    sawActualsRef.current = !!actuals;
+  }, [actuals]);
 
   const idx = RACE_HUBS.findIndex(h => h.slug === hub.slug);
   const olderHub = idx >= 0 ? RACE_HUBS[idx + 1] : null;
@@ -733,12 +767,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
             </div>
           )
         )}
-        {resultsTab === "live" && (
-          <div>
-            <LiveRunningOrder hub={hub} />
-            <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 8, textAlign: "center" }}>Live timing appears automatically once NASCAR's feed starts flowing.</div>
-          </div>
-        )}
+        {resultsTab === "live" && <LiveRunningOrder hub={hub} />}
         {resultsTab === "race" && actuals && (
           <div style={card}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
