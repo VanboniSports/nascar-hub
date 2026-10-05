@@ -25,7 +25,7 @@
 
 const LIVE_FEED = "https://cf.nascar.com/live/feeds/live-feed.json";
 const FRESH_MS = 15 * 60 * 1000;
-const FLAG_LABELS = { 1: "GREEN", 2: "CAUTION", 3: "RED FLAG", 4: "CHECKERED" };
+const FLAG_LABELS = { 1: "GREEN", 2: "CAUTION", 3: "RED FLAG", 4: "CHECKERED", 9: "FINAL" };
 
 function cleanName(full) {
   return String(full || "")
@@ -69,13 +69,13 @@ export default async function handler(req, res) {
     const matches = !explicit || Number(f.race_id) === raceId;
     const isRace = Number(f.run_type) === 3;
     const inProgress = Number(f.laps_to_go) > 0;
-    // After the checkered flag the feed freezes on the final running order.
+    // After the race ends the feed freezes on the final running order with the
+    // flag out of its green/yellow/red cycle (4 = checkered, 9 = post-race).
     // Keep serving it (flagged final) so the hub shows the unofficial results
     // until the official Race Results tab lands (~90 min for inspection).
-    const isCheckered = Number(f.flag_state) === 4;
-    const final = isCheckered && !inProgress;
+    const raceOver = !inProgress && ![1, 2, 3].includes(Number(f.flag_state));
 
-    if (!(matches && isRace && (inProgress || isCheckered) && (fresh || isCheckered))) {
+    if (!(matches && isRace && (inProgress || raceOver) && (fresh || raceOver))) {
       res.status(200).json({ live: false });
       return;
     }
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       live: true,
-      final,
+      final: raceOver,
       raceId: f.race_id,
       trackName: f.track_name,
       runName: f.run_name,
