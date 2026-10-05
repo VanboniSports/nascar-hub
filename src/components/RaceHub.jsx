@@ -519,7 +519,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
     .filter(r => r.fin > 0)
     .map(r => {
       const d = (drivers || []).find(x => String(x.num) === String(r.num));
-      return { ...r, name: d ? d.name : `Car #${r.num}`, pts: raceFinishPoints(r.fin) + (r.sp || 0) + (r.fl ? 1 : 0) };
+      return { ...r, name: d ? d.name : (r.name || `Car #${r.num}`), pts: raceFinishPoints(r.fin) + (r.sp || 0) + (r.fl ? 1 : 0) };
     })
     .sort((a, b) => a.fin - b.fin) : null;
   const typeColor = TC[hub.trackType] || T.accent;
