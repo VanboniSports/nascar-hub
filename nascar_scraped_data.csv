@@ -6494,3 +6494,39 @@ year,race_date,race_name,track_name,driver_name,car_number,finish_position,start
 2026,2026-09-27,September Kansas,Kansas Speedway,Cody Ware,51,34,35,262,0,Running,Chevrolet,30.6,33.0,0,0,0,0,0,34.9,25.7,34,34,34,36,-2,0,2,0,1,0,262,0.0,0.0
 2026,2026-09-27,September Kansas,Kansas Speedway,Josh Berry,21,35,10,257,0,Running,Ford,10.6,24.0,0,0,0,2,9,24.0,56.7,35,35,7,35,3,22,19,20,5,118,257,0.4591,0.0
 2026,2026-09-27,September Kansas,Kansas Speedway,Noah Gragson,4,36,21,112,0,Engine,Ford,23.4,19.62,0,0,0,0,2,29.3,40.0,36,36,14,26,4,32,28,0,0,1,112,0.0089,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Chase Briscoe,19,1,4,267,175,Running,Toyota,16.4,19.56,0,0,1,11,15,2.5,147.0,14,1,1,19,2,55,53,39,55,264,267,0.9888,0.6554
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Kyle Larson,5,2,6,267,0,Running,Chevrolet,8.0,7.78,2,0,2,13,17,12.7,93.9,6,3,2,34,5,102,97,50,12,179,267,0.6704,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Tyler Reddick,45,3,5,267,1,Running,Toyota,12.0,12.78,0,1,5,12,17,9.8,112.2,21,4,1,31,25,115,90,73,18,219,267,0.8202,0.0037
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Austin Cindric,2,4,7,267,33,Running,Ford,8.4,19.56,0,0,0,3,8,8,105.7,1,5,1,27,30,104,74,61,7,237,267,0.8876,0.1236
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Ryan Blaney,12,5,20,267,10,Running,Ford,22.0,23.00,0,0,3,8,19,6.1,115.0,18,7,1,20,1,62,61,42,9,252,267,0.9438,0.0375
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,William Byron,24,6,8,267,0,Running,Chevrolet,15.8,9.22,1,0,0,5,14,10.2,93.3,5,6,3,30,16,111,95,60,6,225,267,0.8427,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Chase Elliott,9,7,13,267,0,Running,Chevrolet,19.8,17.12,0,0,2,6,10,9.4,94.6,3,8,2,24,1,100,99,62,4,233,267,0.8727,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Bubba Wallace,23,8,9,267,1,Running,Toyota,11.6,20.44,0,0,0,4,14,7.4,109.6,19,2,1,30,19,121,102,88,14,243,267,0.9101,0.0037
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Shane van Gisbergen,97,9,25,267,0,Running,Chevrolet,24.2,33.00,0,0,2,5,7,13.9,81.0,20,9,3,27,11,109,98,40,2,164,267,0.6142,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Joey Logano,22,10,23,267,0,Running,Ford,10.2,12.11,2,2,3,7,12,12.3,87.1,17,10,2,27,11,111,100,40,2,173,267,0.6479,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Alex Bowman,48,11,15,267,0,Running,Chevrolet,15.0,10.86,1,0,0,4,7,13.7,72.0,7,12,3,27,10,121,111,51,0,152,267,0.5693,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Carson Hocevar,77,12,10,267,0,Running,Chevrolet,18.6,26.33,0,0,1,6,11,11.6,90.0,2,17,2,25,1,112,111,69,19,208,267,0.779,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Chris Buescher,17,13,14,267,0,Running,Ford,24.6,15.89,0,0,0,2,10,12,85.4,16,13,3,29,0,101,101,53,1,236,267,0.8839,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Daniel Suarez,7,14,11,267,0,Running,Chevrolet,16.0,14.67,0,0,1,3,7,12.4,83.3,4,14,2,29,-7,98,105,66,14,216,267,0.809,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,AJ Allmendinger,16,15,19,267,0,Running,Chevrolet,22.4,16.50,0,0,0,1,4,19.6,63.7,9,15,5,35,10,123,113,17,3,69,267,0.2584,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Denny Hamlin,11,16,1,267,39,Running,Toyota,9.8,11.22,2,1,4,15,20,14.2,81.9,26,16,1,28,-12,113,125,35,24,105,267,0.3933,0.1461
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Ty Gibbs,54,17,2,267,0,Running,Toyota,15.2,21.75,0,0,2,12,18,13.7,82.4,22,11,2,28,-13,119,132,52,15,176,267,0.6592,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Riley Herbst,35,18,22,267,0,Running,Toyota,31.4,19.67,0,0,0,0,3,17.2,68.6,25,19,5,27,-11,107,118,23,1,70,267,0.2622,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Austin Dillon,3,19,28,267,0,Running,Chevrolet,16.0,20.89,0,0,0,0,5,23.6,55.5,30,18,12,34,-9,131,140,0,0,6,267,0.0225,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Noah Gragson,4,20,36,267,0,Running,Ford,28.6,19.86,0,0,0,0,2,21.7,49.0,10,20,6,36,16,125,109,13,0,32,267,0.1199,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Michael McDowell,71,21,18,267,0,Running,Chevrolet,17.8,21.22,0,1,0,3,6,18,62.5,24,23,1,34,-12,117,129,38,2,80,267,0.2996,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Austin Hill,33,22,33,266,0,Running,Chevrolet,26.2,,0,0,0,0,0,23.4,49.7,33,22,7,34,-8,122,130,7,0,12,266,0.0451,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Christopher Bell,20,23,3,266,8,Running,Toyota,9.4,11.67,0,4,1,13,16,10.7,90.8,15,27,1,27,7,76,69,41,27,185,266,0.6955,0.0301
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Brad Keselowski,6,24,16,266,0,Running,Ford,15.2,15.78,0,0,0,2,6,17.8,60.3,23,21,5,32,-18,129,147,46,0,83,266,0.312,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Erik Jones,43,25,21,266,0,Running,Toyota,23.0,20.78,0,0,0,2,5,26.1,44.2,34,25,5,34,-22,92,114,5,0,8,266,0.0301,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Josh Berry,21,26,35,266,0,Running,Ford,17.0,21.83,1,0,0,2,9,27.6,41.2,32,24,12,35,5,82,77,4,1,4,266,0.015,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Cole Custer,41,27,24,266,0,Running,Chevrolet,22.0,26.80,0,0,0,0,1,21.7,45.7,12,26,6,28,-17,109,126,22,0,48,266,0.1805,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Ryan Preece,60,28,12,265,0,Running,Ford,9.6,16.71,0,0,1,1,10,23.4,48.0,11,29,8,33,-3,114,117,17,0,48,265,0.1811,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,John Hunter Nemechek,42,29,32,265,0,Running,Toyota,18.4,20.20,0,0,0,1,2,30.4,35.8,27,30,25,35,-6,63,69,0,0,0,265,0.0,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Ross Chastain,1,30,17,265,0,Running,Chevrolet,16.6,8.67,0,0,0,2,6,26.5,48.7,8,28,5,35,-17,74,91,17,1,38,265,0.1434,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Ty Dillon,10,31,29,265,0,Running,Chevrolet,29.2,28.86,0,0,0,0,0,32.1,30.8,28,31,26,36,-4,58,62,0,0,0,265,0.0,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Ricky Stenhouse Jr,47,32,26,264,0,Running,Chevrolet,25.6,22.00,0,0,0,3,4,26.1,44.6,29,33,9,33,-16,90,106,8,1,15,264,0.0568,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Todd Gilliland,34,33,27,264,0,Running,Ford,19.4,27.22,0,0,0,0,2,27.3,33.3,13,32,2,34,11,115,104,14,0,21,264,0.0795,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Cody Ware,51,34,34,263,0,Running,Chevrolet,31.6,30.71,0,0,0,0,0,34,25.5,31,34,30,36,-2,21,23,0,2,0,263,0.0,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Connor Zilisch,88,35,31,262,0,Running,Chevrolet,23.8,32.00,0,0,0,0,2,34.9,26.5,35,35,27,36,-5,25,30,0,0,0,262,0.0,0.0
+2026,2026-10-04,October Las Vegas,Las Vegas Motor Speedway,Zane Smith,38,36,30,262,0,Running,Ford,30.4,22.60,0,0,0,2,6,34.1,29.8,36,36,8,36,2,43,41,4,0,4,262,0.0153,0.0
