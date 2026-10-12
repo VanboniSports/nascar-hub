@@ -134,3 +134,83 @@ export function normalizeCsvDriverName(raw) {
 
   return name;
 }
+
+// ───────────────────────────────────────────────────────────
+// XFINITY / O'REILLY SERIES DRIVERS — 27 full-time 2026
+// Derived 2026-10-11 from nascar_scraped_data_xfinity.csv:
+// full-time = appeared in >=24 of the 28 races run so far (~85%).
+// num/mfg = most common car number / manufacturer across 2026 races.
+// team is "" — teams are not in the dataset; fill via the admin panel.
+// Power ratings (overall/superspeedway/intermediate/short/road) are NOT
+// included here: they are computed by the site's own Power Rankings
+// algorithm per series (Phase 3 admin work), same as Cup's INITIAL_DRIVERS.
+// Sorted alphabetically; the Cup list sorts by rating once ratings exist.
+// ───────────────────────────────────────────────────────────
+export const INITIAL_DRIVERS_XFINITY = [
+  { num:"7",  name:"Justin Allgaier",    team:"", mfg:"Chevrolet" },
+  { num:"96", name:"Anthony Alfredo",   team:"", mfg:"Chevrolet" },
+  { num:"07", name:"Josh Bilicki",      team:"", mfg:"Chevrolet" },
+  { num:"27", name:"Jeb Burton",        team:"", mfg:"Chevrolet" },
+  { num:"24", name:"Harrison Burton",   team:"", mfg:"Toyota"    },
+  { num:"88", name:"Rajah Caruth",      team:"", mfg:"Chevrolet" },
+  { num:"51", name:"Jeremy Clements",   team:"", mfg:"Chevrolet" },
+  { num:"00", name:"Sheldon Creed",     team:"", mfg:"Chevrolet" },
+  { num:"19", name:"Brent Crews",       team:"", mfg:"Toyota"    },
+  { num:"17", name:"Corey Day",         team:"", mfg:"Chevrolet" },
+  { num:"02", name:"Ryan Ellis",        team:"", mfg:"Chevrolet" },
+  { num:"54", name:"Taylor Gray",       team:"", mfg:"Toyota"    },
+  { num:"21", name:"Austin Hill",       team:"", mfg:"Chevrolet" },
+  { num:"20", name:"Brandon Jones",     team:"", mfg:"Toyota"    },
+  { num:"1",  name:"Carson Kvapil",     team:"", mfg:"Chevrolet" },
+  { num:"2",  name:"Jesse Love",        team:"", mfg:"Chevrolet" },
+  { num:"41", name:"Sam Mayer",         team:"", mfg:"Chevrolet" },
+  { num:"31", name:"Blaine Perkins",    team:"", mfg:"Chevrolet" },
+  { num:"44", name:"Brennan Poole",     team:"", mfg:"Chevrolet" },
+  { num:"99", name:"Parker Retzlaff",   team:"", mfg:"Chevrolet" },
+  { num:"18", name:"William Sawalich",  team:"", mfg:"Toyota"    },
+  { num:"45", name:"Lavar Scott",       team:"", mfg:"Chevrolet" },
+  { num:"39", name:"Ryan Sieg",         team:"", mfg:"Chevrolet" },
+  { num:"28", name:"Kyle Sieg",         team:"", mfg:"Chevrolet" },
+  { num:"8",  name:"Sammy Smith",       team:"", mfg:"Chevrolet" },
+  { num:"48", name:"Patrick Staropoli", team:"", mfg:"Chevrolet" },
+  { num:"26", name:"Dean Thompson",     team:"", mfg:"Toyota"    },
+];
+
+export const FULL_TIMER_NAMES_XFINITY = INITIAL_DRIVERS_XFINITY.map(d => d.name);
+
+// ───────────────────────────────────────────────────────────
+// TRUCK SERIES DRIVERS — 21 full-time 2026
+// Derived 2026-10-11 from nascar_scraped_data_trucks.csv:
+// full-time = appeared in >=18 of the 21 races run so far (~85%).
+// num/mfg = most common car number / manufacturer across 2026 races.
+// team is "" — teams are not in the dataset; fill via the admin panel.
+// Power ratings (overall/superspeedway/intermediate/short/road) are NOT
+// included here: they are computed by the site's own Power Rankings
+// algorithm per series (Phase 3 admin work), same as Cup's INITIAL_DRIVERS.
+// Sorted alphabetically; the Cup list sorts by rating once ratings exist.
+// ───────────────────────────────────────────────────────────
+export const INITIAL_DRIVERS_TRUCK = [
+  { num:"18", name:"Tyler Ankrum",         team:"", mfg:"Chevrolet" },
+  { num:"13", name:"Cole Butcher",         team:"", mfg:"Ford"      },
+  { num:"91", name:"Christian Eckes",      team:"", mfg:"Chevrolet" },
+  { num:"9",  name:"Grant Enfinger",       team:"", mfg:"Chevrolet" },
+  { num:"52", name:"Stewart Friesen",      team:"", mfg:"Toyota"    },
+  { num:"98", name:"Jake Garcia",          team:"", mfg:"Ford"      },
+  { num:"15", name:"Tanner Gray",          team:"", mfg:"Toyota"    },
+  { num:"16", name:"Justin Haley",         team:"", mfg:"RAM"       },
+  { num:"19", name:"Daniel Hemric",        team:"", mfg:"Chevrolet" },
+  { num:"11", name:"Kaden Honeycutt",      team:"", mfg:"Toyota"    },
+  { num:"10", name:"Corey LaJoie",         team:"", mfg:"RAM"       },
+  { num:"88", name:"Ty Majeski",           team:"", mfg:"Ford"      },
+  { num:"44", name:"Andres Perez de Lara", team:"", mfg:"Chevrolet" },
+  { num:"12", name:"Brenden Queen",        team:"", mfg:"RAM"       },
+  { num:"99", name:"Ben Rhodes",           team:"", mfg:"Ford"      },
+  { num:"34", name:"Layne Riggs",          team:"", mfg:"Ford"      },
+  { num:"17", name:"Giovanni Ruggiero",    team:"", mfg:"Toyota"    },
+  { num:"38", name:"Chandler Smith",       team:"", mfg:"Ford"      },
+  { num:"26", name:"Dawson Sutton",        team:"", mfg:"Chevrolet" },
+  { num:"14", name:"Mini Tyrrell",         team:"", mfg:"RAM"       },
+  { num:"81", name:"Kris Wright",          team:"", mfg:"Chevrolet" },
+];
+
+export const FULL_TIMER_NAMES_TRUCK = INITIAL_DRIVERS_TRUCK.map(d => d.name);
