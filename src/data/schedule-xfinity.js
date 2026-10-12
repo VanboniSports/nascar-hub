@@ -35,7 +35,7 @@ export const SCHEDULE_XFINITY = [
   { week:26, date:"Sep 12", name:"Gateway",          track:"World Wide Technology Raceway",       type:"intermediate",  length:1.25,  laps:160 },
   { week:27, date:"Sep 18", name:"Bristol II",       track:"Bristol Motor Speedway",              type:"short",         length:0.533, laps:300 },
   { week:28, date:"Oct 3",  name:"Las Vegas II",     track:"Las Vegas Motor Speedway",            type:"intermediate",  length:1.5,   laps:200 },
-  { week:29, date:"Oct 10", name:"Charlotte Roval",  track:"Charlotte Motor Speedway (ROVAL)",    type:"road",          length:2.32,  laps:67  },
+  { week:29, date:"Oct 11", name:"Charlotte II",     track:"Charlotte Motor Speedway",            type:"intermediate",  length:1.5,   laps:200 },
   { week:30, date:"Oct 17", name:"Phoenix II",       track:"Phoenix Raceway",                     type:"intermediate",  length:1.0,   laps:200 },
   { week:31, date:"Oct 24", name:"Talladega II",     track:"Talladega Superspeedway",             type:"superspeedway", length:2.66,  laps:113 },
   { week:32, date:"Oct 31", name:"Martinsville II",  track:"Martinsville Speedway",               type:"short",         length:0.526, laps:250 },
