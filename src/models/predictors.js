@@ -1,7 +1,23 @@
 // ───────────────────────────────────────────────────────────
 // PREDICTOR ENGINES - extracted from NASCARHub.jsx (phase 1)
 // ───────────────────────────────────────────────────────────
-import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { INITIAL_DRIVERS, FULL_TIMER_NAMES, INITIAL_DRIVERS_XFINITY, FULL_TIMER_NAMES_XFINITY, INITIAL_DRIVERS_TRUCK, FULL_TIMER_NAMES_TRUCK } from "../data/drivers.js";
+
+// ─────────────────────────────────────────────────────────────
+// SERIES CONFIGURATION
+// series: "cup" | "xfinity" | "truck". Every model function defaults
+// to "cup", so existing callers behave byte-identically when no series
+// is passed. Callers pass the per-series CSV data; the series param
+// selects the driver list, display info, track-type lists and field size.
+// ─────────────────────────────────────────────────────────────
+const SERIES_MODEL_CONFIG = {
+  cup:     { names: FULL_TIMER_NAMES,          drivers: INITIAL_DRIVERS },
+  xfinity: { names: FULL_TIMER_NAMES_XFINITY,  drivers: INITIAL_DRIVERS_XFINITY },
+  truck:   { names: FULL_TIMER_NAMES_TRUCK,    drivers: INITIAL_DRIVERS_TRUCK },
+};
+function seriesModelConfig(series) {
+  return SERIES_MODEL_CONFIG[series] || SERIES_MODEL_CONFIG.cup;
+}
 
 // ─────────────────────────────────────────────────────────────
 // PREDICTOR ENGINES — Pure Stats & Enhanced Pure Stats
@@ -9,28 +25,62 @@ import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
 // nascar_enhanced_pure_stats.py
 // ─────────────────────────────────────────────────────────────
 
-// Track type classifier for predictor engines (matches Python)
-const PRED_ROAD_COURSES = [
-  'Circuit Of The Americas','Sonoma Raceway','Watkins Glen International Raceway',
-  'Watkins Glen International','Road America','Chicago Street Course',
-  'Indianapolis Motor Speedway','Autodromo Hermanos Rodriguez',
-  'San Diego Road Course','Charlotte Motor Speedway (ROVAL)',
-  'Naval Base Coronado Street Course',
-];
-const PRED_SHORT_TRACKS = ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway','Iowa Speedway','New Hampshire Motor Speedway'];
-const PRED_SUPERSPEEDWAYS = ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway','Atlanta Motor Speedway'];
-const PRED_DIRT_TRACKS = ['Bristol Motor Speedway (DIRT)'];
+// Track type classifier lists, per series (matches Python).
+// Substring-matched against CSV track names, so each series' list covers
+// the tracks that series actually runs (2022-2026 history included):
+// Xfinity-only Portland/Road America/Chicago Street, Truck-only
+// Mid-Ohio/Lime Rock/St. Petersburg/Knoxville/IRP, Cup-only Mexico City.
+// Rockingham falls through to 'intermediate' in every series, matching
+// the 2026 schedule files.
+const PRED_TRACK_TYPE_LISTS = {
+  cup: {
+    road: [
+      'Circuit Of The Americas','Sonoma Raceway','Watkins Glen International Raceway',
+      'Watkins Glen International','Road America','Chicago Street Course',
+      'Indianapolis Motor Speedway','Autodromo Hermanos Rodriguez',
+      'San Diego Road Course','Charlotte Motor Speedway (ROVAL)',
+      'Naval Base Coronado Street Course',
+    ],
+    short: ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway','Iowa Speedway','New Hampshire Motor Speedway'],
+    superspeedway: ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway','Atlanta Motor Speedway'],
+    dirt: ['Bristol Motor Speedway (DIRT)'],
+  },
+  xfinity: {
+    road: [
+      'Circuit Of The Americas','Sonoma Raceway','Watkins Glen International Raceway',
+      'Watkins Glen International','Road America','Chicago Street Course',
+      'Indianapolis Motor Speedway','Autodromo Hermanos Rodriguez',
+      'Portland International Raceway','Charlotte Motor Speedway (ROVAL)',
+      'Naval Base Coronado Street Course',
+    ],
+    short: ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','Iowa Speedway','New Hampshire Motor Speedway'],
+    superspeedway: ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway','Atlanta Motor Speedway'],
+    dirt: [],
+  },
+  truck: {
+    road: [
+      'Watkins Glen International Raceway','Watkins Glen International',
+      'Charlotte Motor Speedway (ROVAL)','Naval Base Coronado Street Course',
+      'Lime Rock Park','St. Petersburg Street Course','Mid-Ohio Sports Car Course',
+      'Circuit Of The Americas','Sonoma Raceway',
+    ],
+    short: ['Martinsville Speedway','Bristol Motor Speedway','Richmond Raceway','North Wilkesboro Speedway','New Hampshire Motor Speedway','Lucas Oil Indianapolis Raceway Park'],
+    superspeedway: ['Daytona International Speedway','Talladega Superspeedway','Echopark Speedway','Atlanta Motor Speedway'],
+    dirt: ['Bristol Motor Speedway (DIRT)','Knoxville Raceway'],
+  },
+};
 
-export function predGetTrackType(trackName, year) {
+export function predGetTrackType(trackName, year, series = "cup") {
+  const lists = PRED_TRACK_TYPE_LISTS[series] || PRED_TRACK_TYPE_LISTS.cup;
   const tl = (trackName||"").toLowerCase();
   // Indianapolis ran the road course in 2022-2023 and the oval from 2024 on.
   if (tl.includes("indianapolis motor speedway")) {
     return (year != null && year >= 2024) ? 'intermediate' : 'road_course';
   }
-  if (PRED_DIRT_TRACKS.some(r => tl.includes(r.toLowerCase()))) return 'dirt';
-  if (PRED_ROAD_COURSES.some(r => tl.includes(r.toLowerCase()))) return 'road_course';
-  if (PRED_SHORT_TRACKS.some(r => tl.includes(r.toLowerCase()))) return 'short_track';
-  if (PRED_SUPERSPEEDWAYS.some(r => tl.includes(r.toLowerCase()))) return 'superspeedway';
+  if (lists.dirt.some(r => tl.includes(r.toLowerCase()))) return 'dirt';
+  if (lists.road.some(r => tl.includes(r.toLowerCase()))) return 'road_course';
+  if (lists.short.some(r => tl.includes(r.toLowerCase()))) return 'short_track';
+  if (lists.superspeedway.some(r => tl.includes(r.toLowerCase()))) return 'superspeedway';
   return 'intermediate';
 }
 
@@ -69,12 +119,13 @@ export function predBuildDriverIndex(csvData) {
 }
 
 // ── Pure Stats Predictor (from pure_stats_predictor.py) ──
-export function runPureStatsPrediction(csvData, scheduleTrack, scheduleType, scheduleYear) {
+export function runPureStatsPrediction(csvData, scheduleTrack, scheduleType, scheduleYear, series = "cup") {
+  const cfg = seriesModelConfig(series);
   const driverIdx = predBuildDriverIndex(csvData);
-  const trackType = predGetTrackType(scheduleTrack, scheduleYear);
+  const trackType = predGetTrackType(scheduleTrack, scheduleYear, series);
   const predictions = [];
 
-  for (const driverName of FULL_TIMER_NAMES) {
+  for (const driverName of cfg.names) {
     const rows = driverIdx[driverName];
     if (!rows || rows.length === 0) continue;
 
@@ -92,7 +143,7 @@ export function runPureStatsPrediction(csvData, scheduleTrack, scheduleType, sch
     const trackRaces = trackRows.length;
 
     // Track-type performance
-    const typeRows = rows.filter(r => predGetTrackType(r[1], r[2]) === trackType);
+    const typeRows = rows.filter(r => predGetTrackType(r[1], r[2], series) === trackType);
     const typeAvg = typeRows.length > 0 ? typeRows.reduce((s,r)=>s+r[3],0)/typeRows.length : 20.0;
     const typeWins = typeRows.filter(r => r[3]===1).length;
     const typeRaces = typeRows.length;
@@ -117,7 +168,7 @@ export function runPureStatsPrediction(csvData, scheduleTrack, scheduleType, sch
     const top10Prob = Math.max(20, Math.min(95, 120 - score*1.5)) / 100;
 
     // Find driver info from INITIAL_DRIVERS for display
-    const dInfo = INITIAL_DRIVERS.find(d => d.name === driverName);
+    const dInfo = cfg.drivers.find(d => d.name === driverName);
 
     predictions.push({
       driver: driverName,
@@ -154,12 +205,13 @@ const ENH_PLAYOFF_TRACKS = [
   'Talladega Superspeedway','Martinsville Speedway','Homestead-Miami Speedway',
 ];
 
-export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType, scheduleYear) {
+export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleType, scheduleYear, series = "cup") {
+  const cfg = seriesModelConfig(series);
   const driverIdx = predBuildDriverIndex(csvData);
-  const trackType = predGetTrackType(scheduleTrack, scheduleYear);
+  const trackType = predGetTrackType(scheduleTrack, scheduleYear, series);
   const predictions = [];
 
-  for (const driverName of FULL_TIMER_NAMES) {
+  for (const driverName of cfg.names) {
     const rows = driverIdx[driverName];
     if (!rows || rows.length === 0) continue;
 
@@ -177,7 +229,7 @@ export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleT
     const trackRaces = trackRows.length;
 
     // Track-type
-    const typeRows = rows.filter(r => predGetTrackType(r[1], r[2]) === trackType);
+    const typeRows = rows.filter(r => predGetTrackType(r[1], r[2], series) === trackType);
     const typeAvg = typeRows.length > 0 ? typeRows.reduce((s,r)=>s+r[3],0)/typeRows.length : 20.0;
     const typeWins = typeRows.filter(r=>r[3]===1).length;
     const typeRaces = typeRows.length;
@@ -294,7 +346,7 @@ export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleT
     const top5Prob = Math.max(10, Math.min(95, 110 - enhancedScore*2.0)) / 100;
     const top10Prob = Math.max(20, Math.min(95, 120 - enhancedScore*1.5)) / 100;
 
-    const dInfo = INITIAL_DRIVERS.find(d => d.name === driverName);
+    const dInfo = cfg.drivers.find(d => d.name === driverName);
 
     predictions.push({
       driver: driverName,
