@@ -26,18 +26,26 @@ export const DFS_MIN_TOP_TIER = 1;
 // Upgrade a lineup by swapping cheaper drivers for more expensive ones to meet salary floor
 
 
-export function dfsScoreDK(fin, start, lapsLed, totalLaps, isMostLapsLed, projectedFL) {
+export function dfsScoreDK(fin, start, lapsLed, projectedFL) {
+  // True 2026 DraftKings NASCAR scoring, verified against DK's published table:
+  // finish 1st=45, 2nd=42, 3rd=41, 4th-10th = 44-pos, 11th=32, 12th-20th = 43-pos,
+  // 21st=21, 22nd-30th = 42-pos, 31st=10, 32nd-40th = 41-pos; PD +/-1 per pos;
+  // laps led 0.25/lap; fastest laps 0.45/lap. DK awards no most-laps-led bonus.
   let finPts = 0;
-  if (fin === 1)       finPts = 46;
+  if (fin === 1)       finPts = 45;
   else if (fin === 2)  finPts = 42;
-  else if (fin === 3)  finPts = 41;
-  else if (fin <= 43)  finPts = 44 - fin;
+  else if (fin <= 10)  finPts = 44 - fin;
+  else if (fin === 11) finPts = 32;
+  else if (fin <= 20)  finPts = 43 - fin;
+  else if (fin === 21) finPts = 21;
+  else if (fin <= 30)  finPts = 42 - fin;
+  else if (fin === 31) finPts = 10;
+  else if (fin <= 40)  finPts = 41 - fin;
   else                 finPts = 1;
   const placeDiff  = (start - fin) * 1.0;
   const ledPts     = lapsLed * 0.25;
   const fastLapPts = (projectedFL || 0) * 0.45;
-  const mostBonus  = isMostLapsLed ? 5 : 0;
-  return finPts + placeDiff + ledPts + fastLapPts + mostBonus;
+  return finPts + placeDiff + ledPts + fastLapPts;
 }
 
 
@@ -292,8 +300,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
 
     let projectedPts;
     if (platformId === "dk") {
-      const isMostLaps = adjustedLapsLed > totalLaps * 0.25;
-      projectedPts = dfsScoreDK(Math.round(projFinish), projStart, adjustedLapsLed, totalLaps, isMostLaps, adjustedFL);
+      projectedPts = dfsScoreDK(Math.round(projFinish), projStart, adjustedLapsLed, adjustedFL);
     } else {
       projectedPts = dfsScoreFD(Math.round(projFinish), projStart, adjustedLapsLed, totalLaps, adjustedLapsCompleted);
     }
@@ -842,7 +849,7 @@ export function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, increm
           </div>
           <div style={{ lineHeight: 1.7, borderTop: `1px solid ${T.border}`, paddingTop: 8 }}>
             {platform === "dk" ? (
-              <>Finish: 1st=46, 2nd=42, 3rd=41…40th=4 · Place Diff: ±1.0/pos · Laps Led: 0.25/lap · Fastest Laps: 0.45/lap · Most Laps Led Bonus: 5pts</>
+              <>Finish: 1st=45, 2nd=42, 3rd=41…40th=1 (extra drop at 11th/21st/31st) · Place Diff: ±1.0/pos · Laps Led: 0.25/lap · Fastest Laps: 0.45/lap</>
             ) : (
               <>Finish: 1st=43, 2nd=40, 3rd=38, 4th=37…40th=1 · Place Diff: ±0.5/pos · Laps Led: 0.1/lap · Laps Completed: 0.1/lap</>
             )}
