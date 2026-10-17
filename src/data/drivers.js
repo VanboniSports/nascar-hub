@@ -47,6 +47,14 @@ export const INITIAL_DRIVERS = [
 
 export const FULL_TIMER_NAMES = INITIAL_DRIVERS.map(d => d.name);
 
+// Part-time / open-team drivers with Cup starts who can appear in DFS
+// salary pools but are not full-timers. Keyed by canonical name; used as
+// fallback driver info when a salary/qualifying import names a driver
+// outside INITIAL_DRIVERS.
+export const EXTRA_DRIVER_INFO = {
+  "Corey Heim": { num: "67", team: "23XI Racing", mfg: "Toyota" },
+};
+
 // CSV name aliases — maps quirky CSV names to canonical INITIAL_DRIVERS names.
 // Canonical form: juniors end with "Jr" (no period). Run name through
 // normalizeCsvDriverName before any lookup against INITIAL_DRIVERS.
