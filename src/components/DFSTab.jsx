@@ -5,7 +5,7 @@ import { InfoLegend } from "./ui.jsx";
 import { SCHEDULE, SCHEDULE_YEAR } from "../data/schedule.js";
 import { trackEvent } from "../lib/analytics.js";
 import { DFS_PLATFORMS } from "../data/siteMeta.js";
-import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { INITIAL_DRIVERS, FULL_TIMER_NAMES, EXTRA_DRIVER_INFO } from "../data/drivers.js";
 import { predBuildDriverIndex, predGetTrackType, predMatchTrack } from "../models/predictors.js";
 import { dominatorRatingsForField, dominatorTagQualifiers } from "../lib/loopMetrics.js";
 
@@ -86,10 +86,14 @@ export function dfsLapsLedShare(driverRows, scheduleTrack, trackType, currentYea
 // §3 PROJECT DFS POINTS
 
 
-export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracticeData, raceYear) {
+export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qualPracticeData, raceYear, extraDrivers = []) {
   if (!csvData?.length || !race) return [];
   const disabledSet = new Set((disabledDrivers || []).map(d => d.name));
   const driverIdx   = predBuildDriverIndex(csvData);
+  // Field = full-timers plus any extra drivers with salaries for this race
+  // (e.g. part-time / open-team entries like Corey Heim).
+  const fieldDrivers = [...FULL_TIMER_NAMES];
+  for (const d of (extraDrivers || [])) if (d && !fieldDrivers.includes(d)) fieldDrivers.push(d);
   const trackType   = predGetTrackType(race.track, raceYear);
   const totalLaps   = race.laps || 200;
   // Dominator rating per driver at THIS track type, recent seasons only, normalized vs the field.
@@ -98,7 +102,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
   // vs the field max, windowed to the last 3 seasons at this track type.
   const dataMaxYear = Math.max(...csvData.map(r => r[2]));
   const domFieldRows = {};
-  for (const driverName of FULL_TIMER_NAMES) {
+  for (const driverName of fieldDrivers) {
     const drows = (driverIdx[driverName] || []).filter(r => r[2] >= dataMaxYear - 2 && predGetTrackType(r[1], r[2]) === trackType);
     domFieldRows[driverName] = drows;
   }
@@ -109,7 +113,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
   const qualifyingData = (qualPracticeData && qualPracticeData.week === raceWeek) ? qualPracticeData.qualifying : null;
   const practiceData = (qualPracticeData && qualPracticeData.week === raceWeek) ? qualPracticeData.practice : null;
   const projections = [];
-  for (const driverName of FULL_TIMER_NAMES) {
+  for (const driverName of fieldDrivers) {
     if (disabledSet.has(driverName)) continue;
     const rows = driverIdx[driverName];
     if (!rows || rows.length === 0) continue;
@@ -312,7 +316,7 @@ export function dfsProjectPoints(csvData, race, platformId, disabledDrivers, qua
     // diffPts: strip laps-completed floor for FD so value calc isn't inflated
     const lapsCompletedFloor = (platformId === "fd") ? (totalLaps * 0.1) : 0;
     const diffPts = Math.round((projectedPts - lapsCompletedFloor) * 10) / 10;
-    const dInfo = INITIAL_DRIVERS.find(d => d.name === driverName);
+    const dInfo = INITIAL_DRIVERS.find(d => d.name === driverName) || EXTRA_DRIVER_INFO[driverName];
     const tags = [];
     if (trackWins >= 2) tags.push("Track Ace");
     else if (trackWins >= 1) tags.push("Track Winner");
@@ -741,7 +745,10 @@ export function DFSTab({ csvData, dfsSalaries, dfsDisabled, qualPractice, increm
   const runOptimizer = () => {
     if (!race || !hasCsv) return;
     trackEvent("dfs_optimizer_run", { platform: platform, race_week: race.week, race_name: race.name });
-    let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled, qualPractice, SCHEDULE_YEAR);
+    // Include any driver with a salary for this race even if not a full-timer
+    // (e.g. part-time / open-team entries like Corey Heim).
+    const extraDrivers = Object.keys(salaryData);
+    let projections = dfsProjectPoints(csvData, race, platform, dfsDisabled, qualPractice, SCHEDULE_YEAR, extraDrivers);
     projections = projections.map(p => {
       const sal = salaryData[p.driver] || 0;
       return { ...p, salary: sal, value: sal > 0 ? Math.round((p.diffPts / (sal / 1000)) * 100) / 100 : 0 };
