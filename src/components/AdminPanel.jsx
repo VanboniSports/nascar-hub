@@ -1209,6 +1209,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
         if (nameIdx < 0 || salaryIdx < 0) { setUploadMsg("❌ Could not find Name and Salary columns"); return; }
         const salaries = {};
         let matched = 0;
+        const extraDrivers = [];
         for (let i = 1; i < lines.length; i++) {
           if (!lines[i].trim()) continue;
           const fields = [];
@@ -1236,15 +1237,22 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
             return dn === rn || rn.includes(dn) || dn.includes(rn);
           });
           if (matchedDriver) { salaries[matchedDriver] = rawSal; matched++; }
+          else if (/^[A-Za-z]/.test(normalizedRaw) && normalizedRaw.includes(" ")) {
+            // Accept drivers outside the full-time list (e.g. part-time /
+            // open-team entries like Corey Heim) instead of silently dropping.
+            salaries[normalizedRaw] = rawSal; matched++;
+            extraDrivers.push(normalizedRaw);
+          }
         }
         if (matched === 0) { setUploadMsg("❌ No drivers matched"); return; }
+        const extraNames = [...new Set(extraDrivers)];
         const updated = {
           ...dfsSalaries,
           [activePlatform]: salaries,
           [`${activePlatform}_updated`]: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
         };
         onDfsSalariesSave(updated);
-        setUploadMsg(`✓ Imported ${matched} ${plat.abbr} salaries`);
+        setUploadMsg(`✓ Imported ${matched} ${plat.abbr} salaries` + (extraNames.length ? ` (${extraNames.length} outside full-time list: ${extraNames.join(", ")})` : ""));
         e.target.value = "";
       } catch (err) { setUploadMsg(`❌ Parse error: ${err.message}`); }
     };
@@ -1252,8 +1260,9 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
   };
 
   const handleManualAdd = () => {
-    const match = FULL_TIMER_NAMES.find(d => d.toLowerCase() === manualName.trim().toLowerCase());
-    if (!match) { setUploadMsg("❌ Driver not found"); return; }
+    const match = FULL_TIMER_NAMES.find(d => d.toLowerCase() === manualName.trim().toLowerCase())
+      || normalizeCsvDriverName(manualName.trim());
+    if (!match || !/^[A-Za-z]/.test(match) || !match.includes(" ")) { setUploadMsg("❌ Driver not found"); return; }
     const sal = parseInt(manualSalary.replace(/[^0-9]/g, "")) || 0;
     if (sal <= 0) { setUploadMsg("❌ Enter a valid salary"); return; }
     const current = dfsSalaries?.[activePlatform] || {};
@@ -1268,8 +1277,9 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
   };
 
   const handleDisableDriver = () => {
-    const match = FULL_TIMER_NAMES.find(d => d.toLowerCase() === disableDriverName.trim().toLowerCase());
-    if (!match) { setUploadMsg("❌ Driver not found"); return; }
+    const match = FULL_TIMER_NAMES.find(d => d.toLowerCase() === disableDriverName.trim().toLowerCase())
+      || normalizeCsvDriverName(disableDriverName.trim());
+    if (!match || !/^[A-Za-z]/.test(match) || !match.includes(" ")) { setUploadMsg("❌ Driver not found"); return; }
     if ((dfsDisabled || []).find(d => d.name === match)) { setUploadMsg("⚠ Already disabled"); return; }
     const updated = [...(dfsDisabled || []), { name: match, reason: disableReason.trim() || "" }];
     onDfsDisabledSave(updated);
@@ -1299,10 +1309,11 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
         const dl = d.toLowerCase();
         return dl === nl || nl.includes(dl) || dl.includes(nl);
       });
-      if (!fuzzy && /^[A-Za-z]/.test(raw.trim()) && raw.trim().includes(" ")) {
-        console.warn("[QualPractice matchDriver] Unmatched driver name:", raw.trim(), "→ normalized:", normalized);
-      }
-      return fuzzy || null;
+      if (fuzzy) return fuzzy;
+      // Accept drivers outside the full-time list (e.g. part-time / open-team
+      // entries) so their qualifying/practice data flows through.
+      if (/^[A-Za-z]/.test(normalized) && normalized.includes(" ")) return normalized;
+      return null;
     };
 
     for (const line of lines) {
@@ -1396,10 +1407,11 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
         const dl = d.toLowerCase();
         return dl === nl || nl.includes(dl) || dl.includes(nl);
       });
-      if (!fuzzy && /^[A-Za-z]/.test(raw.trim()) && raw.trim().includes(" ")) {
-        console.warn("[PracticeTiming] Unmatched driver:", raw.trim(), "→ normalized:", normalized);
-      }
-      return fuzzy || null;
+      if (fuzzy) return fuzzy;
+      // Accept drivers outside the full-time list (e.g. part-time / open-team
+      // entries) so their qualifying/practice data flows through.
+      if (/^[A-Za-z]/.test(normalized) && normalized.includes(" ")) return normalized;
+      return null;
     };
 
     const driverData = []; // { name, overall, lap5, lap10, lap15, lap20, lap25, lap30 }
