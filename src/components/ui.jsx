@@ -138,7 +138,10 @@ export const BattleChartTooltip = ({ active, payload, label }) => {
 };
 
 
-export function SearchDropdown({ label, options, value, onChange, placeholder }) {
+export function SearchDropdown({ label, options, groups, value, onChange, placeholder }) {
+  // groups (optional): [{ label, options }] — renders non-clickable group
+  // headers above each group's options. When groups is given it replaces
+  // the flat options list; flat behaviour is unchanged when it is absent.
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
@@ -150,9 +153,17 @@ export function SearchDropdown({ label, options, value, onChange, placeholder })
   }, []);
 
   const filtered = useMemo(() =>
-    options.filter(o => o.toLowerCase().includes(search.toLowerCase())),
+    (options || []).filter(o => o.toLowerCase().includes(search.toLowerCase())),
     [options, search]
   );
+
+  const filteredGroups = useMemo(() => {
+    if (!groups) return null;
+    const q = search.toLowerCase();
+    return groups
+      .map(g => ({ label: g.label, options: g.options.filter(o => o.toLowerCase().includes(q)) }))
+      .filter(g => g.options.length > 0);
+  }, [groups, search]);
 
   return (
     <div style={{ flex:1, minWidth:200 }} ref={ref}>
@@ -172,8 +183,22 @@ export function SearchDropdown({ label, options, value, onChange, placeholder })
               <input autoFocus placeholder={`Search ${label.toLowerCase()}...`} value={search} onChange={e => setSearch(e.target.value)}
                 style={{ width:"100%", background:T.surface3, border:`1px solid ${T.border}`, borderRadius:6, padding:"7px 10px", color:T.text, fontSize:12, outline:"none", boxSizing:"border-box", fontFamily:"'Barlow',sans-serif" }} />
             </div>
-            {filtered.length === 0 && <div style={{ padding:"12px 14px", color:T.textDim, fontSize:12 }}>No results</div>}
-            {filtered.map(o => (
+            {filteredGroups
+              ? filteredGroups.length === 0 && <div style={{ padding:"12px 14px", color:T.textDim, fontSize:12 }}>No results</div>
+              : filtered.length === 0 && <div style={{ padding:"12px 14px", color:T.textDim, fontSize:12 }}>No results</div>}
+            {filteredGroups ? filteredGroups.map(g => (
+              <div key={g.label}>
+                <div style={{ padding:"8px 14px 4px", fontSize:10, letterSpacing:2, color:T.accent, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", textTransform:"uppercase" }}>{g.label}</div>
+                {g.options.map(o => (
+                  <div key={o} onClick={() => {onChange(o);setSearch("");setOpen(false);}}
+                    style={{ padding:"9px 14px", cursor:"pointer", background:value===o?T.accentSoft:"transparent", color:value===o?T.accent:T.textMid, fontSize:13, fontWeight:value===o?600:400, borderLeft:value===o?`3px solid ${T.accent}`:"3px solid transparent", transition:"background 0.1s" }}
+                    onMouseEnter={e=>{ if(value!==o) e.currentTarget.style.background=T.surface2; }}
+                    onMouseLeave={e=>{ if(value!==o) e.currentTarget.style.background="transparent"; }}>
+                    {o}
+                  </div>
+                ))}
+              </div>
+            )) : filtered.map(o => (
               <div key={o} onClick={() => {onChange(o);setSearch("");setOpen(false);}}
                 style={{ padding:"9px 14px", cursor:"pointer", background:value===o?T.accentSoft:"transparent", color:value===o?T.accent:T.textMid, fontSize:13, fontWeight:value===o?600:400, borderLeft:value===o?`3px solid ${T.accent}`:"3px solid transparent", transition:"background 0.1s" }}
                 onMouseEnter={e=>{ if(value!==o) e.currentTarget.style.background=T.surface2; }}

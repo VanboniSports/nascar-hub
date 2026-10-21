@@ -104,10 +104,16 @@ export function DaTrackBreakdown({ csvData, fullTimerNames }) {
     return bd;
   }, [csvData]);
 
-  // Driver list: only full-timers from INITIAL_DRIVERS
-  const driverList = useMemo(() => {
-    return activeFullTimerNames.filter(n => byDriver[n]);
-  }, [byDriver]);
+  // Driver picker groups: full-time roster (in roster order) first, then
+  // every other driver in the series data, alphabetical. A full-timer with
+  // no rows in the data does not appear, same as before.
+  const driverGroups = useMemo(() => {
+    const fullSet = new Set(activeFullTimerNames);
+    return {
+      fullTime: activeFullTimerNames.filter(n => byDriver[n]),
+      partTime: Object.keys(byDriver).filter(n => !fullSet.has(n)).sort(),
+    };
+  }, [byDriver, activeFullTimerNames]);
 
   // Helper: build stats for a set of races at a given track
   function buildTrackStat(track, tRaces) {
@@ -264,7 +270,16 @@ export function DaTrackBreakdown({ csvData, fullTimerNames }) {
         <select value={selDriver} onChange={e => { setSelDriver(e.target.value); setExpanded({}); setSortCol("avgFinish"); setSortAsc(true); }}
           style={{ width:"100%", maxWidth:380, padding:"10px 14px", background:T.surface2, color:T.text, border:`1px solid ${T.border2}`, borderRadius:8, fontSize:14, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", cursor:"pointer", outline:"none" }}>
           <option value="">— Choose a driver —</option>
-          {driverList.map(d => <option key={d} value={d}>{d}</option>)}
+          {driverGroups.fullTime.length > 0 && (
+            <optgroup label="Full-time">
+              {driverGroups.fullTime.map(d => <option key={d} value={d}>{d}</option>)}
+            </optgroup>
+          )}
+          {driverGroups.partTime.length > 0 && (
+            <optgroup label="Part-time">
+              {driverGroups.partTime.map(d => <option key={d} value={d}>{d}</option>)}
+            </optgroup>
+          )}
         </select>
       </div>
 
@@ -493,7 +508,16 @@ export function DaHeadToHead({ csvData, incrementTool, fullTimerNames }) {
     return bd;
   }, [csvData, h2hTrackFilter, byDriverFull]);
 
-  const driverList = useMemo(() => activeFullTimerNames.filter(n => byDriverFull[n]).sort(), [byDriverFull]);
+  // Driver picker groups: full-time roster (in roster order) first, then
+  // every other driver in the series data, alphabetical. Stats already
+  // compute from byDriver for any selected name, so part-timers work here.
+  const driverGroups = useMemo(() => {
+    const fullSet = new Set(activeFullTimerNames);
+    return {
+      fullTime: activeFullTimerNames.filter(n => byDriverFull[n]),
+      partTime: Object.keys(byDriverFull).filter(n => !fullSet.has(n)).sort(),
+    };
+  }, [byDriverFull, activeFullTimerNames]);
 
   const setDriver = (idx, val) => {
     setSelectedDrivers(prev => { const next = [...prev]; next[idx] = val; return next; });
@@ -616,7 +640,16 @@ export function DaHeadToHead({ csvData, incrementTool, fullTimerNames }) {
               <div style={{ ...labelStyle, color: selectedDrivers[idx] ? color : T.textDim }}>Driver {idx+1}{idx >= 2 ? " (optional)" : ""}</div>
               <select value={selectedDrivers[idx]} onChange={e=>setDriver(idx, e.target.value)} style={selStyle}>
                 <option value="">— {idx >= 2 ? "Optional" : "Select"} —</option>
-                {driverList.filter(d=>!others.includes(d)).map(d=><option key={d} value={d}>{d}</option>)}
+                {driverGroups.fullTime.filter(d=>!others.includes(d)).length > 0 && (
+                  <optgroup label="Full-time">
+                    {driverGroups.fullTime.filter(d=>!others.includes(d)).map(d=><option key={d} value={d}>{d}</option>)}
+                  </optgroup>
+                )}
+                {driverGroups.partTime.filter(d=>!others.includes(d)).length > 0 && (
+                  <optgroup label="Part-time">
+                    {driverGroups.partTime.filter(d=>!others.includes(d)).map(d=><option key={d} value={d}>{d}</option>)}
+                  </optgroup>
+                )}
               </select>
             </div>
           );

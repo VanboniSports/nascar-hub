@@ -237,12 +237,13 @@ export function TrackLeaderboardTab({ csvData, incrementTool, fullTimerNames }) 
 // ─────────────────────────────────────────────────────────────
 
 
-export function DriverTrackLookup({ csvData, incrementTool }) {
+export function DriverTrackLookup({ csvData, incrementTool, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [selDriver, setSelDriver] = useState("");
   const [selTrack, setSelTrack] = useState("");
   const [result, setResult] = useState(null);
 
-  const { allDrivers, allTracks, byDriverTrack } = useMemo(() => {
+  const { allDrivers, allTracks, byDriverTrack, driverGroups } = useMemo(() => {
     const bd = {};
     const drivers = new Set();
     const tracks = new Set();
@@ -255,12 +256,20 @@ export function DriverTrackLookup({ csvData, incrementTool }) {
       if (!bd[driver][track]) bd[driver][track] = [];
       bd[driver][track].push(r);
     }
+    // Driver dropdown groups: full-time roster (in roster order) first,
+    // then everyone else in the series data, alphabetical. A full-timer
+    // with no rows in the data does not appear, same as before.
+    const fullSet = new Set(activeFullTimerNames);
     return {
       allDrivers: [...drivers].sort(),
       allTracks: [...tracks].sort(),
       byDriverTrack: bd,
+      driverGroups: [
+        { label: "Full-time", options: activeFullTimerNames.filter(n => drivers.has(n)) },
+        { label: "Part-time", options: [...drivers].filter(d => !fullSet.has(d)).sort() },
+      ],
     };
-  }, [csvData]);
+  }, [csvData, activeFullTimerNames]);
 
   function computeDriverTrackStats(driver, track) {
     const races = (byDriverTrack[driver] && byDriverTrack[driver][track]) || [];
@@ -378,7 +387,7 @@ export function DriverTrackLookup({ csvData, incrementTool }) {
       {/* Controls */}
       <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:18 }}>
         <div style={{ display:"flex", gap:14, flexWrap:"wrap", marginBottom:14 }}>
-          <SearchDropdown label="Driver" options={allDrivers} value={selDriver} onChange={setSelDriver} placeholder="Any driver..." />
+          <SearchDropdown label="Driver" groups={driverGroups} value={selDriver} onChange={setSelDriver} placeholder="Any driver..." />
           <SearchDropdown label="Track" options={allTracks} value={selTrack} onChange={setSelTrack} placeholder="Any track..." />
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -691,7 +700,7 @@ export function TrackStatsTab({ csvData, incrementTool, series = "cup", onSeries
 
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "lookup"      && <DriverTrackLookup csvData={csvData} incrementTool={incrementTool} />}
+        {subTab === "lookup"      && <DriverTrackLookup csvData={csvData} incrementTool={incrementTool} fullTimerNames={activeFullTimerNames} />}
         {subTab === "leaderboard" && <TrackLeaderboardTab csvData={csvData} incrementTool={incrementTool} fullTimerNames={activeFullTimerNames} />}
       </div>
     </div>
