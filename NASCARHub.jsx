@@ -221,12 +221,19 @@ export default function NASCARHub() {
   const activeCsvData = activeSeries === "cup" ? csvData : (seriesCsvData[activeSeries] || []);
 
   // Season Points — manually entered NASCAR official points, keyed by "driverName__year"
+  // Phase 3: one object per series. Cup keeps the legacy app_state key
+  // "seasonPoints" exactly; O'Reilly uses "seasonPointsXfinity" and Trucks
+  // uses "seasonPointsTruck", same inner key format, so the same driver
+  // name in two series can never collide.
   const [seasonPoints, setSeasonPoints] = useState({});
+  const [seasonPointsXfinity, setSeasonPointsXfinity] = useState({});
+  const [seasonPointsTruck, setSeasonPointsTruck] = useState({});
   // Phase 4 fix (TDZ): activeSeasonPoints must be declared AFTER seasonPoints.
   // It previously read seasonPoints on line 222, before its useState on line 225,
   // which threw "Cannot access 'seasonPoints' before initialization" on every
-  // Cup first render and blanked the whole preview.
-  const activeSeasonPoints = activeSeries === "cup" ? seasonPoints : {};
+  // Cup first render and blanked the whole preview. Same rule applies to the
+  // two Phase 3 states above: this derived line stays below all three.
+  const activeSeasonPoints = activeSeries === "xfinity" ? seasonPointsXfinity : activeSeries === "truck" ? seasonPointsTruck : seasonPoints;
 
   // DFS Optimizer state — persisted via Supabase
   const [dfsSalaries, setDfsSalaries] = useState({});
@@ -386,6 +393,22 @@ export default function NASCARHub() {
     } catch (e) { console.error("Season points save error:", e); }
   }, []);
 
+  // Phase 3: per-series saves. Cup's callback above is byte-identical in
+  // behaviour to before; these two only ever touch their own new keys.
+  const saveSeasonPointsXfinity = useCallback(async (updated) => {
+    setSeasonPointsXfinity(updated);
+    try {
+      await sb.from("app_state").upsert({ key:"seasonPointsXfinity", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("Season points save error (O'Reilly):", e); }
+  }, []);
+
+  const saveSeasonPointsTruck = useCallback(async (updated) => {
+    setSeasonPointsTruck(updated);
+    try {
+      await sb.from("app_state").upsert({ key:"seasonPointsTruck", value:updated }, { onConflict:"key" });
+    } catch (e) { console.error("Season points save error (Trucks):", e); }
+  }, []);
+
   const saveDfsSalaries = useCallback(async (updated) => {
     setDfsSalaries(updated);
     try {
@@ -542,7 +565,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     Promise.all([loadFromSupabase(), loadHubEditorial()]).then(([data]) => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.filter(r=>r.name!=="Kyle Busch").map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -551,6 +574,8 @@ export default function NASCARHub() {
       if (rfRows?.[0]) setRecentFinishes(rfRows[0].value||{});
       if (raRows?.[0]) setRaceArchive(raRows[0].value||[]);
       if (spRows?.[0]) setSeasonPoints(spRows[0].value||{});
+      if (spxRows?.[0]) setSeasonPointsXfinity(spxRows[0].value||{});
+      if (spTruckRows?.[0]) setSeasonPointsTruck(spTruckRows[0].value||{});
       if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
       if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
       if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
@@ -808,6 +833,10 @@ export default function NASCARHub() {
           onCsvRefresh={refreshCsv}
           seasonPoints={seasonPoints}
           onSeasonPointsSave={saveSeasonPoints}
+          seasonPointsXfinity={seasonPointsXfinity}
+          onSeasonPointsSaveXfinity={saveSeasonPointsXfinity}
+          seasonPointsTruck={seasonPointsTruck}
+          onSeasonPointsSaveTruck={saveSeasonPointsTruck}
           toolUsage={toolUsage}
           dfsSalaries={dfsSalaries}
           onDfsSalariesSave={saveDfsSalaries}

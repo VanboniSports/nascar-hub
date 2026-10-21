@@ -39,9 +39,13 @@ export const SSChartTooltip = ({ active, payload, label }) => {
 export function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoints, incrementTool, series = "cup", onSeriesChange, fullTimerNames }) {
   const [subTab, setSubTab] = useState("standings");
   const activeSeries = normalizeSeries(series);
-  // Season points are Cup-only today (admin Phase 3). For lower series the
-  // parent passes an empty object, so the Pts column renders as a dash,
-  // exactly as it does for a Cup driver with no points row yet.
+  // Phase 3: the parent now passes the active series' own points object,
+  // so the Pts column renders from it for every series. The notice below
+  // shows only while that series has NO points entries at all, and
+  // disappears automatically once data lands, with no further code change.
+  // A driver with no points row in a populated series still renders as a
+  // dash, exactly as Cup did before.
+  const hasSeriesPoints = seasonPoints && Object.keys(seasonPoints).length > 0;
   const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
 
   useEffect(() => { incrementTool?.("season_stats"); }, []);
@@ -49,7 +53,7 @@ export function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoi
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
       <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
-      {activeSeries !== "cup" && (
+      {activeSeries !== "cup" && !hasSeriesPoints && (
         <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 16px", fontSize:12, color:T.textMid, lineHeight:1.6, marginBottom:16 }}>
           Season stats below are built from the {seriesLabel(activeSeries)} Series race history. Official points are not in the site for this series yet, so the Pts column shows a dash until per-series points are entered in the admin panel.
         </div>

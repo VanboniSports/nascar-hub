@@ -54,6 +54,12 @@ export async function loadFromSupabase() {
     const rfRows = byKey["recentFinishes"] || [];
     const raRows = byKey["raceArchive"] || [];
     const spRows = byKey["seasonPoints"] || [];
+    // Phase 3: per-series points. Cup keeps the legacy "seasonPoints" key
+    // exactly; lower series get their own keys with the same inner format
+    // (`${driverName}__${year}` -> points), so a driver with points in two
+    // series (e.g. Austin Hill) can never collide.
+    const spxRows = byKey["seasonPointsXfinity"] || [];
+    const spTruckRows = byKey["seasonPointsTruck"] || [];
     const btRows = byKey["battleRaces"] || [];
     const dsRows = byKey["dfsSalaries"] || [];
     const ddRows = byKey["dfsDisabled"] || [];
@@ -79,7 +85,7 @@ export async function loadFromSupabase() {
         bpRows = Array.isArray(legacyArr) ? [{ value: legacyArr }] : [];
       }
     }
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, btRows, dsRows, ddRows, qpRows, bpRows };
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 

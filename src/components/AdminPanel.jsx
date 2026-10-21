@@ -8,37 +8,55 @@ import { SCHEDULE, getThisWeeksRace } from "../data/schedule.js";
 import { BattleDriverInput } from "./ui.jsx";
 import { getTier } from "../lib/tiers.js";
 import { sb } from "../lib/supabase.js";
-import { INITIAL_DRIVERS, normalizeCsvDriverName, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { INITIAL_DRIVERS, INITIAL_DRIVERS_XFINITY, INITIAL_DRIVERS_TRUCK, normalizeCsvDriverName, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { normalizeSeries, seriesLabel } from "../data/series.js";
 import { parseCSVData } from "../lib/csv.js";
 import { parsePaste, findDriver } from "../lib/pasteParser.js";
 
 export const ADMIN_PASSWORD = "CassidyH7/15";
 
 
-export function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
+export function SeasonPointsAdmin({ drivers, seasonPoints, onSave, seasonPointsXfinity, seasonPointsTruck, onSeasonPointsSaveXfinity, onSeasonPointsSaveTruck }) {
   const [year, setYear] = useState(2026);
+  const [series, setSeries] = useState("cup");
   const [localPts, setLocalPts] = useState({});
   const [pasteText, setPasteText] = useState("");
   const [pasteMsg, setPasteMsg] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
 
-  // Initialize local state from seasonPoints whenever year changes
+  // Phase 3: one roster and one points object per series, selected by the
+  // series selector below. Cup keeps the legacy "seasonPoints" object and
+  // onSave callback exactly; lower series use their own objects/callbacks,
+  // each writing only its own app_state key. The `drivers` prop is kept
+  // for caller compatibility; paste matching uses the active roster, not
+  // the Cup drivers list, so a lower-series paste matches lower drivers.
+  // Known limitation: the table rows are the roster only, so full official
+  // standings lists (part-timers outside the roster) cannot be entered
+  // through this UI; that is a data-step problem, not a roster change.
+  const activeSeries = normalizeSeries(series);
+  const activeRoster = activeSeries === "xfinity" ? INITIAL_DRIVERS_XFINITY : activeSeries === "truck" ? INITIAL_DRIVERS_TRUCK : INITIAL_DRIVERS;
+  const activePoints = activeSeries === "xfinity" ? seasonPointsXfinity : activeSeries === "truck" ? seasonPointsTruck : seasonPoints;
+  const activeSave = activeSeries === "xfinity" ? onSeasonPointsSaveXfinity : activeSeries === "truck" ? onSeasonPointsSaveTruck : onSave;
+
+  // Initialize local state from the active series' points whenever the
+  // year, series, or any series' points object changes
   useEffect(() => {
     const pts = {};
-    INITIAL_DRIVERS.forEach(d => {
+    activeRoster.forEach(d => {
       const key = `${d.name}__${year}`;
-      pts[d.name] = seasonPoints?.[key] != null ? String(seasonPoints[key]) : "";
+      pts[d.name] = activePoints?.[key] != null ? String(activePoints[key]) : "";
     });
     setLocalPts(pts);
     setSaveMsg("");
-  }, [year, seasonPoints]);
+  }, [year, series, seasonPoints, seasonPointsXfinity, seasonPointsTruck]);
 
   const handlePtsChange = (name, val) => {
     setLocalPts(prev => ({ ...prev, [name]: val }));
   };
 
   const handleSave = () => {
-    const updated = { ...seasonPoints };
+    if (!activeSave) return;
+    const updated = { ...activePoints };
     Object.entries(localPts).forEach(([name, val]) => {
       const key = `${name}__${year}`;
       const num = parseInt(val);
@@ -48,8 +66,8 @@ export function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
         delete updated[key];
       }
     });
-    onSave(updated);
-    setSaveMsg(`✓ ${year} points saved for ${Object.values(localPts).filter(v => v !== "").length} drivers.`);
+    activeSave(updated);
+    setSaveMsg(`✓ ${seriesLabel(activeSeries)} ${year} points saved for ${Object.values(localPts).filter(v => v !== "").length} drivers.`);
   };
 
   // Parse pasted standings text
@@ -86,8 +104,8 @@ export function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
       }
       if (!name || !pts) continue;
 
-      // Fuzzy match to INITIAL_DRIVERS
-      const driver = findDriver(drivers, name);
+      // Fuzzy match to the ACTIVE series roster (Phase 3), not Cup
+      const driver = findDriver(activeRoster, name);
       if (driver) {
         newPts[driver.name] = String(pts);
         matched++;
@@ -105,15 +123,21 @@ export function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      {/* Year selector + status */}
+      {/* Series + Year selectors + status */}
       <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Series</span>
+          <select value={activeSeries} onChange={e => setSeries(e.target.value)} style={{ background:"#142030", color:T.text, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 10px", fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }}>
+            {["cup", "xfinity", "truck"].map(s => <option key={s} value={s}>{seriesLabel(s)}</option>)}
+          </select>
+        </div>
         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
           <span style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Year</span>
           <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ background:"#142030", color:T.text, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 10px", fontSize:12, fontFamily:"'IBM Plex Mono',monospace" }}>
             {[2026,2025,2024,2023,2022].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <span style={{ fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{filled} of {INITIAL_DRIVERS.length} drivers have points</span>
+        <span style={{ fontSize:10, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{filled} of {activeRoster.length} drivers have points</span>
         <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
           <button onClick={handleSave} style={{ ...btnStyle2(T.accent), boxShadow:`0 4px 14px ${T.accentGlow}` }}>Save Points</button>
         </div>
@@ -146,7 +170,7 @@ export function SeasonPointsAdmin({ drivers, seasonPoints, onSave }) {
             </tr>
           </thead>
           <tbody>
-            {INITIAL_DRIVERS.map((d, idx) => {
+            {activeRoster.map((d, idx) => {
               const tier = getTier(d.overall);
               return (
                 <tr key={d.num} style={{ borderBottom:`1px solid ${T.border}`, background:idx % 2 === 0 ? "transparent" : `${T.surface2}44` }}>
@@ -462,7 +486,7 @@ export function UsageAdminSection({ toolUsage }) {
 }
 
 
-export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost, onHubEditorialSave }) {
+export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, seasonPointsXfinity, seasonPointsTruck, onSeasonPointsSaveXfinity, onSeasonPointsSaveTruck, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost, onHubEditorialSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -997,6 +1021,10 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                   drivers={drivers}
                   seasonPoints={seasonPoints}
                   onSave={onSeasonPointsSave}
+                  seasonPointsXfinity={seasonPointsXfinity}
+                  seasonPointsTruck={seasonPointsTruck}
+                  onSeasonPointsSaveXfinity={onSeasonPointsSaveXfinity}
+                  onSeasonPointsSaveTruck={onSeasonPointsSaveTruck}
                 />
               )}
 
