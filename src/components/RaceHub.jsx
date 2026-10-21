@@ -78,6 +78,15 @@ function hubFromSchedule(r, series = "cup") {
     length: r.length,
     laps: r.laps,
     week: r.week,
+    // Session times (Phase 4 session-times fix). practice is an explicit
+    // null when a race has no practice session at all (e.g. Talladega
+    // 2026, all three series); undefined on a hub means no session data
+    // was recorded for that race yet, and the timeline must never fall
+    // back to a hardcoded time in that case.
+    practice: r.practice,
+    qualifying: r.qualifying,
+    raceTime: r.raceTime,
+    hasSessionData: r.practice !== undefined || r.qualifying !== undefined || r.raceTime !== undefined,
     intro: [
       `${r.track} hosts the ${officialName}, a ${r.laps}-lap run on a ${r.length}-mile ${r.type} track. The full preview for this one is still coming together. Check back through the week as practice, qualifying, and the race itself fill in the blanks.`,
       normalizeSeries(series) === "cup"
@@ -832,9 +841,14 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         {sectionTitle("Race Weekend")}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[
-            { label: "Practice", when: "Saturday 10:00 AM ET", done: pracCount > 0, canceled: pracCount === 0 && pracCanceled, note: pracCount > 0 ? `${pracCount} drivers logged` : pracCanceled ? "Canceled" : "Scheduled" },
-            { label: "Qualifying", when: "Saturday 11:10 AM ET", done: qualCount > 0, canceled: qualCount === 0 && qualCanceled, note: qualCount > 0 ? `${qualCount} drivers logged` : qualCanceled ? "Canceled" : "Scheduled" },
-            { label: "Race", when: `${hub.dateLabel}, 3:00 PM ET`, done: status !== "upcoming", canceled: false, note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
+            // Session times come from the hub's schedule data, never from
+            // hardcoded text: practice/qualifying days and times vary by
+            // race and series, and some races (Talladega 2026) have no
+            // practice at all. Hubs with no session data recorded show a
+            // neutral "Session times not recorded" instead of a wrong time.
+            { label: "Practice", when: !hub.hasSessionData ? "Session times not recorded" : hub.practice ? hub.practice : "No practice scheduled", done: pracCount > 0, canceled: pracCount === 0 && pracCanceled, note: !hub.hasSessionData ? "Not recorded" : hub.practice === null ? "No practice scheduled" : pracCount > 0 ? `${pracCount} drivers logged` : pracCanceled ? "Canceled" : "Scheduled" },
+            { label: "Qualifying", when: !hub.hasSessionData ? "Session times not recorded" : (hub.qualifying || "Not confirmed"), done: qualCount > 0, canceled: qualCount === 0 && qualCanceled, note: !hub.hasSessionData ? "Not recorded" : qualCount > 0 ? `${qualCount} drivers logged` : qualCanceled ? "Canceled" : "Scheduled" },
+            { label: "Race", when: !hub.hasSessionData ? `${hub.dateLabel}, session times not recorded` : `${hub.dateLabel}, ${hub.raceTime || "time not confirmed"}`, done: status !== "upcoming", canceled: false, note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
           ].map((row, i) => (
             <div key={i} style={{ ...card, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: row.canceled ? T.red : row.done ? T.green : T.textDim, flexShrink: 0 }} />

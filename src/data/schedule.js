@@ -35,9 +35,9 @@ export const SCHEDULE = [
   { week:31, date:"Oct 4",  name:"Las Vegas II",             track:"Las Vegas Motor Speedway",            type:"intermediate",  length:1.5,   laps:267 },
   { week:32, date:"Oct 11", name:"Charlotte Oval",           track:"Charlotte Motor Speedway",            type:"intermediate",  length:1.5,   laps:334 },
   { week:33, date:"Oct 18", name:"Phoenix II",               track:"Phoenix Raceway",                     type:"intermediate",  length:1.0,   laps:312 },
-  { week:34, date:"Oct 25", name:"Talladega II",             track:"Talladega Superspeedway",             type:"superspeedway", length:2.66,  laps:188 },
-  { week:35, date:"Nov 1",  name:"Martinsville II",          track:"Martinsville Speedway",               type:"short",         length:0.526, laps:500 },
-  { week:36, date:"Nov 8",  name:"Championship",             track:"Homestead-Miami Speedway",            type:"intermediate",  length:1.5,   laps:267 },
+  { week:34, date:"Oct 25", name:"Talladega II",             track:"Talladega Superspeedway",             type:"superspeedway", length:2.66,  laps:188, practice:null, qualifying:"Sat Oct 24, 1:00 PM ET", raceTime:"2:00 PM ET" },
+  { week:35, date:"Nov 1",  name:"Martinsville II",          track:"Martinsville Speedway",               type:"short",         length:0.526, laps:500, practice:"Sat Oct 31, 1:00 PM ET", qualifying:"Sat Oct 31, 2:05 PM ET", raceTime:"2:00 PM ET" },
+  { week:36, date:"Nov 8",  name:"Championship",             track:"Homestead-Miami Speedway",            type:"intermediate",  length:1.5,   laps:267, practice:"Fri Nov 6, 5:30 PM ET", qualifying:"Sat Nov 7, 2:30 PM ET", raceTime:"3:00 PM ET" },
 ];
 
 // ─────────────────────────────────────────────────────────────

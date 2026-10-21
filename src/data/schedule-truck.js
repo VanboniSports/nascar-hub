@@ -30,9 +30,9 @@ export const SCHEDULE_TRUCK = [
   { week:20, date:"Sep 26", name:"Kansas",           track:"Kansas Speedway",                     type:"intermediate",  length:1.5,   laps:134 },
   { week:21, date:"Oct 9",  name:"Charlotte Roval",  track:"Charlotte Motor Speedway (ROVAL)",    type:"road",          length:2.32,  laps:134 },
   { week:22, date:"Oct 16", name:"Phoenix",          track:"Phoenix Raceway",                     type:"intermediate",  length:1.0,   laps:150 },
-  { week:23, date:"Oct 23", name:"Talladega",        track:"Talladega Superspeedway",             type:"superspeedway", length:2.66,  laps:94  },
-  { week:24, date:"Oct 30", name:"Martinsville",     track:"Martinsville Speedway",               type:"short",         length:0.526, laps:200 },
-  { week:25, date:"Nov 6",  name:"Championship",     track:"Homestead-Miami Speedway",            type:"intermediate",  length:1.5,   laps:134 },
+  { week:23, date:"Oct 23", name:"Talladega",        track:"Talladega Superspeedway",             type:"superspeedway", length:2.66,  laps:94,  practice:null, qualifying:"Fri Oct 23, 12:30 PM ET", raceTime:"4:00 PM ET" },
+  { week:24, date:"Oct 30", name:"Martinsville",     track:"Martinsville Speedway",               type:"short",         length:0.526, laps:200, practice:"Fri Oct 30, 12:30 PM ET", qualifying:"Fri Oct 30, 1:35 PM ET", raceTime:"6:00 PM ET" },
+  { week:25, date:"Nov 6",  name:"Championship",     track:"Homestead-Miami Speedway",            type:"intermediate",  length:1.5,   laps:134, practice:"Thu Nov 5, 6:30 PM ET", qualifying:"Fri Nov 6, 2:30 PM ET", raceTime:"7:30 PM ET" },
 ];
 
 // ─────────────────────────────────────────────────────────────
