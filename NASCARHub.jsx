@@ -219,10 +219,14 @@ export default function NASCARHub() {
   const activeDrivers = activeSeries === "cup" ? drivers : seriesDrivers;
   const seriesFullTimerNames = activeSeries === "xfinity" ? FULL_TIMER_NAMES_XFINITY : activeSeries === "truck" ? FULL_TIMER_NAMES_TRUCK : FULL_TIMER_NAMES;
   const activeCsvData = activeSeries === "cup" ? csvData : (seriesCsvData[activeSeries] || []);
-  const activeSeasonPoints = activeSeries === "cup" ? seasonPoints : {};
 
   // Season Points — manually entered NASCAR official points, keyed by "driverName__year"
   const [seasonPoints, setSeasonPoints] = useState({});
+  // Phase 4 fix (TDZ): activeSeasonPoints must be declared AFTER seasonPoints.
+  // It previously read seasonPoints on line 222, before its useState on line 225,
+  // which threw "Cannot access 'seasonPoints' before initialization" on every
+  // Cup first render and blanked the whole preview.
+  const activeSeasonPoints = activeSeries === "cup" ? seasonPoints : {};
 
   // DFS Optimizer state — persisted via Supabase
   const [dfsSalaries, setDfsSalaries] = useState({});
