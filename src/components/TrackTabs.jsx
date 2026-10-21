@@ -6,8 +6,11 @@ import { SearchDropdown, FinishBadge, TrackBadge, StatCard } from "./ui.jsx";
 import { Ic } from "./icons.jsx";
 import { lbAvg, lbGetRank } from "../lib/stats.js";
 import { FULL_TIMER_NAMES } from "../data/drivers.js";
+import { normalizeSeries, seriesLabel } from "../data/series.js";
+import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 
-export function TrackLeaderboardTab({ csvData, incrementTool }) {
+export function TrackLeaderboardTab({ csvData, incrementTool, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [trackSearch, setTrackSearch] = useState("");
   const [trackOpen, setTrackOpen] = useState(false);
@@ -35,7 +38,7 @@ export function TrackLeaderboardTab({ csvData, incrementTool }) {
   const driverStats = useMemo(() => {
     if (!selectedTrack) return [];
     const trackRaces = byTrack[selectedTrack] || [];
-    return FULL_TIMER_NAMES.map(driver => {
+    return activeFullTimerNames.map(driver => {
       const races = trackRaces.filter(r => r[0] === driver);
       if (!races.length) return { driver, races: 0, noData: true };
       const finishes = races.map(r => r[3]).filter(v => v != null && v > 0);
@@ -149,7 +152,7 @@ export function TrackLeaderboardTab({ csvData, incrementTool }) {
         <div style={{ textAlign:"center", padding:"50px 20px", color:T.textDim }}>
           <div style={{ fontSize:42, marginBottom:14 }}>🏁</div>
           <div style={{ fontSize:16, fontWeight:700, letterSpacing:2, color:T.textMid, fontFamily:"'Barlow Condensed',sans-serif", textTransform:"uppercase" }}>Select a Track to See the Leaderboard</div>
-          <div style={{ fontSize:12, marginTop:6, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Compare all {FULL_TIMER_NAMES.length} full-time drivers head-to-head at any of {allTracks.length} tracks</div>
+          <div style={{ fontSize:12, marginTop:6, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>Compare all {activeFullTimerNames.length} full-time drivers head-to-head at any of {allTracks.length} tracks</div>
         </div>
       )}
 
@@ -660,11 +663,19 @@ export const TS_SUBTABS = [
 // 4-driver H2H comparison colors
 
 
-export function TrackStatsTab({ csvData, incrementTool }) {
+export function TrackStatsTab({ csvData, incrementTool, series = "cup", onSeriesChange, fullTimerNames }) {
   const [subTab, setSubTab] = useState("lookup");
+  const activeSeries = normalizeSeries(series);
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+      <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
+      {activeSeries !== "cup" && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 16px", fontSize:12, color:T.textMid, lineHeight:1.6, marginBottom:16 }}>
+          Track stats below are built from the {seriesLabel(activeSeries)} Series race history.
+        </div>
+      )}
       {/* Sub-tab nav */}
       <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, marginBottom:20, overflowX:"auto" }}>
         {TS_SUBTABS.map(st => {
@@ -681,7 +692,7 @@ export function TrackStatsTab({ csvData, incrementTool }) {
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
         {subTab === "lookup"      && <DriverTrackLookup csvData={csvData} incrementTool={incrementTool} />}
-        {subTab === "leaderboard" && <TrackLeaderboardTab csvData={csvData} incrementTool={incrementTool} />}
+        {subTab === "leaderboard" && <TrackLeaderboardTab csvData={csvData} incrementTool={incrementTool} fullTimerNames={activeFullTimerNames} />}
       </div>
     </div>
   );

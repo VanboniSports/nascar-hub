@@ -6,6 +6,8 @@ import { CSV_TRACK_TYPES, CSV_TYPE_COLORS, H2H_COLORS } from "../data/siteMeta.j
 import { FinishBadge, StatCard } from "./ui.jsx";
 import { Ic } from "./icons.jsx";
 import { INITIAL_DRIVERS, FULL_TIMER_NAMES } from "../data/drivers.js";
+import { normalizeSeries, seriesLabel } from "../data/series.js";
+import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 import { luckIndex, consistencyScore, dominatorRatingsForField, trackFitTags } from "../lib/loopMetrics.js";
 
 export const DA_TRACKS_2026 = [
@@ -81,7 +83,8 @@ export function DaGrade({ val, allVals, lowerBetter }) {
 }
 
 
-export function DaTrackBreakdown({ csvData }) {
+export function DaTrackBreakdown({ csvData, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [selDriver, setSelDriver] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [sortCol, setSortCol] = useState("avgFinish");
@@ -103,7 +106,7 @@ export function DaTrackBreakdown({ csvData }) {
 
   // Driver list: only full-timers from INITIAL_DRIVERS
   const driverList = useMemo(() => {
-    return FULL_TIMER_NAMES.filter(n => byDriver[n]);
+    return activeFullTimerNames.filter(n => byDriver[n]);
   }, [byDriver]);
 
   // Helper: build stats for a set of races at a given track
@@ -454,7 +457,8 @@ export function DaExpandedRow({ row }) {
 // ─────────────────────────────────────────────────────────────
 
 
-export function DaHeadToHead({ csvData, incrementTool }) {
+export function DaHeadToHead({ csvData, incrementTool, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [selectedDrivers, setSelectedDrivers] = useState(["","","",""]);
   const [h2hTrackFilter, setH2hTrackFilter] = useState("All");
 
@@ -489,7 +493,7 @@ export function DaHeadToHead({ csvData, incrementTool }) {
     return bd;
   }, [csvData, h2hTrackFilter, byDriverFull]);
 
-  const driverList = useMemo(() => FULL_TIMER_NAMES.filter(n => byDriverFull[n]).sort(), [byDriverFull]);
+  const driverList = useMemo(() => activeFullTimerNames.filter(n => byDriverFull[n]).sort(), [byDriverFull]);
 
   const setDriver = (idx, val) => {
     setSelectedDrivers(prev => { const next = [...prev]; next[idx] = val; return next; });
@@ -1016,7 +1020,8 @@ export function DaTeamH2H({ csvData, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 
 
-export function DaConsistencyScore({ csvData }) {
+export function DaConsistencyScore({ csvData, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [sortCol, setSortCol] = useState("consistency");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -1028,7 +1033,7 @@ export function DaConsistencyScore({ csvData }) {
       byDriver[d].push(r);
     }
 
-    return FULL_TIMER_NAMES.filter(n => byDriver[n]).map(name => {
+    return activeFullTimerNames.filter(n => byDriver[n]).map(name => {
       const races = byDriver[name];
       const cs = consistencyScore(races);
       if (!cs) return null;
@@ -1140,7 +1145,8 @@ export function DaConsistencyScore({ csvData }) {
 // ─────────────────────────────────────────────────────────────
 
 
-export function DaBadDayRisk({ csvData, incrementTool }) {
+export function DaBadDayRisk({ csvData, incrementTool, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [mode, setMode] = useState("bad"); // "bad" or "good"
   const [sortCol, setSortCol] = useState("collapseRate");
   const [sortAsc, setSortAsc] = useState(false);
@@ -1179,7 +1185,7 @@ export function DaBadDayRisk({ csvData, incrementTool }) {
       byDriver[d].push(r);
     }
 
-    return FULL_TIMER_NAMES.filter(n => byDriver[n]).map(name => {
+    return activeFullTimerNames.filter(n => byDriver[n]).map(name => {
       const races = byDriver[name];
       const totalRaces = races.length;
 
@@ -1492,7 +1498,8 @@ export function DaBadDayRisk({ csvData, incrementTool }) {
 // ─────────────────────────────────────────────────────────────
 
 
-export function DaLoopData({ csvData }) {
+export function DaLoopData({ csvData, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [sortCol, setSortCol] = useState("arp");
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -1510,13 +1517,13 @@ export function DaLoopData({ csvData }) {
       byDriver[d].push(r);
     }
     const seasonFieldRows = {};
-    for (const n of FULL_TIMER_NAMES) {
+    for (const n of activeFullTimerNames) {
       if (byDriver[n]) seasonFieldRows[n] = byDriver[n].filter(r => (r[12] || 0) > 0);
     }
     const domRatings = dominatorRatingsForField(seasonFieldRows);
     // Luck/tags are windowed over the driver's last 12 races, so sort oldest to newest first
     const chronological = (rows) => [...rows].sort((a, b) => (a[9] || "").localeCompare(b[9] || ""));
-    return FULL_TIMER_NAMES.filter(n => byDriver[n]).map(name => {
+    return activeFullTimerNames.filter(n => byDriver[n]).map(name => {
       const races = seasonFieldRows[name];
       if (races.length < 3) return null;
       const avg = (f) => races.reduce((s, r) => s + f(r), 0) / races.length;
@@ -1645,14 +1652,17 @@ export function DaLoopData({ csvData }) {
 // ─────────────────────────────────────────────────────────────
 
 
-export function DriverAnalyticsTab({ csvData, incrementTool }) {
+export function DriverAnalyticsTab({ csvData, incrementTool, series = "cup", onSeriesChange, fullTimerNames }) {
   const [subTab, setSubTab] = useState("breakdown");
+  const activeSeries = normalizeSeries(series);
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
 
   useEffect(() => { incrementTool?.("driver_analytics"); }, []);
 
   if (csvData.length === 0) {
     return (
       <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+        <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
         {/* Sub-tab nav */}
         <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, marginBottom:20, overflowX:"auto" }}>
           {DA_SUBTABS.map(st => {
@@ -1676,6 +1686,12 @@ export function DriverAnalyticsTab({ csvData, incrementTool }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+      <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
+      {activeSeries !== "cup" && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 16px", fontSize:12, color:T.textMid, lineHeight:1.6, marginBottom:16 }}>
+          Driver analytics below are built from the {seriesLabel(activeSeries)} Series race history.
+        </div>
+      )}
       {/* Sub-tab nav */}
       <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, marginBottom:20, overflowX:"auto" }}>
         {DA_SUBTABS.map(st => {
@@ -1691,12 +1707,12 @@ export function DriverAnalyticsTab({ csvData, incrementTool }) {
 
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "breakdown"   && <DaTrackBreakdown csvData={csvData} />}
-        {subTab === "h2h"         && <DaHeadToHead csvData={csvData} incrementTool={incrementTool} />}
+        {subTab === "breakdown"   && <DaTrackBreakdown csvData={csvData} fullTimerNames={activeFullTimerNames} />}
+        {subTab === "h2h"         && <DaHeadToHead csvData={csvData} incrementTool={incrementTool} fullTimerNames={activeFullTimerNames} />}
         {subTab === "teamh2h"     && <DaTeamH2H csvData={csvData} incrementTool={incrementTool} />}
-        {subTab === "consistency" && <DaConsistencyScore csvData={csvData} />}
-        {subTab === "dnfrisk"     && <DaBadDayRisk csvData={csvData} incrementTool={incrementTool} />}
-        {subTab === "loop"        && <DaLoopData csvData={csvData} />}
+        {subTab === "consistency" && <DaConsistencyScore csvData={csvData} fullTimerNames={activeFullTimerNames} />}
+        {subTab === "dnfrisk"     && <DaBadDayRisk csvData={csvData} incrementTool={incrementTool} fullTimerNames={activeFullTimerNames} />}
+        {subTab === "loop"        && <DaLoopData csvData={csvData} fullTimerNames={activeFullTimerNames} />}
       </div>
     </div>
   );

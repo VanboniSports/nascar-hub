@@ -24,6 +24,14 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementT
   const [subTab, setSubTab] = useState("rankings");
   const activeSeries = normalizeSeries(series);
 
+  // Hooks must run unconditionally, before any early return. The Cup path
+  // below uses prCounted, and the lower-series early return previously
+  // skipped this useRef, so Cup renders used 2 hooks and lower-series
+  // renders used 1: switching series changed the hook count, React threw,
+  // and the whole app blanked. Declaring it here keeps hook order and
+  // count identical for every series.
+  const prCounted = useRef(false);
+
   // Lower-series power ratings do not exist yet. The per-series driver
   // lists in drivers.js carry no overall/track ratings (Phase 3 admin
   // work builds them by applying race results per series). Ranking them
@@ -53,8 +61,7 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementT
   // Power Rankings is the default landing tab, so we do NOT auto-increment on
   // mount (that would inflate counts on every page load). Instead we count a
   // "use" when the visitor actively interacts — clicking any sub-tab counts.
-  const prCounted = useRef(false);
-
+  // (prCounted is declared above the early return; see the hook-order note.)
   const handleSubTab = (id) => {
     setSubTab(id);
     // Count one Power Rankings "use" on the first interaction per session

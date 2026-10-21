@@ -297,7 +297,16 @@ export function RacesTab({ battleRaces, onOpenRace }) {
             const scored = battle && battle.actualResults && battle.actualResults.length > 0;
             const winner = battleWinnerFor(battle, HUB_PREDICTORS);
             return (
-              <button key={hub.slug} onClick={() => onOpenRace(hub.slug)} style={{
+              // Key must be unique across the whole hub set, not just the
+              // slug: Supabase editorial rows can overwrite a Cup hub's
+              // slug (week 30 Kansas II is stored as "kansas-2026", the
+              // same slug as week 9 Kansas), giving the Cup list duplicate
+              // keys. Duplicate keys corrupt React's list reconciliation
+              // when the series filter switches lists, which can leave a
+              // stale Cup card in the DOM on a lower-series list. Series +
+              // week + slug is unique for every hub and does not change
+              // list order or navigation.
+              <button key={`${hub.series}-${hub.week}-${hub.slug}`} onClick={() => onOpenRace(hub.slug)} style={{
                 display: "flex", alignItems: "center", gap: 14, textAlign: "left",
                 background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
                 padding: "14px 18px", cursor: "pointer", width: "100%",
@@ -685,7 +694,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
   const jumpSections = [
     ...(hub.intro && hub.intro.length > 0 ? [{ id: "preview", label: "Preview" }] : []),
     { id: "predictions", label: "Predictions" },
-    { id: "calls", label: "My Calls" },
+    ...(isCupHub ? [{ id: "calls", label: "My Calls" }] : []),
     { id: "weekend", label: "Weekend" },
     { id: "results", label: "Results" },
   ];
@@ -743,7 +752,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
           <div style={{ ...card, textAlign: "center", color: T.textDim, fontSize: 13, padding: "28px 20px" }}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>🔮</div>
             <div>{isCupHub ? "Predictions drop Monday morning." : `Battle Tracker is Cup-only for 2026, so this hub does not show Cup predictions. Model predictions for the ${seriesLabel(hub.series)} Series are on the Race Predictor tab.`}</div>
-            <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>Check back once the models and my gut have weighed in.</div>
+            <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>{isCupHub ? "Check back once the models and my gut have weighed in." : "No gut picks for this series: Battle Tracker stays Cup-only for 2026."}</div>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
@@ -785,7 +794,10 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
 
       </MobileSection>
 
-      {/* DARK HORSE + SUCK PICK */}
+      {/* DARK HORSE + SUCK PICK (Cup only: lower-series hubs do not get
+          dark horse or suck picks, so this section is not rendered for
+          them at all, instead of showing "Cup-only" placeholder cards) */}
+      {isCupHub && (
       <MobileSection id="calls" title="My Calls">
       <div>
         {sectionTitle("My Calls")}
@@ -812,6 +824,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
       </div>
 
       </MobileSection>
+      )}
 
       {/* WEEKEND TIMELINE */}
       <MobileSection id="weekend" title="Race Weekend">

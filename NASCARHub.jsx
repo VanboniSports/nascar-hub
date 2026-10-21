@@ -769,8 +769,8 @@ export default function NASCARHub() {
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
               {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
               {activeTab === "sessions"  && <SessionsTab qualPractice={qualPractice} raceArchive={raceArchive} battleRaces={battleRaces} drivers={drivers} />}
-              {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
-              {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
+              {activeTab === "tracks"    && <TrackStatsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
+              {activeTab === "analytics" && <DriverAnalyticsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
               {activeTab === "season"    && <StatsTab drivers={activeDrivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={activeCsvData} seasonPoints={activeSeasonPoints} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
               {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} qualPractice={qualPractice} incrementTool={incrementTool} />}
               {activeTab === "blog"      && <BlogTab blogPosts={blogPosts} incrementTool={incrementTool} />}
