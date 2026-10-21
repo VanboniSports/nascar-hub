@@ -3,7 +3,12 @@
 // ───────────────────────────────────────────────────────────
 import { normalizeCsvDriverName, INITIAL_DRIVERS } from "../data/drivers.js";
 
-export function parseCSVData(csvText) {
+// driverList is the per-series full-time roster used only as a manufacturer
+// fallback when a CSV row has no manufacturer. It defaults to the Cup
+// roster, so Cup parsing is unchanged. Lower-series callers pass their own
+// roster; without this, a lower-series row with a blank manufacturer
+// would silently pick up a Cup driver's manufacturer.
+export function parseCSVData(csvText, driverList) {
   // Proper CSV parser that handles quoted fields (e.g., "Ricky Stenhouse,")
   function parseCSVLine(line) {
     const fields = [];
@@ -51,7 +56,7 @@ export function parseCSVData(csvText) {
       const raw = (vals[colIdx["manufacturer"]] || "").trim();
       if (raw === "Chevy") return "Chevrolet";
       if (["Chevrolet","Ford","Toyota"].includes(raw)) return raw;
-      const lookup = INITIAL_DRIVERS.find(d => d.name === driverName);
+      const lookup = (driverList || INITIAL_DRIVERS).find(d => d.name === driverName);
       if (lookup?.mfg) return lookup.mfg;
       return "";
     })();

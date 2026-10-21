@@ -7,6 +7,8 @@ import { InfoLegend } from "./ui.jsx";
 import { Ic } from "./icons.jsx";
 import { getTier } from "../lib/tiers.js";
 import { FULL_TIMER_NAMES } from "../data/drivers.js";
+import { normalizeSeries, seriesLabel } from "../data/series.js";
+import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 import { loopAverages } from "../lib/loopMetrics.js";
 
 export const SS_SUBTABS = [
@@ -34,13 +36,24 @@ export const SSChartTooltip = ({ active, payload, label }) => {
 };
 
 
-export function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoints, incrementTool }) {
+export function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoints, incrementTool, series = "cup", onSeriesChange, fullTimerNames }) {
   const [subTab, setSubTab] = useState("standings");
+  const activeSeries = normalizeSeries(series);
+  // Season points are Cup-only today (admin Phase 3). For lower series the
+  // parent passes an empty object, so the Pts column renders as a dash,
+  // exactly as it does for a Cup driver with no points row yet.
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
 
   useEffect(() => { incrementTool?.("season_stats"); }, []);
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+      <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
+      {activeSeries !== "cup" && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 16px", fontSize:12, color:T.textMid, lineHeight:1.6, marginBottom:16 }}>
+          Season stats below are built from the {seriesLabel(activeSeries)} Series race history. Official points are not in the site for this series yet, so the Pts column shows a dash until per-series points are entered in the admin panel.
+        </div>
+      )}
       {/* Sub-tab nav */}
       <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, marginBottom:20, overflowX:"auto" }}>
         {SS_SUBTABS.map(st => {
@@ -56,10 +69,10 @@ export function StatsTab({ drivers, seasonStats, raceHistory, csvData, seasonPoi
 
       {/* Sub-tab content */}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "standings"  && <SSStandingsTab csvData={csvData} drivers={drivers} seasonPoints={seasonPoints} />}
-        {subTab === "compare"    && <SSCompareTab csvData={csvData} drivers={drivers} />}
+        {subTab === "standings"  && <SSStandingsTab csvData={csvData} drivers={drivers} seasonPoints={seasonPoints} fullTimerNames={activeFullTimerNames} />}
+        {subTab === "compare"    && <SSCompareTab csvData={csvData} drivers={drivers} fullTimerNames={activeFullTimerNames} />}
         {subTab === "mfgTrends"  && <SSMfgTrendsTab csvData={csvData} incrementTool={incrementTool} />}
-        {subTab === "sleeper"    && <SSSleeperTab csvData={csvData} drivers={drivers} incrementTool={incrementTool} />}
+        {subTab === "sleeper"    && <SSSleeperTab csvData={csvData} drivers={drivers} incrementTool={incrementTool} fullTimerNames={activeFullTimerNames} />}
       </div>
     </div>
   );
@@ -100,7 +113,8 @@ export function ssBuildSeasonData(csvData, year) {
 // ── Sub-tab 1: Season Standings ──
 
 
-export function SSStandingsTab({ csvData, drivers, seasonPoints }) {
+export function SSStandingsTab({ csvData, drivers, seasonPoints, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [sortKey, setSortKey] = useState("seasonPts");
   const [sortAsc, setSortAsc] = useState(false);
   const [yearFilter, setYearFilter] = useState(2026);
@@ -115,7 +129,7 @@ export function SSStandingsTab({ csvData, drivers, seasonPoints }) {
   const rows = useMemo(() => {
     const data = ssBuildSeasonData(csvData, yearFilter);
     let filtered = data;
-    if (fullTimerOnly) filtered = data.filter(d => FULL_TIMER_NAMES.includes(d.name));
+    if (fullTimerOnly) filtered = data.filter(d => activeFullTimerNames.includes(d.name));
     return filtered.map(d => ({
       ...d,
       seasonPts: seasonPoints?.[`${d.name}__${yearFilter}`] ?? null,
@@ -169,7 +183,7 @@ export function SSStandingsTab({ csvData, drivers, seasonPoints }) {
           </select>
         </div>
         <button onClick={()=>setFullTimerOnly(f=>!f)} style={{ background:fullTimerOnly?T.accentSoft:"transparent", color:fullTimerOnly?T.accent:T.textDim, border:`1px solid ${fullTimerOnly?T.accent:T.border}`, borderRadius:6, padding:"4px 12px", fontSize:10, cursor:"pointer", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", fontWeight:700 }}>
-          {fullTimerOnly ? "36 Full-Timers" : "All Drivers"}
+          {fullTimerOnly ? `${activeFullTimerNames.length} Full-Timers` : "All Drivers"}
         </button>
         <span style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", marginLeft:"auto" }}>{sorted.length} driver{sorted.length!==1?"s":""}</span>
       </div>
@@ -223,7 +237,8 @@ export function SSStandingsTab({ csvData, drivers, seasonPoints }) {
 // ── Sub-tab 2: Season Comparison ──
 
 
-export function SSCompareTab({ csvData, drivers }) {
+export function SSCompareTab({ csvData, drivers, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [selected, setSelected] = useState([]);
   const [yearFilter, setYearFilter] = useState(2026);
 
@@ -237,7 +252,7 @@ export function SSCompareTab({ csvData, drivers }) {
   const dataMap = useMemo(() => { const m = {}; seasonData.forEach(d => { m[d.name] = d; }); return m; }, [seasonData]);
 
   // Only show full-timers present in CSV
-  const driverList = useMemo(() => FULL_TIMER_NAMES.filter(n => dataMap[n]), [dataMap]);
+  const driverList = useMemo(() => activeFullTimerNames.filter(n => dataMap[n]), [dataMap]);
 
   const toggleDriver = (name) => {
     setSelected(prev => prev.includes(name) ? prev.filter(n=>n!==name) : prev.length < 6 ? [...prev, name] : prev);
@@ -557,7 +572,8 @@ export function SSMfgTrendsTab({ csvData, incrementTool }) {
 // ── Sub-tab 4: Sleeper Detector ──
 
 
-export function SSSleeperTab({ csvData, drivers, incrementTool }) {
+export function SSSleeperTab({ csvData, drivers, incrementTool, fullTimerNames }) {
+  const activeFullTimerNames = fullTimerNames || FULL_TIMER_NAMES;
   const [yearFilter, setYearFilter] = useState(2026);
   const [sortKey, setSortKey] = useState("diff");
   const [sortAsc, setSortAsc] = useState(false);
@@ -580,7 +596,7 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
       const name = r[0];
       const fin = r[3];
       if (!name || !fin || fin <= 0) continue;
-      if (!FULL_TIMER_NAMES.includes(name)) continue;
+      if (!activeFullTimerNames.includes(name)) continue;
 
       if (r[2] === yearFilter) {
         if (!currentByDriver[name]) currentByDriver[name] = [];
@@ -594,7 +610,7 @@ export function SSSleeperTab({ csvData, drivers, incrementTool }) {
     }
 
     const results = [];
-    for (const name of FULL_TIMER_NAMES) {
+    for (const name of activeFullTimerNames) {
       const career = careerByDriver[name];
       const current = currentByDriver[name];
       if (!career || career.length < 3 || !current || current.length < 2) continue;

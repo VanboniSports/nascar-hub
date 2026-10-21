@@ -4,6 +4,8 @@ import { T } from "../theme.js";
 import { InfoLegend } from "./ui.jsx";
 import { Ic } from "./icons.jsx";
 import { RankingsTab } from "./RankingsTab.jsx";
+import { normalizeSeries, seriesLabel } from "../data/series.js";
+import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 import { CompareTab } from "./CompareTab.jsx";
 import { TrendsTab } from "./TrendsTab.jsx";
 
@@ -18,8 +20,35 @@ export const PR_SUBTABS = [
 // ─────────────────────────────────────────────────────────────
 
 
-export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementTool }) {
+export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementTool, series = "cup", onSeriesChange }) {
   const [subTab, setSubTab] = useState("rankings");
+  const activeSeries = normalizeSeries(series);
+
+  // Lower-series power ratings do not exist yet. The per-series driver
+  // lists in drivers.js carry no overall/track ratings (Phase 3 admin
+  // work builds them by applying race results per series). Ranking them
+  // anyway would sort on undefined values and present invented order, so
+  // this tab shows the roster, unranked, with a plain explanation, and
+  // does not render the Rankings/Compare/Trends sub-tabs for lower series.
+  // Cup renders exactly as before.
+  if (activeSeries !== "cup") {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+        <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 20px", fontSize:13, color:T.textMid, lineHeight:1.7 }}>
+          Power Rankings for the {seriesLabel(activeSeries)} Series are not built yet. Ratings are computed in the admin panel by applying race results per series (Phase 3), and that step has not run for this series. The list below is the full-time driver roster for this series, in alphabetical order, not a ranking. Season stats and model predictions for this series are on the Season Stats and Race Predictor tabs.
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {[...drivers].sort((a, b) => a.name.localeCompare(b.name)).map((d) => (
+            <div key={d.num} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+              <span style={{ fontSize:13, fontWeight:800, color:T.text, fontFamily:"'Barlow Condensed',sans-serif" }}>#{d.num} {d.name}</span>
+              <span style={{ fontSize:12, color:T.textDim }}>{d.mfg}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // Power Rankings is the default landing tab, so we do NOT auto-increment on
   // mount (that would inflate counts on every page load). Instead we count a
@@ -40,6 +69,7 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementT
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+      <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
       <div style={{ display:"flex", gap:2, borderBottom:`1px solid ${T.border}`, marginBottom:20, overflowX:"auto" }}>
         {PR_SUBTABS.map(st => {
           const active = st.id === subTab;

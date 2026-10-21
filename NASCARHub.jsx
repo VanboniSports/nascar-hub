@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspens
 
 
 // ── Phase-1 module split: pure logic lives in src/ (see src/*/<module>.js) ──
-import { TRACK_KEYS, INITIAL_DRIVERS, FULL_TIMER_NAMES, normalizeCsvDriverName } from "./src/data/drivers.js";
+import { TRACK_KEYS, INITIAL_DRIVERS, INITIAL_DRIVERS_XFINITY, INITIAL_DRIVERS_TRUCK, FULL_TIMER_NAMES, FULL_TIMER_NAMES_XFINITY, FULL_TIMER_NAMES_TRUCK, normalizeCsvDriverName } from "./src/data/drivers.js";
+import { normalizeSeries, seriesCsvUrl, seriesCsvCacheKey } from "./src/data/series.js";
 import { processRace } from "./src/models/ratings.js";
 import { parseCSVData } from "./src/lib/csv.js";
 import { lbAvg, lbGetRank } from "./src/lib/stats.js";
@@ -199,6 +200,27 @@ export default function NASCARHub() {
   const [csvLoading, setCsvLoading] = useState(true);
   const [csvError, setCsvError] = useState(null);
 
+  // Data-series selection (Phase 4). One selection, shared by the tabs
+  // that can already use per-series data: Race Predictor, Power Rankings
+  // and Season Stats. It defaults to Cup, and it deliberately does NOT
+  // replace the global Cup csvData above: DFS, Track Stats and Driver
+  // Analytics keep using Cup data, and Battle Tracker ignores it
+  // entirely (Cup-only for 2026). Lower-series CSV is fetched lazily
+  // only when a lower series is selected, into its own state below.
+  const [dataSeries, setDataSeries] = useState("cup");
+  const [seriesCsvData, setSeriesCsvData] = useState({});
+  const [seriesCsvLoading, setSeriesCsvLoading] = useState(false);
+  const [seriesCsvError, setSeriesCsvError] = useState(null);
+  const activeSeries = normalizeSeries(dataSeries);
+  const seriesDrivers = activeSeries === "xfinity" ? INITIAL_DRIVERS_XFINITY : activeSeries === "truck" ? INITIAL_DRIVERS_TRUCK : INITIAL_DRIVERS;
+  // Cup tabs keep the LIVE drivers state (admin-updated ratings from
+  // Supabase), exactly as before. Only lower series use the static
+  // roster, because no live per-series ratings state exists yet.
+  const activeDrivers = activeSeries === "cup" ? drivers : seriesDrivers;
+  const seriesFullTimerNames = activeSeries === "xfinity" ? FULL_TIMER_NAMES_XFINITY : activeSeries === "truck" ? FULL_TIMER_NAMES_TRUCK : FULL_TIMER_NAMES;
+  const activeCsvData = activeSeries === "cup" ? csvData : (seriesCsvData[activeSeries] || []);
+  const activeSeasonPoints = activeSeries === "cup" ? seasonPoints : {};
+
   // Season Points — manually entered NASCAR official points, keyed by "driverName__year"
   const [seasonPoints, setSeasonPoints] = useState({});
 
@@ -262,6 +284,52 @@ export default function NASCARHub() {
       });
 
   }, []);
+
+  // Lazy lower-series CSV load (Phase 4). Runs only when a lower series
+  // is selected, and only once per series. Parsing uses that series'
+  // driver list for the manufacturer fallback (see csv.js). Cup never
+  // runs this effect: it keeps using the global Cup csvData above.
+  // Data currency: the repo lower-series CSVs are current only through
+  // early October 2026 (Phoenix lower-series updates are local and
+  // unpushed), so lower-series views will not show Phoenix data yet.
+  useEffect(() => {
+    if (activeSeries === "cup") return;
+    if (seriesCsvData[activeSeries]) return;
+    let alive = true;
+    setSeriesCsvLoading(true);
+    setSeriesCsvError(null);
+    fetch(seriesCsvUrl(activeSeries))
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
+      })
+      .then(text => {
+        if (!alive) return;
+        const parsed = parseCSVData(text, seriesDrivers);
+        if (parsed.length > 0) {
+          setSeriesCsvData(prev => ({ ...prev, [activeSeries]: parsed }));
+          try { localStorage.setItem(seriesCsvCacheKey(activeSeries), JSON.stringify(parsed)); } catch {}
+        } else {
+          throw new Error("CSV parsed but produced 0 records");
+        }
+        setSeriesCsvLoading(false);
+      })
+      .catch(err => {
+        if (!alive) return;
+        console.warn("Series CSV auto-fetch failed, trying localStorage cache:", err);
+        setSeriesCsvError(`Auto-load failed: ${err.message}.`);
+        try {
+          const csvRaw = localStorage.getItem(seriesCsvCacheKey(activeSeries));
+          if (csvRaw) {
+            const cached = JSON.parse(csvRaw);
+            setSeriesCsvData(prev => ({ ...prev, [activeSeries]: cached }));
+            setSeriesCsvError(null);
+          }
+        } catch {}
+        setSeriesCsvLoading(false);
+      });
+    return () => { alive = false; };
+  }, [activeSeries]);
 
   const saveCsvData = useCallback(async (parsed) => {
     setCsvData(parsed);
@@ -690,8 +758,8 @@ export default function NASCARHub() {
           <main className="nascar-main" style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
             <Suspense fallback={<TabLoading />}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
-              {activeTab === "power"     && <PowerRankingsTab drivers={drivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} />}
-              {activeTab === "predictor" && <PredictorTab drivers={drivers} csvData={csvData} incrementTool={incrementTool} />}
+              {activeTab === "power"     && <PowerRankingsTab drivers={activeDrivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} />}
+              {activeTab === "predictor" && <PredictorTab drivers={activeDrivers} csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} displayDrivers={activeDrivers} />}
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
@@ -699,7 +767,7 @@ export default function NASCARHub() {
               {activeTab === "sessions"  && <SessionsTab qualPractice={qualPractice} raceArchive={raceArchive} battleRaces={battleRaces} drivers={drivers} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={csvData} incrementTool={incrementTool} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={csvData} incrementTool={incrementTool} />}
-              {activeTab === "season"    && <StatsTab drivers={drivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={csvData} seasonPoints={seasonPoints} incrementTool={incrementTool} />}
+              {activeTab === "season"    && <StatsTab drivers={activeDrivers} seasonStats={seasonStats} raceHistory={raceHistory} csvData={activeCsvData} seasonPoints={activeSeasonPoints} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
               {activeTab === "dfs"       && <DFSTab csvData={csvData} dfsSalaries={dfsSalaries} dfsDisabled={dfsDisabled} qualPractice={qualPractice} incrementTool={incrementTool} />}
               {activeTab === "blog"      && <BlogTab blogPosts={blogPosts} incrementTool={incrementTool} />}
               {activeTab === "privacy"   && <PrivacyTab />}

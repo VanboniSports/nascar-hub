@@ -7,6 +7,10 @@ import { HubStatusBadge, sectionTitle } from "./ui.jsx";
 import { MobileSection, MobileJumpNav, BackToTop } from "./MobileNav.jsx";
 import { Ic } from "./icons.jsx";
 import { SCHEDULE, SCHEDULE_YEAR, getThisWeeksRace } from "../data/schedule.js";
+import { SCHEDULE_XFINITY, getThisWeeksRaceXfinity } from "../data/schedule-xfinity.js";
+import { SCHEDULE_TRUCK, getThisWeeksRaceTruck } from "../data/schedule-truck.js";
+import { SERIES_IDS, normalizeSeries, seriesLabel, hubSlugForSeries } from "../data/series.js";
+import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 import { scoreEntry } from "../models/battle.js";
 
 // ── RACE HUBS: auto-generated from the season schedule ─────────────────────────
@@ -23,9 +27,15 @@ let editorialReady = false;
 export function hubEditorialReady() { return editorialReady; }
 // Apply Supabase editorial rows to the generated hubs, in place so every
 // existing hubBySlug/currentHub reference picks them up.
+// hubEditorial rows are keyed by week number only and are Cup data today.
+// Applying them to lower-series hubs by week would attach Cup editorial
+// (official names, intro copy, live race ids) to the wrong race, so this
+// phase applies them to Cup hubs only. Phase 3 namespaces the key
+// (hubEditorial:<series>) and removes this guard.
 export function setHubEditorialData(rows) {
   hubEditorial = rows || {};
   for (const hub of RACE_HUBS) {
+    if (hub.series !== "cup") continue;
     const ov = hubEditorial[hub.week];
     if (!ov) continue;
     if (ov.slug) hub.slug = ov.slug;
@@ -50,12 +60,15 @@ export async function loadHubEditorial() {
 const MONTH_IDX = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
 const DAY_ABBR = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-function hubFromSchedule(r) {
+function hubFromSchedule(r, series = "cup") {
   const [mon, day] = r.date.split(" ");
   const d = new Date(SCHEDULE_YEAR, MONTH_IDX[mon], parseInt(day, 10));
   const officialName = r.name;
+  const baseSlug = (r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-" + SCHEDULE_YEAR);
   return {
-    slug: (r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-" + SCHEDULE_YEAR),
+    series: normalizeSeries(series),
+    seriesLabel: seriesLabel(series),
+    slug: hubSlugForSeries(series, baseSlug),
     name: r.name,
     officialName,
     track: r.track,
@@ -66,13 +79,47 @@ function hubFromSchedule(r) {
     laps: r.laps,
     week: r.week,
     intro: [
-      `${r.track} hosts the ${officialName}, a ${r.laps}-lap run on a ${r.length}-mile ${r.type} track. The full preview for this one is still coming together — check back through the week as practice, qualifying, and the race itself fill in the blanks.`,
-      "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest.",
+      `${r.track} hosts the ${officialName}, a ${r.laps}-lap run on a ${r.length}-mile ${r.type} track. The full preview for this one is still coming together. Check back through the week as practice, qualifying, and the race itself fill in the blanks.`,
+      normalizeSeries(series) === "cup"
+        ? "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest."
+        : "Battle Tracker is Cup-only for 2026, so this hub does not carry battle scoring. Model predictions for this series are on the Race Predictor tab, and official results will appear here once per-series results are wired.",
     ],
   };
 }
 
-export const RACE_HUBS = SCHEDULE.map(hubFromSchedule).reverse();
+// Combined hub list, newest first within each series, Cup first, then
+// O'Reilly, then Trucks. The Cup block is exactly the old reverse-schedule
+// order, so Cup RacesTab order and Cup prev/next navigation are unchanged.
+// Navigation and filtering stay within one series (see hubsForSeries), so
+// prev/next never jumps from a Cup hub to a lower-series hub.
+export const RACE_HUBS = [
+  ...SCHEDULE.map((r) => hubFromSchedule(r, "cup")).reverse(),
+  ...SCHEDULE_XFINITY.map((r) => hubFromSchedule(r, "xfinity")).reverse(),
+  ...SCHEDULE_TRUCK.map((r) => hubFromSchedule(r, "truck")).reverse(),
+];
+
+export function hubsForSeries(series) {
+  return RACE_HUBS.filter((h) => h.series === normalizeSeries(series));
+}
+
+// Same-weekend hub in another series: same track first, then closest date.
+// For a shared weekend this is the hub the series selector jumps to, for
+// example Cup Phoenix II (Oct 18) -> O'Reilly Phoenix II (Oct 17) ->
+// Truck Phoenix (Oct 16), all at Phoenix Raceway. If a series never visits
+// that track, it falls back to the closest date in that series.
+export function findHubForSeries(series, hub) {
+  if (!hub) return null;
+  const list = hubsForSeries(series);
+  if (!list.length) return null;
+  const target = new Date(hub.date + "T12:00:00").getTime();
+  const dist = (h) => {
+    const t = new Date(h.date + "T12:00:00").getTime();
+    return Number.isFinite(t) && Number.isFinite(target) ? Math.abs(t - target) : Infinity;
+  };
+  const sameTrack = list.filter((h) => h.track === hub.track).sort((a, b) => dist(a) - dist(b));
+  if (sameTrack.length) return sameTrack[0];
+  return [...list].sort((a, b) => dist(a) - dist(b))[0] || null;
+}
 // Predictors shown on race hub pages. The ML model is retired from hubs.
 
 
@@ -110,7 +157,11 @@ export function hubCountdown(hub) {
 
 
 export function findBattleForHub(battleRaces, hub) {
-  if (!hub || !battleRaces || !battleRaces.length) return null;
+  // Battle Tracker stays Cup-only for 2026. Returning null for lower-series
+  // hubs is the central guard that stops Cup battle predictions, dark horse
+  // and suck picks, and Cup results from ever appearing on another series'
+  // hub, even if a caller forgets to gate them itself.
+  if (!hub || (hub.series && hub.series !== "cup") || !battleRaces || !battleRaces.length) return null;
   const norm = s => (s || "").toLowerCase().trim();
   const byName = battleRaces.find(r => norm(r.raceName) === norm(hub.officialName) || norm(r.raceName) === norm(hub.name));
   if (byName) return byName;
@@ -138,7 +189,9 @@ export function raceFinishPoints(fin) {
   return 0;
 }
 export function findArchiveForHub(raceArchive, hub) {
-  if (!hub || !raceArchive || !raceArchive.length) return null;
+  // Race archive (power-rankings results) is Cup-only today, same guard as
+  // findBattleForHub: never borrow Cup results for another series' hub.
+  if (!hub || (hub.series && hub.series !== "cup") || !raceArchive || !raceArchive.length) return null;
   const norm = s => (s || "").toLowerCase().trim();
   const byName = raceArchive.find(a => norm(a.raceName) === norm(hub.officialName) || norm(a.raceName) === norm(hub.name));
   if (byName) return byName;
@@ -190,9 +243,15 @@ export function topDisagreements(predictions) {
 // The hub matching this week's scheduled race (for the homepage hero card).
 
 
-export function currentHub() {
-  const race = getThisWeeksRace();
-  return (race && RACE_HUBS.find(h => h.week === race.week)) || RACE_HUBS[0] || null;
+export function currentHub(series = "cup") {
+  // Week numbers collide across series (for example Cup week 33 and
+  // O'Reilly week 33 are different races), so the lookup must filter by
+  // series. With series "cup" this is exactly the old behavior: the Cup
+  // schedule's current race, falling back to the newest Cup hub.
+  const s = normalizeSeries(series);
+  const race = s === "xfinity" ? getThisWeeksRaceXfinity() : s === "truck" ? getThisWeeksRaceTruck() : getThisWeeksRace();
+  const list = hubsForSeries(s);
+  return (race && list.find(h => h.week === race.week)) || list[0] || null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -208,21 +267,31 @@ export function currentHub() {
 
 
 export function RacesTab({ battleRaces, onOpenRace }) {
+  // Hub selection is series-dimensioned. Default is Cup, so the default
+  // list is exactly the old Cup list, in the old order. Switching the
+  // filter lists that series' hubs only; it never mixes series in one list.
+  const [seriesFilter, setSeriesFilter] = useState("cup");
+  const hubs = hubsForSeries(seriesFilter);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <div style={{ fontSize: 22, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: "uppercase" }}>Race Hubs</div>
         <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
-          Every race gets one page: model predictions, the battle tracker scoring, DFS notes and official results.
+          {seriesFilter === "cup"
+            ? "Every race gets one page: model predictions, the battle tracker scoring, DFS notes and official results."
+            : `Every ${seriesLabel(seriesFilter)} Series race gets one page: model predictions and official results. Battle Tracker and DFS are Cup-only for now.`}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <SeriesSwitcher series={seriesFilter} onSeriesChange={setSeriesFilter} />
         </div>
       </div>
-      {RACE_HUBS.length === 0 ? (
+      {hubs.length === 0 ? (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 28, textAlign: "center", color: T.textDim, fontSize: 13 }}>
           No race hubs yet. The first one drops with Kansas.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {RACE_HUBS.map(hub => {
+          {hubs.map(hub => {
             const status = hubStatus(hub);
             const battle = findBattleForHub(battleRaces, hub);
             const scored = battle && battle.actualResults && battle.actualResults.length > 0;
@@ -241,7 +310,7 @@ export function RacesTab({ battleRaces, onOpenRace }) {
                     {hub.officialName || hub.name}
                   </div>
                   <div style={{ fontSize: 11, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 3 }}>
-                    {hub.track} · {hub.dateLabel} · {hub.laps} laps
+                    {hub.series !== "cup" ? `${seriesLabel(hub.series)} · ` : ""}{hub.track} · {hub.dateLabel} · {hub.laps} laps
                   </div>
                   {scored && (
                     <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 3 }}>
@@ -277,6 +346,32 @@ export function RacesTab({ battleRaces, onOpenRace }) {
 // race id and show whichever Cup race is currently live, so no per-week race
 // id is needed. A hub's Supabase editorial row can still set nascarRaceId to
 // pin the panel to one specific race.
+
+// Series guard for the live feed. The proxy's auto mode returns whichever
+// race is currently live, with no series filter, which is how a hub could
+// show another series' race. Before a live order is shown, it must match
+// this hub: same track (with Atlanta/Echopark and Dover name aliases) and
+// a scheduled lap count within 10 laps of the hub's. Series lap counts on
+// a shared weekend differ by far more than 10 (Phoenix: Cup 312, O'Reilly
+// 200, Trucks 150; Talladega: 188, 113, 94), while overtime adds only a
+// few laps, so 10 is a safe tolerance. A mismatch renders nothing, the
+// same as when no race is live, instead of showing the wrong series.
+function trackNamesMatch(a, b) {
+  const norm = (x) => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const na = norm(a), nb = norm(b);
+  if (!na || !nb) return false;
+  const isAtlanta = (x) => x.includes("atlanta") || x.includes("echopark");
+  if (isAtlanta(na) && isAtlanta(nb)) return true;
+  if (na.includes("dover") && nb.includes("dover")) return true;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function liveFeedMatchesHub(data, hub) {
+  if (!data || !hub) return false;
+  if (data.trackName && hub.track && !trackNamesMatch(data.trackName, hub.track)) return false;
+  if (data.lapsTotal && hub.laps && Math.abs(data.lapsTotal - hub.laps) > 10) return false;
+  return true;
+}
 
 const liveOrdinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
 
@@ -347,6 +442,9 @@ export function LiveRunningOrder({ hub }) {
         const j = await r.json();
         if (!alive) return;
         if (!(j && j.live)) { setData(null); return; }
+        // Never show another series' live race on this hub. See
+        // liveFeedMatchesHub above: a mismatch renders nothing.
+        if (!liveFeedMatchesHub(j, hub)) { setData(null); return; }
         setData(j);
         // Once the final order arrives, stop polling: the data is frozen.
         if (j.final) finalRef.current = true;
@@ -498,23 +596,31 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
     );
   }
 
+  // Series gating for this page. Battle Tracker, the race archive, and
+  // practice/qualifying data are Cup-only today. For a lower-series hub
+  // every one of those sources is forced to empty, so the page shows a
+  // "not in the site yet" note instead of Cup data wearing another
+  // series' name. findBattleForHub and findArchiveForHub gate the same
+  // way; this is the second, page-level guard.
+  const isCupHub = hub.series === "cup";
+  const effectiveBattleRace = isCupHub ? battleRace : null;
   const status = hubStatus(hub);
-  const predictions = (battleRace && battleRace.predictions) || {};
+  const predictions = (effectiveBattleRace && effectiveBattleRace.predictions) || {};
   const MODELS = HUB_PREDICTORS;
   const hasAnyPredictions = MODELS.some(m => predictions[m] && predictions[m].length);
   // Disagreements and the battle winner only consider hub predictors,
   // so the retired ML model can never appear on this page.
   const hubPredictions = Object.fromEntries(Object.entries(predictions).filter(([m]) => MODELS.includes(m)));
   const disagreements = hasAnyPredictions ? topDisagreements(hubPredictions) : [];
-  const darkHorse = battleRace && battleRace.darkHorse;
-  const suckPick = battleRace && battleRace.suckPick;
-  const darkHorseReason = battleRace && battleRace.darkHorseReason;
-  const suckPickReason = battleRace && battleRace.suckPickReason;
-  const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
-  const winner = battleWinnerFor(battleRace, HUB_PREDICTORS);
+  const darkHorse = effectiveBattleRace && effectiveBattleRace.darkHorse;
+  const suckPick = effectiveBattleRace && effectiveBattleRace.suckPick;
+  const darkHorseReason = effectiveBattleRace && effectiveBattleRace.darkHorseReason;
+  const suckPickReason = effectiveBattleRace && effectiveBattleRace.suckPickReason;
+  const actuals = (effectiveBattleRace && effectiveBattleRace.actualResults && effectiveBattleRace.actualResults.length) ? effectiveBattleRace.actualResults : null;
+  const winner = battleWinnerFor(effectiveBattleRace, HUB_PREDICTORS);
   // Full official results with points, from the power-rankings race archive.
   // Falls back to the battle top-10 list until the archive has this race.
-  const archiveEntry = findArchiveForHub(raceArchive, hub);
+  const archiveEntry = isCupHub ? findArchiveForHub(raceArchive, hub) : null;
   const fullResults = archiveEntry && archiveEntry.results ? archiveEntry.results
     .filter(r => r.fin > 0)
     .map(r => {
@@ -524,7 +630,10 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
     .sort((a, b) => a.fin - b.fin) : null;
   const typeColor = TC[hub.trackType] || T.accent;
 
-  const qpMatch = qualPractice && qualPractice.week === hub.week;
+  // Practice/qualifying rows are keyed by week number only and are Cup
+  // data. Week numbers collide across series, so a lower-series hub must
+  // not inherit Cup practice/qualifying counts by week.
+  const qpMatch = isCupHub && qualPractice && qualPractice.week === hub.week;
   const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
   const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
   const pracCanceled = qpMatch && !!qualPractice.practiceCanceled;
@@ -540,7 +649,13 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
   // The Live tab stays up after the checkered flag until official results land:
   // it shows the final running order in the gap between the feed ending and
   // the Race Results tab appearing (~90 min for post-race inspection).
-  const liveTabOpen = status === "live" || (status === "completed" && !actuals);
+  // Cup keeps the old rule (Live stays up after the checkered flag until
+  // official results land). For a lower-series hub there are no official
+  // results in the site yet, so keeping Live open forever after race day
+  // would be wrong; Live is offered on race day only.
+  const liveTabOpen = isCupHub
+    ? (status === "live" || (status === "completed" && !actuals))
+    : status === "live";
   const resultTabs = [
     { id: "practice", label: "Practice" },
     { id: "qualifying", label: "Qualifying" },
@@ -557,9 +672,12 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
     sawActualsRef.current = !!actuals;
   }, [actuals]);
 
-  const idx = RACE_HUBS.findIndex(h => h.slug === hub.slug);
-  const olderHub = idx >= 0 ? RACE_HUBS[idx + 1] : null;
-  const newerHub = idx > 0 ? RACE_HUBS[idx - 1] : null;
+  // Prev/next stay within the same series, in the same newest-first
+  // order as before. For Cup this is exactly the old navigation.
+  const seriesHubs = hubsForSeries(hub.series);
+  const idx = seriesHubs.findIndex(h => h.slug === hub.slug);
+  const olderHub = idx >= 0 ? seriesHubs[idx + 1] : null;
+  const newerHub = idx > 0 ? seriesHubs[idx - 1] : null;
 
   const card = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" };
 
@@ -584,7 +702,19 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
           {hub.officialName || hub.name}
         </div>
         <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 6 }}>
-          {hub.name} · {hub.track} · {hub.dateLabel} · {hub.length} mi · {hub.laps} laps · <span style={{ color: typeColor }}>{TL[hub.trackType] || hub.trackType}</span>
+          {hub.series !== "cup" ? `${seriesLabel(hub.series)} Series · ` : ""}{hub.name} · {hub.track} · {hub.dateLabel} · {hub.length} mi · {hub.laps} laps · <span style={{ color: typeColor }}>{TL[hub.trackType] || hub.trackType}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700 }}>Same weekend in</span>
+          {SERIES_IDS.map((id) => {
+            const target = id === hub.series ? null : findHubForSeries(id, hub);
+            const active = id === hub.series;
+            return (
+              <button key={id} disabled={active || !target} onClick={() => target && onOpenRace(target.slug)} style={{ padding: "5px 12px", borderRadius: 20, cursor: active || !target ? "default" : "pointer", fontSize: 11, fontWeight: active ? 800 : 500, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase", background: active ? T.accentSoft : "transparent", color: active ? T.accent : T.textDim, border: `1px solid ${active ? T.accent : T.border}`, opacity: !target && !active ? 0.5 : 1 }}>
+                {seriesLabel(id)}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -612,7 +742,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
         {!hasAnyPredictions ? (
           <div style={{ ...card, textAlign: "center", color: T.textDim, fontSize: 13, padding: "28px 20px" }}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>🔮</div>
-            <div>Predictions drop Monday morning.</div>
+            <div>{isCupHub ? "Predictions drop Monday morning." : `Battle Tracker is Cup-only for 2026, so this hub does not show Cup predictions. Model predictions for the ${seriesLabel(hub.series)} Series are on the Race Predictor tab.`}</div>
             <div style={{ fontSize: 11, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>Check back once the models and my gut have weighed in.</div>
           </div>
         ) : (
@@ -667,7 +797,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
                   <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{darkHorse}</div>
                   {darkHorseReason && <div style={{ fontSize: 12, color: T.textMid, marginTop: 6, lineHeight: 1.5 }}>{darkHorseReason}</div>}
                 </div>
-              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my dark horse Wednesday morning.</div>}
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{isCupHub ? "I name my dark horse Wednesday morning." : "Cup-only for 2026."}</div>}
           </div>
           <div style={{ ...card, borderLeft: `3px solid ${T.red}` }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: T.red, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Suck Pick</div>
@@ -676,7 +806,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
                   <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{suckPick}</div>
                   {suckPickReason && <div style={{ fontSize: 12, color: T.textMid, marginTop: 6, lineHeight: 1.5 }}>{suckPickReason}</div>}
                 </div>
-              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>I name my suck pick Wednesday morning.</div>}
+              : <div style={{ fontSize: 12, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>{isCupHub ? "I name my suck pick Wednesday morning." : "Cup-only for 2026."}</div>}
           </div>
         </div>
       </div>
@@ -705,7 +835,8 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
 
       </MobileSection>
 
-      {/* DFS CALLOUT */}
+      {/* DFS CALLOUT (Cup only): the optimizer and its salaries are Cup data, so a lower-series hub must not point at them as if they were that series. */}
+      {isCupHub && (
       <div style={{ ...card, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: `linear-gradient(135deg, ${T.goldBg}, ${T.surface} 70%)` }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontSize: 13, fontWeight: 900, color: T.text, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase" }}>Building a DFS lineup?</div>
@@ -715,11 +846,17 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
           Open DFS Optimizer
         </button>
       </div>
+      )}
 
       {/* RESULTS — tabbed: practice / qualifying before the race, live during, race results after */}
       <MobileSection id="results" title="Official Results">
       <div>
         {sectionTitle("Official Results")}
+        {!isCupHub && (
+          <div style={{ ...card, marginBottom: 12, fontSize: 12, color: T.textMid, lineHeight: 1.6 }}>
+            Official results for the {seriesLabel(hub.series)} Series are not in the site yet. This page never shows another series' results here. The Race Results tab appears once per-series results are wired, and the Live tab on race day only shows this series' race.
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           {resultTabs.map(t => (
             <button key={t.id} onClick={() => setResultsTab(t.id)} style={{
@@ -851,7 +988,7 @@ export function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpe
   const winner = actuals ? battleWinnerFor(battleRace, HUB_PREDICTORS) : null;
   const darkHorse = battleRace && battleRace.darkHorse;
   const suckPick = battleRace && battleRace.suckPick;
-  const qpMatch = qualPractice && qualPractice.week === hub.week;
+  const qpMatch = hub.series === "cup" && qualPractice && qualPractice.week === hub.week;
   const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
   const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
   const sectionLabel = { fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", margin: "16px 0 8px" };

@@ -3,6 +3,10 @@ import React, { useState } from "react";
 import { T, TC, TL } from "../theme.js";
 import { InfoLegend } from "./ui.jsx";
 import { SCHEDULE, SCHEDULE_YEAR } from "../data/schedule.js";
+import { SCHEDULE_XFINITY } from "../data/schedule-xfinity.js";
+import { SCHEDULE_TRUCK } from "../data/schedule-truck.js";
+import { normalizeSeries, seriesLabel } from "../data/series.js";
+import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 import { getTier } from "../lib/tiers.js";
 import { trackEvent } from "../lib/analytics.js";
 import { INITIAL_DRIVERS } from "../data/drivers.js";
@@ -19,31 +23,43 @@ export const PRED_MODELS = [
 // ─────────────────────────────────────────────────────────────
 
 
-export function PredictorTab({ drivers, csvData, incrementTool }) {
+export function PredictorTab({ drivers, csvData, incrementTool, series = "cup", onSeriesChange, displayDrivers }) {
   const [selectedWeek, setSelectedWeek] = useState("");
   const [selectedModel, setSelectedModel] = useState("power");
   const [results, setResults] = useState([]);
 
-  const race = selectedWeek === "allstar" ? SCHEDULE.find(r => r.allStar) : SCHEDULE.find(r => !r.allStar && r.week === parseInt(selectedWeek));
+  // Per-series schedule. Cup is the default and keeps the old lookup exactly.
+  // All-Star exists only in the Cup schedule; it is not offered for
+  // lower series, where the week lookup below simply never matches it.
+  const activeSeries = normalizeSeries(series);
+  const seriesSchedule = activeSeries === "xfinity" ? SCHEDULE_XFINITY : activeSeries === "truck" ? SCHEDULE_TRUCK : SCHEDULE;
+  const race = selectedWeek === "allstar" ? SCHEDULE.find(r => r.allStar) : seriesSchedule.find(r => !r.allStar && r.week === parseInt(selectedWeek));
   const model = PRED_MODELS.find(m => m.id === selectedModel);
   const needsCsv = selectedModel === "pure" || selectedModel === "enhanced";
   const hasCsv = csvData.length > 0;
 
+  // Power Rankings model needs live per-series ratings, which exist only
+  // for Cup today (Phase 3 admin work builds them for lower series).
+  // Pure and Enhanced are CSV-driven and already take a series param in
+  // the Phase 2 model code, so they run for every series. The Power
+  // button is disabled, not silently fed Cup ratings, for lower series.
+  const powerAvailable = activeSeries === "cup";
   const runPrediction = () => {
     if (!race) return;
+    if (selectedModel === "power" && !powerAvailable) return;
     incrementTool?.("race_predictor");
-    trackEvent("predictor_run", { model: selectedModel, race_week: race.week, race_name: race.name });
+    trackEvent("predictor_run", { model: selectedModel, race_week: race.week, race_name: race.name, series: activeSeries });
 
     if (selectedModel === "power") {
       // Deterministic power-ratings model (see src/models/predictors.js)
       setResults(runPowerRankingsPrediction(drivers, race));
 
     } else if (selectedModel === "pure") {
-      const preds = runPureStatsPrediction(csvData, race.track, race.type, SCHEDULE_YEAR);
+      const preds = runPureStatsPrediction(csvData, race.track, race.type, SCHEDULE_YEAR, activeSeries);
       setResults(preds);
 
     } else if (selectedModel === "enhanced") {
-      const preds = runEnhancedPureStatsPrediction(csvData, race.track, race.type, SCHEDULE_YEAR);
+      const preds = runEnhancedPureStatsPrediction(csvData, race.track, race.type, SCHEDULE_YEAR, activeSeries);
       setResults(preds);
     }
   };
@@ -52,6 +68,12 @@ export function PredictorTab({ drivers, csvData, incrementTool }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      <SeriesSwitcher series={activeSeries} onSeriesChange={(id) => { onSeriesChange && onSeriesChange(id); setSelectedWeek(""); setResults([]); }} />
+      {!powerAvailable && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 16px", fontSize:12, color:T.textMid, lineHeight:1.6 }}>
+          Power Rankings model is Cup-only for now: per-series ratings are built in the admin panel (Phase 3) and do not exist for the {seriesLabel(activeSeries)} Series yet. Pure Stats and Enhanced Pure Stats below run on this series' own race history.
+        </div>
+      )}
       {/* Model Selector */}
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
         {PRED_MODELS.map(m => {
@@ -118,10 +140,10 @@ export function PredictorTab({ drivers, csvData, incrementTool }) {
           <select value={selectedWeek} onChange={e=>{ setSelectedWeek(e.target.value); setResults([]); }}
             style={{ width:"100%", background:T.surface2, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"9px 12px", fontSize:13, outline:"none" }}>
             <option value="">Choose a race...</option>
-            {SCHEDULE.map(r => <option key={r.allStar ? "allstar" : r.week} value={r.allStar ? "allstar" : r.week}>{r.allStar ? "★" : `Week ${r.week}`} · {r.date} · {r.name}{r.allStar ? " (Non-Points)" : ""}</option>)}
+            {seriesSchedule.map(r => <option key={r.allStar ? "allstar" : r.week} value={r.allStar ? "allstar" : r.week}>{r.allStar ? "★" : `Week ${r.week}`} · {r.date} · {r.name}{r.allStar ? " (Non-Points)" : ""}</option>)}
           </select>
         </div>
-        <button onClick={runPrediction} disabled={!race || (needsCsv && !hasCsv)} style={{ padding:"9px 24px", background:(race && (!needsCsv||hasCsv))?model.color:"#1a2d40", color:(race && (!needsCsv||hasCsv))?"#fff":T.textDim, border:"none", borderRadius:8, cursor:(race && (!needsCsv||hasCsv))?"pointer":"default", fontSize:13, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:(race && (!needsCsv||hasCsv))?`0 4px 18px ${model.color}44`:"none" }}>
+        <button onClick={runPrediction} disabled={!race || (needsCsv && !hasCsv) || (selectedModel === "power" && !powerAvailable)} style={{ padding:"9px 24px", background:(race && (!needsCsv||hasCsv) && !(selectedModel === "power" && !powerAvailable))?model.color:"#1a2d40", color:(race && (!needsCsv||hasCsv) && !(selectedModel === "power" && !powerAvailable))?"#fff":T.textDim, border:"none", borderRadius:8, cursor:(race && (!needsCsv||hasCsv) && !(selectedModel === "power" && !powerAvailable))?"pointer":"default", fontSize:13, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", boxShadow:(race && (!needsCsv||hasCsv) && !(selectedModel === "power" && !powerAvailable))?`0 4px 18px ${model.color}44`:"none" }}>
           Generate Prediction
         </button>
       </div>
@@ -140,7 +162,7 @@ export function PredictorTab({ drivers, csvData, incrementTool }) {
             {model.icon} {model.label} MODEL — {results.length} drivers ranked
           </div>
           {results.map((p, i) => {
-            const dInfo = INITIAL_DRIVERS.find(d => d.num === p.num);
+            const dInfo = (displayDrivers || INITIAL_DRIVERS).find(d => d.num === p.num);
             const ovr = dInfo?.overall || 60;
             const tier = getTier(ovr);
             const medal = i===0?"🏆":i===1?"🥈":i===2?"🥉":"";
