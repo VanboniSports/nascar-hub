@@ -6109,3 +6109,41 @@ year,race_date,race_name,track_name,driver_name,car_number,finish_position,start
 2026,2026-10-11,October Charlotte,Charlotte Motor Speedway,Rajah Caruth,88,36,10,126,0,Accident,Chevrolet,20.6,17.5,0,0,0,2,8,22.2,67.7,28,36,6,35,-6,46,52,25,0,95,126,0.754,0.0
 2026,2026-10-11,October Charlotte,Charlotte Motor Speedway,Dawson Cram,47,37,37,66,0,Brakes,Chevrolet,35.6,30.33,0,0,0,0,0,36.2,25.7,37,37,21,37,5,5,0,0,0,0,66,0.0,0.0
 2026,2026-10-11,October Charlotte,Charlotte Motor Speedway,J.J. Yeley,38,38,38,63,2,Water Pump,Ford,37.0,25.25,0,0,0,0,0,35.5,30.7,38,38,1,38,6,14,8,0,0,5,63,0.0794,0.0317
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Jesse Love,2,1,1,200,156,Running,Chevrolet,7.2,4.0,1,0,1,10,16,1.3,149.7,1,1,1,19,-3,13,16,8,62,200,200,1.0,0.78
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Sam Mayer,41,2,35,200,0,Running,Chevrolet,9.6,16.12,0,0,0,6,14,6,116.7,5,2,2,35,28,53,25,29,20,189,200,0.945,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Justin Allgaier,7,3,13,200,18,Running,Chevrolet,14.4,10.44,1,0,6,16,20,3.9,123.7,6,3,1,22,8,45,37,31,29,198,200,0.99,0.09
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Corey Day,17,4,11,200,7,Running,Chevrolet,8.4,11.5,0,0,4,10,19,5.7,110.7,2,4,1,16,1,40,39,35,8,197,200,0.985,0.035
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Sammy Smith,8,5,9,200,0,Running,Chevrolet,10.6,8.75,1,1,0,7,13,6.6,105.3,4,5,3,24,-4,45,49,30,1,197,200,0.985,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Brandon Jones,20,6,2,200,0,Running,Toyota,16.4,10.56,0,1,1,6,16,15.5,81.9,16,6,2,38,10,73,63,23,1,121,200,0.605,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Dean Thompson,26,7,17,200,0,Running,Toyota,12.4,26.67,0,0,0,0,4,11,91.8,8,7,5,25,0,70,70,42,0,161,200,0.805,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,William Sawalich,18,8,3,200,0,Running,Toyota,13.4,21.0,0,1,1,8,12,9.3,94.2,3,8,2,21,-21,42,63,36,0,200,200,1.0,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Rajah Caruth,88,9,6,200,0,Running,Chevrolet,21.4,13.0,0,0,0,2,8,8.5,96.7,13,9,1,21,-5,50,55,39,5,196,200,0.98,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Carson Kvapil,1,10,16,200,0,Running,Chevrolet,15.0,14.0,0,0,2,11,17,8,99.2,10,11,4,26,2,70,68,52,5,197,200,0.985,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Parker Retzlaff,99,11,18,200,9,Running,Chevrolet,13.2,23.22,0,0,0,4,12,14,77.4,9,10,1,22,5,52,47,24,1,108,200,0.54,0.045
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Jeremy Clements,51,12,19,200,1,Running,Chevrolet,16.2,20.56,0,0,0,1,5,12.8,82.3,17,13,1,23,9,72,63,43,0,166,200,0.83,0.005
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Harrison Burton,24,13,36,200,0,Running,Toyota,18.8,18.0,0,0,0,0,3,18.5,69.8,26,12,2,36,30,69,39,12,0,48,200,0.24,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Andrew Patterson,32,14,25,200,0,Running,Chevrolet,20.4,15.0,0,0,0,0,0,25.3,55.7,25,14,4,37,15,67,52,8,0,47,200,0.235,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Austin Hill,21,15,10,200,0,Running,Chevrolet,14.4,12.44,0,0,2,8,14,14.1,78.5,29,17,3,29,6,63,57,24,0,127,200,0.635,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Jeb Burton,27,16,22,200,0,Running,Chevrolet,22.2,19.33,0,0,0,0,3,15.5,71.7,15,18,4,25,1,53,52,27,0,79,200,0.395,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Anthony Alfredo,96,17,15,200,0,Running,Chevrolet,15.6,24.56,0,0,0,3,9,16,68.3,11,16,6,26,-4,60,64,28,0,62,200,0.31,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Ryan Ellis,02,18,28,200,0,Running,Chevrolet,30.2,24.88,0,0,0,0,1,25.8,48.5,30,15,11,37,9,63,54,5,0,29,200,0.145,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Lavar Scott,45,19,30,200,0,Running,Chevrolet,30.0,33.0,0,0,0,0,0,26.2,47.7,24,19,7,36,10,68,58,5,0,11,200,0.055,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Brent Crews,19,20,8,199,1,Running,Toyota,9.4,18.0,0,0,0,11,16,13.9,78.3,7,21,1,34,-25,67,92,37,0,147,199,0.7387,0.005
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Patrick Staropoli,48,21,27,199,0,Running,Chevrolet,26.4,26.0,0,0,0,0,0,21.5,58.3,14,22,4,30,-8,69,77,11,0,27,199,0.1357,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Nick Sanchez,87,22,7,199,0,Running,Chevrolet,17.2,19.6,0,0,0,1,2,20.4,61.2,21,20,6,32,-4,83,87,8,0,7,199,0.0352,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Ryan Sieg,39,23,12,199,0,Running,Chevrolet,18.4,17.56,0,0,1,2,7,15.5,74.7,12,23,5,38,0,68,68,29,0,127,199,0.6382,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Blaine Perkins,31,24,14,199,0,Running,Chevrolet,25.2,25.57,0,0,0,0,1,22.8,55.5,20,25,14,34,-15,71,86,1,0,1,199,0.005,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Kyle Sieg,28,25,21,199,0,Running,Chevrolet,20.0,25.0,0,0,0,0,2,21.7,57.5,18,24,8,32,-10,56,66,0,0,0,199,0.0,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Josh Williams,92,26,23,199,0,Running,Chevrolet,22.4,24.25,0,0,0,0,0,25.4,45.3,19,26,3,34,6,74,68,5,0,5,199,0.0251,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Brad Perez,42,27,37,199,0,Running,Chevrolet,31.8,15.0,0,0,0,0,0,26.6,42.7,22,27,5,37,-3,90,93,3,0,2,199,0.0101,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Taylor Gray,54,28,5,199,0,Running,Toyota,6.2,9.33,0,1,1,5,14,17.3,76.8,28,29,1,35,-2,31,33,5,15,97,199,0.4874,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Will Rodgers,53,29,24,198,0,Running,Chevrolet,25.6,15.0,0,0,0,0,0,25.6,50.5,23,28,19,35,-21,52,73,0,3,0,198,0.0,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Connor Mosack,43,30,31,198,0,Running,Chevrolet,22.6,26.67,0,0,0,0,0,32.2,33.9,36,31,11,38,10,47,37,0,1,1,198,0.0051,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Garrett Smithley,0,31,34,198,0,Running,Chevrolet,24.8,29.5,0,0,0,0,1,33.7,28.7,32,32,2,38,-1,26,27,0,0,1,198,0.0051,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Sheldon Creed,00,32,4,198,8,Running,Chevrolet,4.0,9.22,0,0,3,13,20,28,93.1,37,33,1,38,6,10,4,3,8,46,198,0.2323,0.0404
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Joey Gase,55,33,38,198,0,Running,Ford,24.2,25.86,0,0,0,0,0,32.4,33.5,31,34,14,38,6,55,49,0,0,0,198,0.0,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Leland Honeyman Jr.,91,34,20,197,0,Running,Chevrolet,24.6,23.25,0,0,0,0,0,31.1,31.8,34,35,20,35,-17,32,49,0,0,0,197,0.0,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Brennan Poole,44,35,26,197,0,Running,Ford,14.8,24.12,0,0,0,0,4,26.3,40.5,27,36,2,36,10,69,59,5,0,5,197,0.0254,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Josh Bilicki,07,36,32,179,0,Brakes,Chevrolet,25.8,26.5,0,0,0,0,0,32.3,30.7,33,30,20,36,3,38,35,0,0,0,179,0.0,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Dawson Cram,47,37,33,126,0,Fuel Pump,Chevrolet,36.4,31.88,0,0,0,0,0,36,28.0,35,37,3,38,0,13,13,0,0,1,126,0.0079,0.0
+2026,2026-10-17,October Phoenix,Phoenix Raceway,Jake Finch,9,38,29,54,0,Engine,Chevrolet,21.4,15.0,0,0,0,0,0,34.1,36.8,38,38,18,36,3,22,19,0,0,0,54,0.0,0.0
