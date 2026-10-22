@@ -130,15 +130,42 @@ export function SSStandingsTab({ csvData, drivers, seasonPoints, fullTimerNames 
     return [...yrs].sort((a,b) => b-a);
   }, [csvData]);
 
+  // Year-aware full-timer list for the Standings filter. The prop roster is
+  // the CURRENT year's roster, so using it for past years hid champions who
+  // have since left the series (e.g. O'Reilly 2022 Ty Gibbs, Trucks 2025
+  // Corey Heim). For the current year (max year in the active series CSV)
+  // the prop roster is kept exactly. For past years the list is derived
+  // from that year's CSV data: a driver counts as a full-timer if they
+  // raced in at least 80% of that series' races that year, where the race
+  // count is the number of distinct race dates (csvData index 9) and a
+  // driver's count is their rows that year. The 80% threshold keeps
+  // full-season drivers in and part-timers out without needing a roster
+  // per historical year; all four previously hidden champions ran full
+  // seasons and pass it.
+  const yearFullTimerNames = useMemo(() => {
+    const currentYear = years[0];
+    if (yearFilter === currentYear || !yearFilter) return activeFullTimerNames;
+    const raceDates = new Set();
+    const counts = {};
+    for (const r of csvData) {
+      if (r[2] !== yearFilter) continue;
+      if (r[9]) raceDates.add(r[9]);
+      if (r[0]) counts[r[0]] = (counts[r[0]] || 0) + 1;
+    }
+    if (raceDates.size === 0) return activeFullTimerNames;
+    const threshold = 0.8 * raceDates.size;
+    return Object.keys(counts).filter(n => counts[n] >= threshold);
+  }, [csvData, years, yearFilter, activeFullTimerNames]);
+
   const rows = useMemo(() => {
     const data = ssBuildSeasonData(csvData, yearFilter);
     let filtered = data;
-    if (fullTimerOnly) filtered = data.filter(d => activeFullTimerNames.includes(d.name));
+    if (fullTimerOnly) filtered = data.filter(d => yearFullTimerNames.includes(d.name));
     return filtered.map(d => ({
       ...d,
       seasonPts: seasonPoints?.[`${d.name}__${yearFilter}`] ?? null,
     }));
-  }, [csvData, yearFilter, fullTimerOnly, seasonPoints]);
+  }, [csvData, yearFilter, fullTimerOnly, seasonPoints, yearFullTimerNames]);
 
   const sorted = useMemo(() => {
     const arr = [...rows];
@@ -187,7 +214,7 @@ export function SSStandingsTab({ csvData, drivers, seasonPoints, fullTimerNames 
           </select>
         </div>
         <button onClick={()=>setFullTimerOnly(f=>!f)} style={{ background:fullTimerOnly?T.accentSoft:"transparent", color:fullTimerOnly?T.accent:T.textDim, border:`1px solid ${fullTimerOnly?T.accent:T.border}`, borderRadius:6, padding:"4px 12px", fontSize:10, cursor:"pointer", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase", fontWeight:700 }}>
-          {fullTimerOnly ? `${activeFullTimerNames.length} Full-Timers` : "All Drivers"}
+          {fullTimerOnly ? `${yearFullTimerNames.length} Full-Timers` : "All Drivers"}
         </button>
         <span style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace", marginLeft:"auto" }}>{sorted.length} driver{sorted.length!==1?"s":""}</span>
       </div>
