@@ -5,11 +5,13 @@ import { T, TC, TL } from "../theme.js";
 import { Ic } from "./icons.jsx";
 import { TOOL_USAGE_KEYS, BLOG_CATEGORIES, BLOG_CAT_COLORS, BATTLE_TRACK_COLORS, PREDICTORS, PREDICTOR_COLORS, PREDICTOR_DESCRIPTIONS, DFS_PLATFORMS } from "../data/siteMeta.js";
 import { SCHEDULE, getThisWeeksRace } from "../data/schedule.js";
+import { SCHEDULE_XFINITY, getThisWeeksRaceXfinity } from "../data/schedule-xfinity.js";
+import { SCHEDULE_TRUCK, getThisWeeksRaceTruck } from "../data/schedule-truck.js";
 import { BattleDriverInput } from "./ui.jsx";
 import { getTier } from "../lib/tiers.js";
 import { sb } from "../lib/supabase.js";
 import { INITIAL_DRIVERS, INITIAL_DRIVERS_XFINITY, INITIAL_DRIVERS_TRUCK, normalizeCsvDriverName, FULL_TIMER_NAMES } from "../data/drivers.js";
-import { normalizeSeries, seriesLabel } from "../data/series.js";
+import { normalizeSeries, seriesLabel, hubSlugForSeries } from "../data/series.js";
 import { parseCSVData } from "../lib/csv.js";
 import { parsePaste, findDriver } from "../lib/pasteParser.js";
 
@@ -1062,15 +1064,42 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
 // ─────────────────────────────────────────────────────────────
 // RACE HUB EDITORIAL — per-week hub overrides (official race name, page
 // slug, NASCAR live-feed race id, editorial preview paragraphs) stored in
-// Supabase (app_state key "hubEditorial"). Weeks with no saved row get the
-// generic auto-generated preview. Saves apply on the site and in the app
-// with no code push.
+// Supabase, one app_state key per series (Phase 3, matching seasonPoints):
+// Cup keeps the legacy key "hubEditorial", O'Reilly uses
+// "hubEditorialXfinity", Trucks uses "hubEditorialTruck", each week-keyed
+// inside. Weeks with no saved row get the generic auto-generated preview.
+// Saves apply on the site and in the app with no code push.
 // ─────────────────────────────────────────────────────────────
+// Hub editorial storage keys per series. Cup keeps the legacy key exactly;
+// lower series get their own keys so a week number (which is per-series)
+// can never be read as another series' week.
+export const HUB_EDITORIAL_KEYS = { cup: "hubEditorial", xfinity: "hubEditorialXfinity", truck: "hubEditorialTruck" };
+export function hubEditorialKeyForSeries(series) { return HUB_EDITORIAL_KEYS[normalizeSeries(series)]; }
+// Per-series schedules and "this week" helpers. Week defaults come from
+// the SELECTED series' own schedule, never from Cup's week number, so
+// switching series never loads a Cup week as if it were that series' week.
+const HUB_SERIES_SCHEDULES = { cup: SCHEDULE, xfinity: SCHEDULE_XFINITY, truck: SCHEDULE_TRUCK };
+function hubSeriesThisWeek(series) {
+  try {
+    const s = normalizeSeries(series);
+    if (s === "xfinity") return (getThisWeeksRaceXfinity() || {}).week;
+    if (s === "truck") return (getThisWeeksRaceTruck() || {}).week;
+    return (getThisWeeksRace() || {}).week;
+  } catch (e) { return undefined; }
+}
+function hubSeriesDefaultWeek(series) {
+  const w = hubSeriesThisWeek(series);
+  if (w != null) return w;
+  const sched = HUB_SERIES_SCHEDULES[normalizeSeries(series)] || SCHEDULE;
+  return sched.length ? sched[sched.length - 1].week : 31;
+}
+
 export function HubEditorialAdminSection({ onHubEditorialSave }) {
   const inputStyle = { width:"100%", background:T.surface2, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:"8px 12px", fontSize:13, outline:"none", fontFamily:"'Barlow',sans-serif" };
   const btnStyle = (col) => ({ padding:"8px 18px", background:col, border:"none", color:"#fff", borderRadius:8, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" });
   const labelStyle = { fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" };
-  const [week, setWeek] = useState(() => { try { return (getThisWeeksRace() || {}).week ?? 31; } catch (e) { return 31; } });
+  const [series, setSeries] = useState("cup");
+  const [week, setWeek] = useState(() => hubSeriesDefaultWeek("cup"));
   const [officialName, setOfficialName] = useState("");
   const [slug, setSlug] = useState("");
   const [nascarRaceId, setNascarRaceId] = useState("");
@@ -1079,10 +1108,10 @@ export function HubEditorialAdminSection({ onHubEditorialSave }) {
   const [saving, setSaving] = useState(false);
   const [hasRow, setHasRow] = useState(false);
 
-  const loadWeek = useCallback(async (w) => {
+  const loadWeek = useCallback(async (w, s) => {
     setMsg("Loading…");
     try {
-      const { data } = await sb.from("app_state").select("value").eq("key", "hubEditorial").maybeSingle();
+      const { data } = await sb.from("app_state").select("value").eq("key", hubEditorialKeyForSeries(s)).maybeSingle();
       const ov = (data && data.value && (data.value[w] || data.value[String(w)])) || null;
       setOfficialName(ov?.officialName || "");
       setSlug(ov?.slug || "");
@@ -1095,18 +1124,27 @@ export function HubEditorialAdminSection({ onHubEditorialSave }) {
     }
   }, []);
 
-  useEffect(() => { loadWeek(week); }, [week, loadWeek]);
+  useEffect(() => { loadWeek(week, series); }, [week, series, loadWeek]);
 
-  const readAll = async () => {
-    const { data } = await sb.from("app_state").select("value").eq("key", "hubEditorial").maybeSingle();
+  const readAll = async (s) => {
+    const { data } = await sb.from("app_state").select("value").eq("key", hubEditorialKeyForSeries(s)).maybeSingle();
     return { ...((data && data.value) || {}) };
+  };
+
+  // Switching series resets the week to that series' own "this week" race,
+  // so a Cup week number is never carried over as if it were the new
+  // series' week (week numbers are per-series schedules).
+  const handleSeriesChange = (s) => {
+    const next = normalizeSeries(s);
+    setSeries(next);
+    setWeek(hubSeriesDefaultWeek(next));
   };
 
   const handleSave = async () => {
     setSaving(true);
     setMsg("");
     try {
-      const all = await readAll();
+      const all = await readAll(series);
       const paras = introText.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
       const entry = {};
       if (officialName.trim()) entry.officialName = officialName.trim();
@@ -1116,10 +1154,10 @@ export function HubEditorialAdminSection({ onHubEditorialSave }) {
       if (paras.length) entry.intro = paras;
       if (!Object.keys(entry).length) { setMsg("Nothing to save — fill in at least one field."); setSaving(false); return; }
       all[week] = entry;
-      const { error } = await sb.from("app_state").upsert({ key:"hubEditorial", value:all }, { onConflict:"key" });
+      const { error } = await sb.from("app_state").upsert({ key:hubEditorialKeyForSeries(series), value:all }, { onConflict:"key" });
       if (error) throw error;
       setHasRow(true);
-      setMsg("Saved — the hub updates everywhere on next load.");
+      setMsg(`Saved — the ${seriesLabel(series)} hub updates everywhere on next load.`);
       if (onHubEditorialSave) await onHubEditorialSave();
     } catch (e) {
       setMsg("Save failed: " + (e.message || e));
@@ -1128,14 +1166,14 @@ export function HubEditorialAdminSection({ onHubEditorialSave }) {
   };
 
   const handleRemove = async () => {
-    if (!window.confirm(`Remove the saved override for week ${week}? The hub will fall back to the generic preview.`)) return;
+    if (!window.confirm(`Remove the saved ${seriesLabel(series)} override for week ${week}? The hub will fall back to the generic preview.`)) return;
     setSaving(true);
     setMsg("");
     try {
-      const all = await readAll();
+      const all = await readAll(series);
       delete all[week];
       delete all[String(week)];
-      const { error } = await sb.from("app_state").upsert({ key:"hubEditorial", value:all }, { onConflict:"key" });
+      const { error } = await sb.from("app_state").upsert({ key:hubEditorialKeyForSeries(series), value:all }, { onConflict:"key" });
       if (error) throw error;
       setHasRow(false);
       setOfficialName(""); setSlug(""); setNascarRaceId(""); setIntroText("");
@@ -1147,22 +1185,33 @@ export function HubEditorialAdminSection({ onHubEditorialSave }) {
     setSaving(false);
   };
 
-  const schedRow = SCHEDULE.find(r => r.week === week);
-  const generatedSlug = schedRow ? (schedRow.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-2026") : "";
-  const weekOptions = [...SCHEDULE].sort((a, b) => b.week - a.week);
+  const activeSchedule = HUB_SERIES_SCHEDULES[normalizeSeries(series)] || SCHEDULE;
+  const schedRow = activeSchedule.find(r => r.week === week);
+  const generatedSlug = schedRow ? hubSlugForSeries(series, (schedRow.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + "-2026")) : "";
+  const weekOptions = [...activeSchedule].sort((a, b) => b.week - a.week);
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16, maxWidth:760 }}>
       <div style={{ fontSize:13, color:T.textDim, lineHeight:1.6 }}>
-        Each race week can override the auto-generated hub: the official race name, the page slug, the NASCAR live-feed race id, and the editorial preview paragraphs. Weeks with no saved override show the generic preview. Changes apply on the website and in the app with no rebuild.
+        Each race week can override the auto-generated hub: the official race name, the page slug, the NASCAR live-feed race id, and the editorial preview paragraphs. Weeks with no saved override show the generic preview. Overrides are stored per series, so editing a {seriesLabel(series)} week never touches another series' hub. Changes apply on the website and in the app with no rebuild.
       </div>
-      <div>
-        <label style={labelStyle}>Race week</label>
-        <select value={week} onChange={e => setWeek(parseInt(e.target.value, 10))} style={{ ...inputStyle, cursor:"pointer" }}>
-          {weekOptions.map(r => (
-            <option key={r.week} value={r.week}>Week {r.week} — {r.name} ({r.date})</option>
-          ))}
-        </select>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+        <div>
+          <label style={labelStyle}>Series</label>
+          <select value={series} onChange={e => handleSeriesChange(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
+            <option value="cup">Cup</option>
+            <option value="xfinity">O'Reilly</option>
+            <option value="truck">Trucks</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Race week</label>
+          <select value={week} onChange={e => setWeek(parseInt(e.target.value, 10))} style={{ ...inputStyle, cursor:"pointer" }}>
+            {weekOptions.map(r => (
+              <option key={r.week} value={r.week}>Week {r.week} — {r.name} ({r.date})</option>
+            ))}
+          </select>
+        </div>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
         <div>

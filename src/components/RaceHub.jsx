@@ -17,26 +17,34 @@ import { scoreEntry } from "../models/battle.js";
 // Every week gets a hub automatically from src/data/schedule.js — no more
 // hardcoding one race at a time. Races with rich extras (editorial intro,
 // official race name, NASCAR live-feed race id, slug) are stored in Supabase
-// (app_state key "hubEditorial", one entry per race week) and applied at boot
+// (one app_state key per series, one entry per race week) and applied at boot
 // by loadHubEditorial(); every other week gets a fully working hub with a
 // generic preview. Editing copy in the admin panel's Race Hubs tab updates the
 // site (and the app) with no code push.
 // Newest week first, so olderHub/newerHub navigation keeps working.
-let hubEditorial = {};
+// Hub editorial storage (Phase 3, series-namespaced, matching the
+// seasonPoints pattern): Cup keeps the legacy key "hubEditorial" exactly,
+// so all existing Cup editorial is untouched; O'Reilly uses
+// "hubEditorialXfinity" and Trucks uses "hubEditorialTruck", each with the
+// same inner week-keyed format. Week numbers are per-series schedules, so
+// a Cup week must never be read as another series' week.
+const HUB_EDITORIAL_KEYS = { cup: "hubEditorial", xfinity: "hubEditorialXfinity", truck: "hubEditorialTruck" };
+let hubEditorialBySeries = { cup: {}, xfinity: {}, truck: {} };
 let editorialReady = false;
 export function hubEditorialReady() { return editorialReady; }
 // Apply Supabase editorial rows to the generated hubs, in place so every
-// existing hubBySlug/currentHub reference picks them up.
-// hubEditorial rows are keyed by week number only and are Cup data today.
-// Applying them to lower-series hubs by week would attach Cup editorial
-// (official names, intro copy, live race ids) to the wrong race, so this
-// phase applies them to Cup hubs only. Phase 3 namespaces the key
-// (hubEditorial:<series>) and removes this guard.
-export function setHubEditorialData(rows) {
-  hubEditorial = rows || {};
+// existing hubBySlug/currentHub reference picks them up. Each hub reads
+// only its own series' record at its own week, so Cup editorial can never
+// attach to a lower-series hub (and vice versa). Accepts either the new
+// per-series map { cup, xfinity, truck } or, for backward compatibility, a
+// plain week-keyed object, which is treated as the Cup record.
+export function setHubEditorialData(rowsOrMap) {
+  const isMap = rowsOrMap && (Object.prototype.hasOwnProperty.call(rowsOrMap, "cup") || Object.prototype.hasOwnProperty.call(rowsOrMap, "xfinity") || Object.prototype.hasOwnProperty.call(rowsOrMap, "truck"));
+  hubEditorialBySeries = isMap
+    ? { cup: rowsOrMap.cup || {}, xfinity: rowsOrMap.xfinity || {}, truck: rowsOrMap.truck || {} }
+    : { cup: rowsOrMap || {}, xfinity: {}, truck: {} };
   for (const hub of RACE_HUBS) {
-    if (hub.series !== "cup") continue;
-    const ov = hubEditorial[hub.week];
+    const ov = (hubEditorialBySeries[hub.series] || {})[hub.week];
     if (!ov) continue;
     if (ov.slug) hub.slug = ov.slug;
     if (ov.officialName) hub.officialName = ov.officialName;
@@ -47,9 +55,12 @@ export function setHubEditorialData(rows) {
 }
 export async function loadHubEditorial() {
   try {
-    const { data } = await sb.from("app_state").select("value").eq("key", "hubEditorial").maybeSingle();
-    setHubEditorialData(data && data.value);
-    return Object.keys(hubEditorial).length;
+    const results = await Promise.all(Object.values(HUB_EDITORIAL_KEYS).map(async (key) => {
+      const { data } = await sb.from("app_state").select("value").eq("key", key).maybeSingle();
+      return data && data.value;
+    }));
+    setHubEditorialData({ cup: results[0], xfinity: results[1], truck: results[2] });
+    return Object.values(hubEditorialBySeries).reduce((n, rows) => n + Object.keys(rows || {}).length, 0);
   } catch (e) {
     console.error("hubEditorial load error:", e);
     editorialReady = true;
