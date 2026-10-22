@@ -20,7 +20,7 @@ export const PR_SUBTABS = [
 // ─────────────────────────────────────────────────────────────
 
 
-export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, powerDrivers, powerPrevRanks, powerRatingHistory, powerHasData, incrementTool, series = "cup", onSeriesChange }) {
+export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, powerDrivers, powerPrevRanks, powerRatingHistory, powerHasData, comboBoard, comboPrevRanks, comboHasData, incrementTool, series = "cup", onSeriesChange }) {
   const [subTab, setSubTab] = useState("rankings");
   const activeSeries = normalizeSeries(series);
   // Phase 3: lower series render from their own namespaced ratings state
@@ -33,6 +33,22 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, powerDrive
   const tabPrevRanks = activeSeries === "cup" ? prevRanks : (powerPrevRanks || {});
   const tabRatingHistory = activeSeries === "cup" ? ratingHistory : (powerRatingHistory || []);
   const tabHasData = activeSeries === "cup" ? true : !!powerHasData;
+  // Combo Power Score (approved Oct 21, 2026): the Rankings sub-tab
+  // sorts and displays this score when combo data exists for the
+  // active series; otherwise it falls back to the legacy overall
+  // rating exactly as before. Compare and Trends below keep reading
+  // tabDrivers / tabRatingHistory (legacy track ratings), untouched.
+  // comboBoard is computed in NASCARHub from the per-series combo
+  // state (powerComboCup / powerComboXfinity / powerComboTruck).
+  const comboScores = {};
+  const comboProvisionalNums = new Set();
+  if (comboHasData && comboBoard?.ranked) {
+    comboBoard.ranked.forEach(d => {
+      comboScores[d.num] = { score: d.score, raw: d.effectiveRaw };
+      if (d.provisional) comboProvisionalNums.add(d.num);
+    });
+  }
+  const comboEarlyProvisional = !!(comboHasData && comboBoard?.earlyProvisional);
 
   // Hooks must run unconditionally, before any early return. The Cup path
   // below uses prCounted, and the lower-series early return previously
@@ -116,12 +132,19 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, powerDrive
             ))}
           </div>
           <div style={{ fontSize:11, color:T.textDim, borderTop:`1px solid ${T.border}`, paddingTop:8, marginTop:4 }}>
-            Ratings update after each race using an asymmetric decay algorithm with recency bias, win bonuses, and momentum multipliers. Overall rating blends all track-type ratings with recent form.
+            {comboHasData
+              ? "Power Score: half a season score where older races fade with time, plus half a last-6-races score, so the board shows who is hot right now and who has been hot through the season. The score is scaled so the field average sits at 75 and a normal leader near 93; exceptional dominance can reach 98-99. Track-type ratings below are the legacy ratings and are unchanged; Compare and Trends still use them."
+              : "Ratings update after each race using an asymmetric decay algorithm with recency bias, win bonuses, and momentum multipliers. Overall rating blends all track-type ratings with recent form."}
           </div>
         </div>
       </InfoLegend>
+      {comboEarlyProvisional && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 14px", fontSize:12, color:T.textMid, marginBottom:16 }}>
+          Early-season board: provisional. Scores ramp up over a driver's first three races, so a one-race result cannot reach 99.
+        </div>
+      )}
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "rankings" && <RankingsTab drivers={tabDrivers} prevRanks={tabPrevRanks} />}
+        {subTab === "rankings" && <RankingsTab drivers={tabDrivers} prevRanks={tabPrevRanks} overallScores={comboHasData ? comboScores : null} overallPrevRanks={comboHasData ? (comboPrevRanks || {}) : null} provisionalNums={comboProvisionalNums} />}
         {subTab === "compare"  && <CompareTab drivers={tabDrivers} />}
         {subTab === "trends"   && <TrendsTab drivers={tabDrivers} ratingHistory={tabRatingHistory} />}
       </div>

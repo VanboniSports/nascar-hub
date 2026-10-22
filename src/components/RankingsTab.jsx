@@ -5,9 +5,27 @@ import { getTier } from "../lib/tiers.js";
 import { TRACK_KEYS } from "../data/drivers.js";
 import { TrackTypePill, RatingMiniBar } from "./ui.jsx";
 
-export function RankingsTab({ drivers, prevRanks }) {
+export function RankingsTab({ drivers, prevRanks, overallScores, overallPrevRanks, provisionalNums }) {
   const [trackFilter, setTrackFilter] = useState("overall");
-  const sorted = [...drivers].sort((a,b) => b[trackFilter]-a[trackFilter]);
+  // Combo Power Score override (Power Rankings Rankings view only):
+  // when the "overall" filter is active and a combo score exists for a
+  // driver, sort and display by that score instead of the legacy
+  // overall rating, and use combo prev-ranks for the change arrows.
+  // Track-type filters always use the legacy track ratings and legacy
+  // prevRanks, unchanged. Drivers with no combo score (zero races run)
+  // sort last in the overall view and show "—" instead of a number.
+  const useCombo = trackFilter === "overall" && !!overallScores;
+  const comboOf = (d) => (useCombo ? overallScores[d.num] : null);
+  const sorted = [...drivers].sort((a,b) => {
+    if (useCombo) {
+      const ca = comboOf(a), cb = comboOf(b);
+      if (!ca && !cb) return a.name.localeCompare(b.name);
+      if (!ca) return 1;
+      if (!cb) return -1;
+      return (cb.raw - ca.raw) || (cb.score - ca.score) || a.name.localeCompare(b.name);
+    }
+    return b[trackFilter]-a[trackFilter];
+  });
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
@@ -18,9 +36,13 @@ export function RankingsTab({ drivers, prevRanks }) {
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         {sorted.map((d, i) => {
-          const tier = getTier(d.overall);
+          const combo = comboOf(d);
+          const displayValue = useCombo ? (combo ? combo.score : null) : d[trackFilter];
+          const tier = getTier(useCombo && combo ? combo.score : d.overall);
           const rank = i+1;
-          const prev = prevRanks[d.num]?.[trackFilter];
+          const prev = useCombo
+            ? (overallPrevRanks?.[d.num] || null)
+            : prevRanks[d.num]?.[trackFilter];
           const change = prev ? prev - rank : 0;
           return (
             <div key={d.num} style={{ background:tier.bg, border:`1px solid ${tier.border}`, borderLeft:`3px solid ${tier.border}`, borderRadius:10, padding:"14px 18px", transition:"all 0.15s" }}>
@@ -29,6 +51,7 @@ export function RankingsTab({ drivers, prevRanks }) {
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                     <span style={{ fontSize:15, fontWeight:700, color:T.text }}>#{d.num} {d.name}</span>
+                    {provisionalNums?.has(d.num) && <span style={{ fontSize:9, fontWeight:700, color:T.gold, background:"rgba(250,204,21,0.12)", border:"1px solid rgba(250,204,21,0.25)", borderRadius:4, padding:"1px 6px", letterSpacing:1 }}>PROVISIONAL</span>}
                     {d.rookie && <span style={{ fontSize:9, fontWeight:700, color:"#4ade80", background:"rgba(34,197,94,0.12)", border:"1px solid rgba(34,197,94,0.25)", borderRadius:4, padding:"1px 6px", letterSpacing:1 }}>ROOKIE</span>}
                     {change > 0 && <span style={{ fontSize:11, fontWeight:700, color:T.green }}>▲{change}</span>}
                     {change < 0 && <span style={{ fontSize:11, fontWeight:700, color:T.red }}>▼{Math.abs(change)}</span>}
@@ -44,7 +67,7 @@ export function RankingsTab({ drivers, prevRanks }) {
                     ))}
                   </div>
                 </div>
-                <div style={{ fontSize:32, fontWeight:900, color:TC[trackFilter], fontFamily:"'Barlow Condensed',sans-serif", flexShrink:0, letterSpacing:-1 }}>{d[trackFilter]}</div>
+                <div style={{ fontSize:32, fontWeight:900, color:TC[trackFilter], fontFamily:"'Barlow Condensed',sans-serif", flexShrink:0, letterSpacing:-1 }}>{displayValue ?? "—"}</div>
               </div>
             </div>
           );

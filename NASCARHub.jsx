@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspens
 // ── Phase-1 module split: pure logic lives in src/ (see src/*/<module>.js) ──
 import { TRACK_KEYS, INITIAL_DRIVERS, INITIAL_DRIVERS_XFINITY, INITIAL_DRIVERS_TRUCK, FULL_TIMER_NAMES, FULL_TIMER_NAMES_XFINITY, FULL_TIMER_NAMES_TRUCK, normalizeCsvDriverName } from "./src/data/drivers.js";
 import { normalizeSeries, seriesCsvUrl, seriesCsvCacheKey } from "./src/data/series.js";
-import { processRace } from "./src/models/ratings.js";
+import { processRace, emptyComboState, applyComboRace, computeComboBoard } from "./src/models/ratings.js";
 import { parseCSVData } from "./src/lib/csv.js";
 import { lbAvg, lbGetRank } from "./src/lib/stats.js";
 import { parsePaste, findDriver } from "./src/lib/pasteParser.js";
@@ -15,7 +15,7 @@ import { runPureStatsPrediction, runEnhancedPureStatsPrediction, runPowerRanking
 import { VBS_LOGO } from "./src/data/logo.js";
 import { T } from "./src/theme.js";
 import { Ic } from "./src/components/icons.jsx";
-import { sb, loadFromSupabase, saveToSupabase, savePowerToSupabase } from "./src/lib/supabase.js";
+import { sb, loadFromSupabase, saveToSupabase, savePowerToSupabase, saveComboToSupabase } from "./src/lib/supabase.js";
 import { logUsageEvent, tabIdFromPath, raceSlugFromPath, pathForTab, applyTabMeta, trackRacePageView, trackRaceTabView, applyRaceMeta } from "./src/lib/analytics.js";
 import { hubBySlug, findBattleForHub, currentHub, RacesTab, RaceHubPage, RaceHeroCard, loadHubEditorial } from "./src/components/RaceHub.jsx";
 
@@ -258,11 +258,25 @@ export default function NASCARHub() {
   const [powerRatingHistoryTruck, setPowerRatingHistoryTruck] = useState([]);
   const [powerHasDataXfinity, setPowerHasDataXfinity] = useState(false);
   const [powerHasDataTruck, setPowerHasDataTruck] = useState(false);
+  // Combo Power Score state (approved Oct 21, 2026). Stored ONLY in
+  // the new powerComboCup / powerComboXfinity / powerComboTruck
+  // app_state keys — never in the Cup drivers table or the legacy
+  // ratings keys, so production (which never reads these keys) is
+  // unchanged. drivers[].overall keeps its legacy meaning for
+  // Predictor / Season Stats / Compare / Trends; the combo board
+  // below is derived from this state and is used by the Power
+  // Rankings Rankings sub-tab only.
+  const [comboCup, setComboCup] = useState(() => emptyComboState());
+  const [comboXfinity, setComboXfinity] = useState(() => emptyComboState());
+  const [comboTruck, setComboTruck] = useState(() => emptyComboState());
   // Derived lines stay below all of the useStates above (TDZ rule).
   const activePowerDrivers = activeSeries === "xfinity" ? powerDriversXfinity : activeSeries === "truck" ? powerDriversTruck : drivers;
   const activePowerPrevRanks = activeSeries === "xfinity" ? powerPrevRanksXfinity : activeSeries === "truck" ? powerPrevRanksTruck : prevRanks;
   const activePowerRatingHistory = activeSeries === "xfinity" ? powerRatingHistoryXfinity : activeSeries === "truck" ? powerRatingHistoryTruck : ratingHistory;
   const activePowerHasData = activeSeries === "xfinity" ? powerHasDataXfinity : activeSeries === "truck" ? powerHasDataTruck : true;
+  const activeComboState = activeSeries === "xfinity" ? comboXfinity : activeSeries === "truck" ? comboTruck : comboCup;
+  const activeComboBoard = useMemo(() => computeComboBoard(activeComboState), [activeComboState]);
+  const activeComboHasData = (activeComboState?.racesProcessed || 0) > 0;
 
   // DFS Optimizer state — persisted via Supabase
   const [dfsSalaries, setDfsSalaries] = useState({});
@@ -594,7 +608,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     Promise.all([loadFromSupabase(), loadHubEditorial()]).then(([data]) => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.filter(r=>r.name!=="Kyle Busch").map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -616,6 +630,12 @@ export default function NASCARHub() {
       if (rfTruckRows?.[0]) setPowerRecentFinishesTruck(rfTruckRows[0].value||{});
       if (rhXfinityRows?.[0]) setPowerRatingHistoryXfinity(rhXfinityRows[0].value||[]);
       if (rhTruckRows?.[0]) setPowerRatingHistoryTruck(rhTruckRows[0].value||[]);
+      // Combo: only overwrite the empty state when a stored record
+      // actually exists; otherwise the series keeps an empty board
+      // and the tab falls back to the legacy overall ranking.
+      if (comboCupRows?.[0]?.value) setComboCup(comboCupRows[0].value);
+      if (comboXfinityRows?.[0]?.value) setComboXfinity(comboXfinityRows[0].value);
+      if (comboTruckRows?.[0]?.value) setComboTruck(comboTruckRows[0].value);
       if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
       if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
       if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
@@ -659,9 +679,12 @@ export default function NASCARHub() {
   }, []);
 
   const handleRaceApplied = useCallback(({ raceName, trackType, totalLaps, results }) => {
-    setUndoStack(prev => [...prev, { drivers, prevRanks, recentFinishes, raceHistory, ratingHistory, seasonStats, raceArchive }]);
+    setUndoStack(prev => [...prev, { drivers, prevRanks, recentFinishes, raceHistory, ratingHistory, seasonStats, raceArchive, comboCup }]);
 
     const { drivers:newDrivers, prevRanks:newPR, recentFinishes:newRF, preSnap, postSnap, topFinishers, seasonStatsOut } = processRace(drivers, raceName, trackType, totalLaps, results, prevRanks, recentFinishes);
+    // Combo (Cup): same race, same results, separate state and key.
+    // Legacy drivers[].overall above is untouched by this line.
+    const newComboCup = applyComboRace(comboCup, totalLaps, results);
 
     const newSeasonStats = { ...seasonStats };
     Object.entries(seasonStatsOut).forEach(([num, r]) => {
@@ -686,8 +709,10 @@ export default function NASCARHub() {
     setRatingHistory(newRatingHistory);
     setSeasonStats(newSeasonStats);
     setRaceArchive(newRaceArchive);
+    setComboCup(newComboCup);
     doSave(newDrivers, newRaceHistory, newSeasonStats, newRatingHistory, newPR, newRF, newRaceArchive);
-  }, [drivers, prevRanks, recentFinishes, raceHistory, ratingHistory, seasonStats, raceArchive, doSave]);
+    saveComboToSupabase("cup", newComboCup);
+  }, [drivers, prevRanks, recentFinishes, raceHistory, ratingHistory, seasonStats, raceArchive, comboCup, doSave]);
 
   // Phase 3: admin race apply for a LOWER series only. Mirrors Cup's
   // handleRaceApplied for the ratings computation, but deliberately does
@@ -706,15 +731,21 @@ export default function NASCARHub() {
     const curRH = s === "xfinity" ? powerRatingHistoryXfinity : powerRatingHistoryTruck;
     const { drivers: newDrivers, prevRanks: newPR, recentFinishes: newRF, preSnap, postSnap } = processRace(curDrivers, raceName, trackType, totalLaps, results, curPR, curRF, s);
     const newRH = [...curRH, preSnap, postSnap];
+    // Combo (lower series): same race, same results, separate key.
+    const curCombo = s === "xfinity" ? comboXfinity : comboTruck;
+    const newCombo = applyComboRace(curCombo, totalLaps, results);
     if (s === "xfinity") {
       setPowerDriversXfinity(newDrivers); setPowerPrevRanksXfinity(newPR);
       setPowerRecentFinishesXfinity(newRF); setPowerRatingHistoryXfinity(newRH); setPowerHasDataXfinity(true);
+      setComboXfinity(newCombo);
     } else {
       setPowerDriversTruck(newDrivers); setPowerPrevRanksTruck(newPR);
       setPowerRecentFinishesTruck(newRF); setPowerRatingHistoryTruck(newRH); setPowerHasDataTruck(true);
+      setComboTruck(newCombo);
     }
     savePowerToSupabase(s, { drivers: newDrivers, prevRanks: newPR, recentFinishes: newRF, ratingHistory: newRH });
-  }, [powerDriversXfinity, powerDriversTruck, powerPrevRanksXfinity, powerPrevRanksTruck, powerRecentFinishesXfinity, powerRecentFinishesTruck, powerRatingHistoryXfinity, powerRatingHistoryTruck]);
+    saveComboToSupabase(s, newCombo);
+  }, [powerDriversXfinity, powerDriversTruck, powerPrevRanksXfinity, powerPrevRanksTruck, powerRecentFinishesXfinity, powerRecentFinishesTruck, powerRatingHistoryXfinity, powerRatingHistoryTruck, comboXfinity, comboTruck]);
 
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
@@ -727,7 +758,9 @@ export default function NASCARHub() {
     setRatingHistory(snap.ratingHistory);
     setSeasonStats(snap.seasonStats);
     setRaceArchive(snap.raceArchive);
+    if (snap.comboCup) setComboCup(snap.comboCup);
     doSave(snap.drivers, snap.raceHistory, snap.seasonStats, snap.ratingHistory, snap.prevRanks, snap.recentFinishes, snap.raceArchive);
+    if (snap.comboCup) saveComboToSupabase("cup", snap.comboCup);
   }, [undoStack, doSave]);
 
   const handleReset = useCallback(() => {
@@ -736,16 +769,20 @@ export default function NASCARHub() {
     setDrivers(d); setPrevRanks({}); setRecentFinishes({});
     setRaceHistory([]); setRatingHistory([]); setSeasonStats({});
     setUndoStack([]);
+    setComboCup(emptyComboState());
     doSave(d,[],{},[],[],{},raceArchive);
+    saveComboToSupabase("cup", emptyComboState());
   }, [raceArchive, doSave]);
 
   const handleReplay = useCallback(() => {
     if (raceArchive.length === 0) { window.alert("No archived races to replay."); return; }
     if (!window.confirm(`Replay ${raceArchive.length} race(s) from scratch?`)) return;
     let d=JSON.parse(JSON.stringify(INITIAL_DRIVERS)), pr={}, rf={}, rh=[], rth=[], ss={}, ra=JSON.parse(JSON.stringify(raceArchive));
+    let combo = emptyComboState();
     ra.forEach(race => {
       const out = processRace(d, race.raceName, race.trackType, race.totalLaps, race.results, pr, rf);
       d=out.drivers; pr=out.prevRanks; rf=out.recentFinishes;
+      combo = applyComboRace(combo, race.totalLaps, race.results);
       rth=[...rth, out.preSnap, out.postSnap];
       rh=[{race:race.raceName,trackType:race.trackType,date:race.date,topFinishers:out.topFinishers},...rh];
       Object.entries(out.seasonStatsOut).forEach(([num,r])=>{
@@ -757,7 +794,9 @@ export default function NASCARHub() {
     });
     setDrivers(d); setPrevRanks(pr); setRecentFinishes(rf);
     setRaceHistory(rh); setRatingHistory(rth); setSeasonStats(ss); setUndoStack([]);
+    setComboCup(combo);
     doSave(d,rh,ss,rth,pr,rf,ra);
+    saveComboToSupabase("cup", combo);
   }, [raceArchive, doSave]);
 
   const sbColor = { idle:T.textDim, loading:T.gold, live:T.green, error:T.red }[sbStatus];
@@ -854,7 +893,7 @@ export default function NASCARHub() {
           <main className="nascar-main" style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
             <Suspense fallback={<TabLoading />}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
-              {activeTab === "power"     && <PowerRankingsTab drivers={activeDrivers} prevRanks={prevRanks} ratingHistory={ratingHistory} powerDrivers={activePowerDrivers} powerPrevRanks={activePowerPrevRanks} powerRatingHistory={activePowerRatingHistory} powerHasData={activePowerHasData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} />}
+              {activeTab === "power"     && <PowerRankingsTab drivers={activeDrivers} prevRanks={prevRanks} ratingHistory={ratingHistory} powerDrivers={activePowerDrivers} powerPrevRanks={activePowerPrevRanks} powerRatingHistory={activePowerRatingHistory} powerHasData={activePowerHasData} comboBoard={activeComboBoard} comboPrevRanks={activeComboState?.prevRanks || {}} comboHasData={activeComboHasData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} />}
               {activeTab === "predictor" && <PredictorTab drivers={activeDrivers} csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} displayDrivers={activeDrivers} />}
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}

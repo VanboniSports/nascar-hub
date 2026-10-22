@@ -75,6 +75,14 @@ export async function loadFromSupabase() {
     const rfTruckRows = byKey["recentFinishesTruck"] || [];
     const rhXfinityRows = byKey["ratingHistoryXfinity"] || [];
     const rhTruckRows = byKey["ratingHistoryTruck"] || [];
+    // Combo Power Score (approved Oct 21, 2026): NEW keys only, one per
+    // series. The combo lives apart from the legacy ratings above so
+    // production — which never reads these keys — is unchanged, and
+    // the Cup drivers table / prevRanks / rating_history are never
+    // overwritten by combo data.
+    const comboCupRows = byKey["powerComboCup"] || [];
+    const comboXfinityRows = byKey["powerComboXfinity"] || [];
+    const comboTruckRows = byKey["powerComboTruck"] || [];
     const btRows = byKey["battleRaces"] || [];
     const dsRows = byKey["dfsSalaries"] || [];
     const ddRows = byKey["dfsDisabled"] || [];
@@ -100,8 +108,20 @@ export async function loadFromSupabase() {
         bpRows = Array.isArray(legacyArr) ? [{ value: legacyArr }] : [];
       }
     }
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
+}
+
+// Combo Power Score save: writes exactly ONE new key for the given
+// series (powerComboCup / powerComboXfinity / powerComboTruck) and
+// touches nothing else. Combo data never goes into the Cup drivers
+// table or the legacy ratings keys, so production is unchanged.
+export async function saveComboToSupabase(series, comboState) {
+  if (!sb) return;
+  const key = series === "cup" ? "powerComboCup" : series === "xfinity" ? "powerComboXfinity" : "powerComboTruck";
+  try {
+    await sb.from("app_state").upsert({ key, value: comboState }, { onConflict: "key" });
+  } catch (e) { console.error("SB combo save error:", e); }
 }
 
 // Per-series Power Rankings save (lower series only; Cup keeps using
