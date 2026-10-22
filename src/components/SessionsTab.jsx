@@ -1,28 +1,38 @@
 // Sessions Tab — Practice, Qualifying, Live, and Race Results in one place.
 // Streamlined view for checking session times without the full race page.
+// Series switcher (Oct 2026): Cup / O'Reilly / Trucks. Default is Cup, so
+// Cup behaviour is unchanged. For lower series, NEVER borrow Cup data:
+// practice/qualifying are Cup week-keyed (week numbers collide across
+// series), and battle/archive lookups already return null for non-Cup
+// hubs. Lower hubs therefore show honest empty states until per-series
+// practice/qualifying logging and results archives exist (separate job).
 import React, { useState } from "react";
 import { T } from "../theme.js";
 import { currentHub, hubStatus, LiveRunningOrder, findArchiveForHub, findBattleForHub } from "./RaceHub.jsx";
+import { seriesLabel } from "../data/series.js";
+import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 import { HubStatusBadge, sectionTitle } from "./ui.jsx";
 
 export default function SessionsTab({ qualPractice, raceArchive, battleRaces, drivers }) {
-  const hub = currentHub();
-  if (!hub) {
-    return (
-      <div style={{ padding: 20, textAlign: "center", color: T.textDim }}>
-        No race scheduled.
-      </div>
-    );
-  }
+  const [series, setSeries] = useState("cup");
+  const hub = currentHub(series);
 
   const status = hubStatus(hub);
-  const battleRace = battleRaces ? findBattleForHub(battleRaces, hub) : null;
+  const isCup = !hub || hub.series === "cup";
+  // findBattleForHub / findArchiveForHub already return null for non-Cup
+  // hubs; the explicit isCup gate here makes the guard visible at the
+  // call site so a future edit cannot accidentally borrow Cup results.
+  const battleRace = isCup && battleRaces ? findBattleForHub(battleRaces, hub) : null;
   const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
-  const archiveEntry = raceArchive ? findArchiveForHub(raceArchive, hub) : null;
+  const archiveEntry = isCup && raceArchive ? findArchiveForHub(raceArchive, hub) : null;
   const fullResults = archiveEntry && archiveEntry.results ? archiveEntry.results
     : (actuals ? actuals.map((name, i) => ({ pos: i + 1, name })) : null);
 
-  const qpMatch = qualPractice && qualPractice.week === hub.week;
+  // Cup-only gate: dfsQualifying is a single Cup week-keyed record, and
+  // week numbers collide across series (e.g. Cup week 33 vs O'Reilly
+  // week 33 are different races). Reading it for a lower-series hub
+  // would display Cup practice/qualifying under another series' name.
+  const qpMatch = isCup && qualPractice && hub && qualPractice.week === hub.week;
   const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
   const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
   const pracCanceled = qpMatch && !!qualPractice.practiceCanceled;
@@ -39,17 +49,36 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
   const resultTabs = [
     { id: "practice", label: "Practice" },
     { id: "qualifying", label: "Qualifying" },
+    // Live is offered only when status is "live", i.e. on race day, for
+    // every series. For lower hubs this is the RaceHubPage rule: Live is
+    // NOT kept open after race day (no results exist yet to replace it).
     ...(status === "live" ? [{ id: "live", label: "Live" }] : []),
+    // Race Results appears only when battle actuals exist, which the
+    // isCup gate above guarantees can never happen for a lower hub.
     ...(actuals ? [{ id: "race", label: "Race Results" }] : []),
   ];
   const [resultsTab, setResultsTab] = useState(
     status === "live" ? "live" : actuals ? "race" : qualCount > 0 ? "qualifying" : "practice"
   );
+  // Switching series can strand the selected tab (e.g. "race" or "live"
+  // do not exist for a lower hub). Fall back to the default tab for the
+  // current hub instead of rendering an empty tab body.
+  const activeTab = resultTabs.some(t => t.id === resultsTab) ? resultsTab
+    : (status === "live" ? "live" : actuals ? "race" : qualCount > 0 ? "qualifying" : "practice");
+
+  if (!hub) {
+    return (
+      <div style={{ padding: 20, textAlign: "center", color: T.textDim }}>
+        No race scheduled.
+      </div>
+    );
+  }
 
   const card = { background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+      <SeriesSwitcher series={series} onSeriesChange={setSeries} />
       {/* Header */}
       <div style={{ ...card, borderLeft: `3px solid ${T.accent}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -60,8 +89,21 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
           {hub.officialName || hub.name}
         </div>
         <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
-          {hub.track} · {hub.dateLabel}
+          {hub.series !== "cup" ? `${seriesLabel(hub.series)} Series · ` : ""}{hub.track} · {hub.dateLabel}
         </div>
+        {/* Session times from the schedule (same conventions as RaceHub):
+            no session data -> "Session times not recorded"; practice
+            null -> "No practice scheduled" (e.g. Talladega 2026, all
+            three series, has no practice at all). */}
+        <div style={{ fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", marginTop: 4 }}>
+          {!hub.hasSessionData ? "Session times not recorded"
+            : `Practice: ${hub.practice ? hub.practice : "No practice scheduled"} · Qualifying: ${hub.qualifying || "Not confirmed"} · Race: ${hub.dateLabel}, ${hub.raceTime || "time not confirmed"}`}
+        </div>
+        {!isCup && (
+          <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 6 }}>
+            Practice and qualifying results for this series are not logged yet; session times above come from the schedule.
+          </div>
+        )}
       </div>
 
       {/* Tab buttons */}
@@ -71,15 +113,15 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
             padding: "8px 18px", borderRadius: 8, cursor: "pointer",
             fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif",
             letterSpacing: 1.5, textTransform: "uppercase",
-            background: resultsTab === t.id ? T.accentSoft : T.surface3,
-            border: `1px solid ${resultsTab === t.id ? T.accent : T.border}`,
-            color: resultsTab === t.id ? T.accentText : T.textDim,
+            background: activeTab === t.id ? T.accentSoft : T.surface3,
+            border: `1px solid ${activeTab === t.id ? T.accent : T.border}`,
+            color: activeTab === t.id ? T.accentText : T.textDim,
           }}>{t.label}</button>
         ))}
       </div>
 
       {/* Practice */}
-      {resultsTab === "practice" && (
+      {activeTab === "practice" && (
         practiceList.length > 0 ? (
           <div style={card}>
             {practiceList.map((p, i) => (
@@ -102,7 +144,7 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
       )}
 
       {/* Qualifying */}
-      {resultsTab === "qualifying" && (
+      {activeTab === "qualifying" && (
         qualList.length > 0 ? (
           <div style={card}>
             {qualList.map((q, i) => (
@@ -125,7 +167,7 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
       )}
 
       {/* Live */}
-      {resultsTab === "live" && (
+      {activeTab === "live" && (
         <div>
           <LiveRunningOrder hub={hub} />
           <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 8, textAlign: "center" }}>
@@ -135,7 +177,7 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
       )}
 
       {/* Race Results */}
-      {resultsTab === "race" && actuals && (
+      {activeTab === "race" && actuals && (
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <span style={{ fontSize: 22 }}>🏆</span>
