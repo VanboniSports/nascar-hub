@@ -83,6 +83,11 @@ export async function loadFromSupabase() {
     const comboCupRows = byKey["powerComboCup"] || [];
     const comboXfinityRows = byKey["powerComboXfinity"] || [];
     const comboTruckRows = byKey["powerComboTruck"] || [];
+    // Hub model predictions for lower series (Oct 22, 2026): model-only
+    // picks keyed by hub slug, one key per lower series. Battle Tracker
+    // stays Cup-only; these keys never feed battle scoring.
+    const hubPredXfinityRows = byKey["hubPredictionsXfinity"] || [];
+    const hubPredTruckRows = byKey["hubPredictionsTruck"] || [];
     const btRows = byKey["battleRaces"] || [];
     const dsRows = byKey["dfsSalaries"] || [];
     const ddRows = byKey["dfsDisabled"] || [];
@@ -108,7 +113,7 @@ export async function loadFromSupabase() {
         bpRows = Array.isArray(legacyArr) ? [{ value: legacyArr }] : [];
       }
     }
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, hubPredXfinityRows, hubPredTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 

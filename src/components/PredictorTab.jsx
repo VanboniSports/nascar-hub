@@ -38,12 +38,14 @@ export function PredictorTab({ drivers, csvData, incrementTool, series = "cup", 
   const needsCsv = selectedModel === "pure" || selectedModel === "enhanced";
   const hasCsv = csvData.length > 0;
 
-  // Power Rankings model needs live per-series ratings, which exist only
-  // for Cup today (Phase 3 admin work builds them for lower series).
-  // Pure and Enhanced are CSV-driven and already take a series param in
-  // the Phase 2 model code, so they run for every series. The Power
-  // button is disabled, not silently fed Cup ratings, for lower series.
-  const powerAvailable = activeSeries === "cup";
+  // Power Rankings model needs combo scores, which exist for all three
+  // series since the Oct 2026 combo replay (powerComboCup /
+  // powerComboXfinity / powerComboTruck). NASCARHub attaches comboScore
+  // to the drivers passed here; if a series has no combo scores yet,
+  // the Power button is disabled rather than silently fed Cup ratings.
+  // Pure and Enhanced are CSV-driven and already take a series param
+  // in the Phase 2 model code, so they run for every series.
+  const powerAvailable = activeSeries === "cup" || (drivers || []).some(d => d.comboScore != null);
   const runPrediction = () => {
     if (!race) return;
     if (selectedModel === "power" && !powerAvailable) return;
@@ -71,7 +73,7 @@ export function PredictorTab({ drivers, csvData, incrementTool, series = "cup", 
       <SeriesSwitcher series={activeSeries} onSeriesChange={(id) => { onSeriesChange && onSeriesChange(id); setSelectedWeek(""); setResults([]); }} />
       {!powerAvailable && (
         <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 16px", fontSize:12, color:T.textMid, lineHeight:1.6 }}>
-          Power Rankings model is Cup-only for now: per-series ratings are built in the admin panel (Phase 3) and do not exist for the {seriesLabel(activeSeries)} Series yet. Pure Stats and Enhanced Pure Stats below run on this series' own race history.
+          Power Rankings model needs combo scores, which do not exist for the {seriesLabel(activeSeries)} Series yet. Pure Stats and Enhanced Pure Stats below run on this series' own race history.
         </div>
       )}
       {/* Model Selector */}

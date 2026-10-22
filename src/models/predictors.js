@@ -373,14 +373,18 @@ export function runEnhancedPureStatsPrediction(csvData, scheduleTrack, scheduleT
 
 
 // ── Power Rankings Predictor ──
-// Deterministic: scores drivers from the live ratings (updated weekly by the
-// decay algorithm in ratings.js and synced from Supabase), blended for track
+// Deterministic: scores drivers from the live ratings, blended for track
 // type. Identical ratings always produce identical picks. The old random
 // score swing was removed 2026-09-22.
+// Power model rating (Oct 22, 2026): the combo Power Score
+// (d.comboScore, half time-decayed season perfScore + half last-6
+// perfScore, fixed scale) when present, falling back to the legacy
+// d.overall only when a driver has no combo score. The legacy overall
+// is NOT overwritten: other tabs keep reading d.overall unchanged.
 export function runPowerRankingsPrediction(drivers, race) {
   const preds = drivers.map(d => {
     const trackRating = d[race.type];
-    const overallRating = d.overall;
+    const overallRating = d.comboScore != null ? d.comboScore : d.overall;
     let relatedBonus = 0;
     if (race.type === "superspeedway") relatedBonus = d.intermediate*0.5 + d.road*0.2;
     else if (race.type === "intermediate") relatedBonus = d.short*0.4 + d.superspeedway*0.3;

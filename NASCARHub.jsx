@@ -278,6 +278,27 @@ export default function NASCARHub() {
   const activeComboBoard = useMemo(() => computeComboBoard(activeComboState), [activeComboState]);
   const activeComboHasData = (activeComboState?.racesProcessed || 0) > 0;
 
+  // Predictor drivers (Oct 22, 2026): the Power model in predictors.js
+  // reads d.comboScore when present and falls back to d.overall. Cup
+  // uses the live drivers state, lower series use their legacy power
+  // drivers (which carry track ratings); in both cases the legacy
+  // d.overall is left untouched, so Season Stats, Compare, Trends and
+  // Predictor tier coloring keep reading legacy overall exactly as
+  // before. This derived copy is passed to PredictorTab only.
+  const predictorDrivers = useMemo(() => {
+    const base = activeSeries === "cup" ? drivers : activePowerDrivers;
+    const byNum = {};
+    (activeComboBoard?.ranked || []).forEach(d => { byNum[String(d.num)] = d.score; });
+    return (base || []).map(d => (byNum[String(d.num)] != null ? { ...d, comboScore: byNum[String(d.num)] } : d));
+  }, [activeSeries, drivers, activePowerDrivers, activeComboBoard]);
+
+  // Hub model predictions for lower series (Oct 22, 2026): keyed by hub
+  // slug, loaded from app_state hubPredictionsXfinity / hubPredictionsTruck.
+  // Battle Tracker stays Cup-only; these are display-only model picks.
+  const [hubPredictionsXfinity, setHubPredictionsXfinity] = useState({});
+  const [hubPredictionsTruck, setHubPredictionsTruck] = useState({});
+  const hubPredictionsBySeries = { xfinity: hubPredictionsXfinity, truck: hubPredictionsTruck };
+
   // DFS Optimizer state — persisted via Supabase
   const [dfsSalaries, setDfsSalaries] = useState({});
   const [dfsDisabled, setDfsDisabled] = useState([]);
@@ -608,7 +629,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     Promise.all([loadFromSupabase(), loadHubEditorial()]).then(([data]) => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, hubPredXfinityRows, hubPredTruckRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.filter(r=>r.name!=="Kyle Busch").map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -636,6 +657,8 @@ export default function NASCARHub() {
       if (comboCupRows?.[0]?.value) setComboCup(comboCupRows[0].value);
       if (comboXfinityRows?.[0]?.value) setComboXfinity(comboXfinityRows[0].value);
       if (comboTruckRows?.[0]?.value) setComboTruck(comboTruckRows[0].value);
+      if (hubPredXfinityRows?.[0]?.value) setHubPredictionsXfinity(hubPredXfinityRows[0].value || {});
+      if (hubPredTruckRows?.[0]?.value) setHubPredictionsTruck(hubPredTruckRows[0].value || {});
       if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
       if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
       if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
@@ -884,7 +907,7 @@ export default function NASCARHub() {
         {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner); hidden on the Race Hub tab itself */}
         {activeTab !== "race" && (
         <div className="nascar-mobile-banner">
-          <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} collapsible />
+          <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpen={openRacePage} collapsible />
         </div>
         )}
 
@@ -894,11 +917,11 @@ export default function NASCARHub() {
             <Suspense fallback={<TabLoading />}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
               {activeTab === "power"     && <PowerRankingsTab drivers={activeDrivers} prevRanks={prevRanks} ratingHistory={ratingHistory} powerDrivers={activePowerDrivers} powerPrevRanks={activePowerPrevRanks} powerRatingHistory={activePowerRatingHistory} powerHasData={activePowerHasData} comboBoard={activeComboBoard} comboPrevRanks={activeComboState?.prevRanks || {}} comboHasData={activeComboHasData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} />}
-              {activeTab === "predictor" && <PredictorTab drivers={activeDrivers} csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} displayDrivers={activeDrivers} />}
+              {activeTab === "predictor" && <PredictorTab drivers={predictorDrivers} csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} displayDrivers={activeDrivers} />}
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
-              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
+              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
               {activeTab === "sessions"  && <SessionsTab qualPractice={qualPractice} raceArchive={raceArchive} battleRaces={battleRaces} drivers={drivers} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
@@ -913,7 +936,7 @@ export default function NASCARHub() {
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
           {activeTab !== "race" && (
           <div className="nascar-sidebar" style={{ flex: "0 1 320px", minWidth: 280, maxWidth: 320 }}>
-            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
+            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
           </div>
           )}
         </div>

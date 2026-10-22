@@ -102,7 +102,7 @@ function hubFromSchedule(r, series = "cup") {
       `${r.track} hosts the ${officialName}, a ${r.laps}-lap run on a ${r.length}-mile ${r.type} track. The full preview for this one is still coming together. Check back through the week as practice, qualifying, and the race itself fill in the blanks.`,
       normalizeSeries(series) === "cup"
         ? "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest."
-        : "Battle Tracker is Cup-only for 2026, so this hub does not carry battle scoring. Model predictions for this series are on the Race Predictor tab, and official results will appear here once per-series results are wired.",
+        : "Battle Tracker is Cup-only for 2026, so this hub does not carry battle scoring. Model predictions for this series appear in the Model Predictions section below when available, and on the Race Predictor tab. Official results will appear here once per-series results are wired.",
     ],
   };
 }
@@ -602,7 +602,7 @@ export function LiveRunningOrder({ hub }) {
 // RACE HUB PAGE — /race/<slug>
 
 
-export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenTab, raceArchive, drivers }) {
+export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, onOpenRace, onOpenTab, raceArchive, drivers }) {
   if (!hub) {
     // Direct /race/<slug> links for weeks whose slug comes from the Supabase
     // editorial rows resolve on the first paint after boot loads them.
@@ -634,13 +634,20 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
   const isCupHub = hub.series === "cup";
   const effectiveBattleRace = isCupHub ? battleRace : null;
   const status = hubStatus(hub);
-  const predictions = (effectiveBattleRace && effectiveBattleRace.predictions) || {};
-  const MODELS = HUB_PREDICTORS;
+  // Lower-series model picks (Oct 22, 2026): display-only picks from
+  // app_state hubPredictionsXfinity / hubPredictionsTruck, keyed by hub
+  // slug. Battle Tracker stays Cup-only: these picks never feed battle
+  // scoring, and Gut / dark horse / suck pick sections stay Cup-only
+  // (they are gated by isCupHub below). Cup hubs keep using the battle
+  // entry exactly as before.
+  const lowerModelPredictions = !isCupHub && hubPredictions && hubPredictions[hub.series] && hubPredictions[hub.series][hub.slug] ? (hubPredictions[hub.series][hub.slug].predictions || {}) : {};
+  const predictions = isCupHub ? ((effectiveBattleRace && effectiveBattleRace.predictions) || {}) : lowerModelPredictions;
+  const MODELS = isCupHub ? HUB_PREDICTORS : ["Pure Stats", "Enhanced Pure Stats", "Power Rankings"];
   const hasAnyPredictions = MODELS.some(m => predictions[m] && predictions[m].length);
   // Disagreements and the battle winner only consider hub predictors,
   // so the retired ML model can never appear on this page.
-  const hubPredictions = Object.fromEntries(Object.entries(predictions).filter(([m]) => MODELS.includes(m)));
-  const disagreements = hasAnyPredictions ? topDisagreements(hubPredictions) : [];
+  const hubModelPicks = Object.fromEntries(Object.entries(predictions).filter(([m]) => MODELS.includes(m)));
+  const disagreements = hasAnyPredictions ? topDisagreements(hubModelPicks) : [];
   const darkHorse = effectiveBattleRace && effectiveBattleRace.darkHorse;
   const suckPick = effectiveBattleRace && effectiveBattleRace.suckPick;
   const darkHorseReason = effectiveBattleRace && effectiveBattleRace.darkHorseReason;
@@ -767,7 +774,7 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
       {/* PREDICTIONS */}
       <MobileSection id="predictions" title="Model Predictions">
       <div>
-        {sectionTitle("Model Predictions", hasAnyPredictions ? "Top 10 from each predictor, via the Battle Tracker" : null)}
+        {sectionTitle("Model Predictions", hasAnyPredictions ? (isCupHub ? "Top 10 from each predictor, via the Battle Tracker" : "Top 10 from each model — model predictions only, no Battle Tracker scoring, no Gut picks for this series") : null)}
         {!hasAnyPredictions ? (
           <div style={{ ...card, textAlign: "center", color: T.textDim, fontSize: 13, padding: "28px 20px" }}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>🔮</div>
@@ -1014,14 +1021,18 @@ export function RaceHubPage({ hub, battleRace, qualPractice, onOpenRace, onOpenT
 // expand inline, so checking the race never navigates you away from your tab.
 
 
-export function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpen, collapsible }) {
+export function RaceHeroCard({ hub, battleRace, hubPredictions, qualPractice, onOpen, defaultOpen, collapsible }) {
   const [open, setOpen] = useState(!!defaultOpen || !collapsible);
   if (!hub) return null;
   const status = hubStatus(hub);
   const days = hubCountdown(hub);
   const typeColor = TC[hub.trackType] || T.accent;
-  const predictions = (battleRace && battleRace.predictions) || {};
-  const hasAnyPredictions = HUB_PREDICTORS.some(m => predictions[m] && predictions[m].length);
+  // Lower-series hero picks (Oct 22, 2026): display-only model picks from
+  // hubPredictions, keyed by hub slug. No battle scoring for lower hubs.
+  const lowerModelPredictions = hub && hub.series !== "cup" && hubPredictions && hubPredictions[hub.series] && hubPredictions[hub.series][hub.slug] ? (hubPredictions[hub.series][hub.slug].predictions || {}) : {};
+  const predictions = (battleRace && battleRace.predictions) || lowerModelPredictions;
+  const heroModels = hub && hub.series !== "cup" ? ["Pure Stats", "Enhanced Pure Stats", "Power Rankings"] : HUB_PREDICTORS;
+  const hasAnyPredictions = heroModels.some(m => predictions[m] && predictions[m].length);
   const actuals = (battleRace && battleRace.actualResults && battleRace.actualResults.length) ? battleRace.actualResults : null;
   const winner = actuals ? battleWinnerFor(battleRace, HUB_PREDICTORS) : null;
   const darkHorse = battleRace && battleRace.darkHorse;
@@ -1064,7 +1075,7 @@ export function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpe
           <div style={sectionLabel}>{hasAnyPredictions ? "Top 3 by predictor" : "Predictions"}</div>
           {!hasAnyPredictions ? (
             <div style={{ fontSize: 13, color: T.textDim }}>Models drop Monday, my picks land Wednesday.</div>
-          ) : HUB_PREDICTORS.map(m => {
+          ) : heroModels.map(m => {
             const picks = (predictions[m] || []).slice(0, 3);
             const color = PREDICTOR_COLORS[m] || T.accent;
             return (
@@ -1094,7 +1105,9 @@ export function RaceHeroCard({ hub, battleRace, qualPractice, onOpen, defaultOpe
           )}
           <div style={sectionLabel}>Battle</div>
           <div style={{ fontSize: 13, color: T.textMid }}>
-            {actuals && winner
+            {hub && hub.series !== "cup"
+              ? "Model predictions only — no Battle Tracker scoring for this series."
+              : actuals && winner
               ? <span><span style={{ color: T.gold, fontWeight: 700 }}>{winner.predictor}</span> took it with {winner.points} pts.</span>
               : "Scored after the race."}
           </div>
