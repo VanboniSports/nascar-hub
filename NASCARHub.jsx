@@ -904,8 +904,8 @@ export default function NASCARHub() {
           </div>
         )}
 
-        {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner); hidden on the Race Hub tab itself */}
-        {activeTab !== "race" && (
+        {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner); hidden on the Race Hub tab itself and on Sessions, where the Sessions tab's own series switcher controls which series is shown and a Cup hero card would leak Cup data under a lower-series selection */}
+        {activeTab !== "race" && activeTab !== "sessions" && (
         <div className="nascar-mobile-banner">
           <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpen={openRacePage} collapsible />
         </div>
@@ -933,8 +933,8 @@ export default function NASCARHub() {
             </Suspense>
           </main>
 
-          {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself */}
-          {activeTab !== "race" && (
+          {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself and on Sessions, where the Sessions tab's own series switcher controls which series is shown and a Cup hero card would leak Cup data under a lower-series selection */}
+          {activeTab !== "race" && activeTab !== "sessions" && (
           <div className="nascar-sidebar" style={{ flex: "0 1 320px", minWidth: 280, maxWidth: 320 }}>
             <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
           </div>
