@@ -60,6 +60,21 @@ export async function loadFromSupabase() {
     // series (e.g. Austin Hill) can never collide.
     const spxRows = byKey["seasonPointsXfinity"] || [];
     const spTruckRows = byKey["seasonPointsTruck"] || [];
+    // Phase 3: per-series Power Rankings. Cup keeps the legacy drivers
+    // table + prevRanks + recentFinishes + rating_history table exactly.
+    // Lower series get their own app_state keys (car numbers collide
+    // across series, so lower ratings must never go into the Cup drivers
+    // table). recentFinishes per series is needed too: processRace uses
+    // it for momentum, and without persisting it, admin applies after a
+    // reload would compute momentum from an empty history.
+    const powerDriversXfinityRows = byKey["powerDriversXfinity"] || [];
+    const powerDriversTruckRows = byKey["powerDriversTruck"] || [];
+    const prXfinityRows = byKey["prevRanksXfinity"] || [];
+    const prTruckRows = byKey["prevRanksTruck"] || [];
+    const rfXfinityRows = byKey["recentFinishesXfinity"] || [];
+    const rfTruckRows = byKey["recentFinishesTruck"] || [];
+    const rhXfinityRows = byKey["ratingHistoryXfinity"] || [];
+    const rhTruckRows = byKey["ratingHistoryTruck"] || [];
     const btRows = byKey["battleRaces"] || [];
     const dsRows = byKey["dfsSalaries"] || [];
     const ddRows = byKey["dfsDisabled"] || [];
@@ -85,8 +100,22 @@ export async function loadFromSupabase() {
         bpRows = Array.isArray(legacyArr) ? [{ value: legacyArr }] : [];
       }
     }
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
+}
+
+// Per-series Power Rankings save (lower series only; Cup keeps using
+// saveToSupabase). Writes exactly the four keys for the given series and
+// touches nothing else, so a lower-series apply can never corrupt Cup.
+export async function savePowerToSupabase(series, { drivers, prevRanks, recentFinishes, ratingHistory }) {
+  if (!sb) return;
+  const suffix = series === "xfinity" ? "Xfinity" : "Truck";
+  try {
+    await sb.from("app_state").upsert({ key: `powerDrivers${suffix}`, value: drivers }, { onConflict: "key" });
+    await sb.from("app_state").upsert({ key: `prevRanks${suffix}`, value: prevRanks }, { onConflict: "key" });
+    await sb.from("app_state").upsert({ key: `recentFinishes${suffix}`, value: recentFinishes }, { onConflict: "key" });
+    await sb.from("app_state").upsert({ key: `ratingHistory${suffix}`, value: ratingHistory }, { onConflict: "key" });
+  } catch (e) { console.error("SB power save error:", e); }
 }
 
 export async function saveToSupabase(drivers, raceHistory, seasonStats, ratingHistory, prevRanks, recentFinishes, raceArchive) {

@@ -20,9 +20,19 @@ export const PR_SUBTABS = [
 // ─────────────────────────────────────────────────────────────
 
 
-export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementTool, series = "cup", onSeriesChange }) {
+export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, powerDrivers, powerPrevRanks, powerRatingHistory, powerHasData, incrementTool, series = "cup", onSeriesChange }) {
   const [subTab, setSubTab] = useState("rankings");
   const activeSeries = normalizeSeries(series);
+  // Phase 3: lower series render from their own namespaced ratings state
+  // (powerDrivers / powerPrevRanks / powerRatingHistory from NASCARHub),
+  // never from the Cup props. Cup keeps using the legacy props exactly.
+  // hasData is false until a stored per-series record exists (admin apply
+  // or replay); until then the tab shows the "not built yet" notice and
+  // the unranked roster, never a fake ranking from equal-70 starts.
+  const tabDrivers = activeSeries === "cup" ? drivers : (powerDrivers || drivers);
+  const tabPrevRanks = activeSeries === "cup" ? prevRanks : (powerPrevRanks || {});
+  const tabRatingHistory = activeSeries === "cup" ? ratingHistory : (powerRatingHistory || []);
+  const tabHasData = activeSeries === "cup" ? true : !!powerHasData;
 
   // Hooks must run unconditionally, before any early return. The Cup path
   // below uses prCounted, and the lower-series early return previously
@@ -39,7 +49,7 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementT
   // this tab shows the roster, unranked, with a plain explanation, and
   // does not render the Rankings/Compare/Trends sub-tabs for lower series.
   // Cup renders exactly as before.
-  if (activeSeries !== "cup") {
+  if (activeSeries !== "cup" && !tabHasData) {
     return (
       <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
         <SeriesSwitcher series={activeSeries} onSeriesChange={onSeriesChange} />
@@ -47,7 +57,7 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementT
           Power Rankings for the {seriesLabel(activeSeries)} Series are not built yet. Ratings are computed in the admin panel by applying race results per series (Phase 3), and that step has not run for this series. The list below is the full-time driver roster for this series, in alphabetical order, not a ranking. Season stats and model predictions for this series are on the Season Stats and Race Predictor tabs.
         </div>
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {[...drivers].sort((a, b) => a.name.localeCompare(b.name)).map((d) => (
+          {[...tabDrivers].sort((a, b) => a.name.localeCompare(b.name)).map((d) => (
             <div key={d.num} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
               <span style={{ fontSize:13, fontWeight:800, color:T.text, fontFamily:"'Barlow Condensed',sans-serif" }}>#{d.num} {d.name}</span>
               <span style={{ fontSize:12, color:T.textDim }}>{d.mfg}</span>
@@ -111,9 +121,9 @@ export function PowerRankingsTab({ drivers, prevRanks, ratingHistory, incrementT
         </div>
       </InfoLegend>
       <div key={subTab} style={{ animation:"fadeIn 0.2s ease" }}>
-        {subTab === "rankings" && <RankingsTab drivers={drivers} prevRanks={prevRanks} />}
-        {subTab === "compare"  && <CompareTab drivers={drivers} />}
-        {subTab === "trends"   && <TrendsTab drivers={drivers} ratingHistory={ratingHistory} />}
+        {subTab === "rankings" && <RankingsTab drivers={tabDrivers} prevRanks={tabPrevRanks} />}
+        {subTab === "compare"  && <CompareTab drivers={tabDrivers} />}
+        {subTab === "trends"   && <TrendsTab drivers={tabDrivers} ratingHistory={tabRatingHistory} />}
       </div>
     </div>
   );

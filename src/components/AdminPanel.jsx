@@ -488,7 +488,7 @@ export function UsageAdminSection({ toolUsage }) {
 }
 
 
-export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, seasonPointsXfinity, seasonPointsTruck, onSeasonPointsSaveXfinity, onSeasonPointsSaveTruck, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost, onHubEditorialSave }) {
+export function GlobalAdminPanel({ drivers, onRaceApplied, powerDriversXfinity, powerDriversTruck, onPowerRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, seasonPointsXfinity, seasonPointsTruck, onSeasonPointsSaveXfinity, onSeasonPointsSaveTruck, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost, onHubEditorialSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -496,6 +496,15 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
   const [adminSection, setAdminSection] = useState("power"); // "power" | "battle" | "csv" | "points" | "usage"
 
   // Power Rankings admin state
+  // Phase 3: per-series power admin. Cup uses the live Cup drivers and
+  // the legacy Cup apply path, exactly as before. Lower series use their
+  // own roster (with ratings, from NASCARHub power state) and a separate
+  // apply path that writes only that series' app_state keys, so a lower
+  // apply can never corrupt Cup ratings. Undo / Replay / Reset stay
+  // Cup-only (see the action buttons below).
+  const [powerSeries, setPowerSeries] = useState("cup");
+  const activePowerSeries = normalizeSeries(powerSeries);
+  const powerDrivers = activePowerSeries === "xfinity" ? (powerDriversXfinity || []) : activePowerSeries === "truck" ? (powerDriversTruck || []) : drivers;
   const [raceName, setRaceName] = useState("");
   const [trackType, setTrackType] = useState("intermediate");
   const [totalLaps, setTotalLaps] = useState(267);
@@ -538,27 +547,33 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
   // Power Rankings — paste import
   const handleParse = () => {
     if (!raceText.trim()) { setImportMsg("Paste race results first."); return; }
-    const { results, unmatched } = parsePaste(drivers, raceText, stage1Text, stage2Text, totalLaps);
+    const { results, unmatched } = parsePaste(powerDrivers, raceText, stage1Text, stage2Text, totalLaps);
     const newFin={}, newSt={}, newLed={}, newSp={};
     results.forEach(r => {
       newFin[r.num] = r.fin; newSt[r.num] = r.st;
       newLed[r.num] = r.led; newSp[r.num] = r.sp;
     });
     setFinishes(newFin); setStarts(newSt); setLapsLed(newLed); setStagePts(newSp);
-    const u = unmatched.filter(n => !["Shane Van Gisbergen","Austin Hill","Anthony Alfredo","Ty Dillon extra","Cody Ware extra"].includes(n));
+    // The name filter below is Cup-specific (known Cup non-full-timers);
+    // for lower series, show every unmatched name instead of hiding any.
+    const u = activePowerSeries === "cup" ? unmatched.filter(n => !["Shane Van Gisbergen","Austin Hill","Anthony Alfredo","Ty Dillon extra","Cody Ware extra"].includes(n)) : unmatched;
     setImportMsg(`✓ Imported ${results.length} drivers${u.length>0?` · Unmatched: ${u.join(", ")}`:""}${unmatched.length>0&&u.length===0?" · Some non-fulltime drivers skipped":""}`);
     setRaceText(""); setStage1Text(""); setStage2Text("");
   };
 
   const handleApply = () => {
     if (!raceName) { setMsg("Enter a race name."); return; }
-    const results = drivers.map(d => ({
+    const results = powerDrivers.map(d => ({
       num:d.num, fin:parseInt(finishes[d.num])||0,
       st:parseInt(starts[d.num])||0, led:parseInt(lapsLed[d.num])||0, sp:parseInt(stagePts[d.num])||0,
       fl:fastLap[d.num]?1:0,
     })).filter(r => r.fin > 0);
     if (results.length === 0) { setMsg("No finish positions entered."); return; }
-    onRaceApplied({ raceName, trackType, totalLaps:parseInt(totalLaps)||200, results });
+    if (activePowerSeries === "cup") {
+      onRaceApplied({ raceName, trackType, totalLaps:parseInt(totalLaps)||200, results });
+    } else {
+      onPowerRaceApplied({ series: activePowerSeries, raceName, trackType, totalLaps:parseInt(totalLaps)||200, results });
+    }
     setFinishes({}); setStarts({}); setLapsLed({}); setStagePts({}); setFastLap({});
     setRaceName(""); setMsg(`✓ ${raceName} applied — ${results.length} drivers updated.`);
   };
@@ -705,6 +720,15 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
               {/* ─── POWER RANKINGS ADMIN ─── */}
               {adminSection === "power" && (
                 <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+                  {/* Phase 3: series selector. Cup path is unchanged; lower
+                      series apply to their own namespaced ratings state. */}
+                  <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:10, color:T.textDim, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Series</span>
+                    <select value={powerSeries} onChange={e=>{ setPowerSeries(e.target.value); setFinishes({}); setStarts({}); setLapsLed({}); setStagePts({}); setFastLap({}); setMsg(""); setImportMsg(""); }} style={{ background:T.surface2, color:T.text, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 10px", fontSize:12, fontFamily:"'IBM Plex Mono',monospace", cursor:"pointer" }}>
+                      {["cup", "xfinity", "truck"].map(s => <option key={s} value={s}>{seriesLabel(s)}</option>)}
+                    </select>
+                    <span style={{ fontSize:11, color:T.textDim, fontFamily:"'IBM Plex Mono',monospace" }}>{powerDrivers.length} drivers · {activePowerSeries === "cup" ? "Cup ratings (legacy)" : "separate per-series ratings"}</span>
+                  </div>
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 120px", gap:12 }}>
                     <div>
                       <label style={{ fontSize:10, color:T.textDim, display:"block", marginBottom:6, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"'Barlow Condensed',sans-serif" }}>Race Name</label>
@@ -763,7 +787,7 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                         </tr>
                       </thead>
                       <tbody>
-                        {drivers.map((d, idx) => {
+                        {powerDrivers.map((d, idx) => {
                           const numInp = (val, setter, max, highlight) => (
                             <input type="number" value={val||""} onChange={e=>setter(prev=>({...prev,[d.num]:e.target.value}))}
                               min={0} max={max}
@@ -787,14 +811,19 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, raceHistory, raceArch
                   {/* Action buttons */}
                   <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
                     <button onClick={handleApply} style={{ ...btnStyle(T.accent), boxShadow:`0 4px 14px ${T.accentGlow}` }}>Apply Race Results</button>
-                    <button onClick={onUndo} disabled={!canUndo} style={{ ...btnStyle(canUndo?"#f59e0b":"#1a2d40") }}><Ic.Undo /> Undo Last Race</button>
-                    <button onClick={onReplay} style={btnStyle("#22c55e")}>🔄 Replay All</button>
-                    <button onClick={onReset} style={btnStyle("#475569")}>Reset All</button>
+                    {/* Undo / Replay / Reset operate on Cup state only; they
+                        are disabled for lower series so they can never
+                        rewind or reset Cup ratings while a lower series
+                        is selected. Lower-series undo/replay is not built. */}
+                    <button onClick={onUndo} disabled={activePowerSeries !== "cup" || !canUndo} style={{ ...btnStyle(activePowerSeries === "cup" && canUndo?"#f59e0b":"#1a2d40") }}><Ic.Undo /> Undo Last Race</button>
+                    <button onClick={onReplay} disabled={activePowerSeries !== "cup"} style={btnStyle(activePowerSeries === "cup" ? "#22c55e" : "#1a2d40")}>🔄 Replay All</button>
+                    <button onClick={onReset} disabled={activePowerSeries !== "cup"} style={btnStyle(activePowerSeries === "cup" ? "#475569" : "#1a2d40")}>Reset All</button>
                   </div>
+                  {activePowerSeries !== "cup" && <p style={{ fontSize:11, color:T.textDim, margin:0, fontFamily:"'IBM Plex Mono',monospace" }}>Undo / Replay / Reset are Cup-only for now. Lower-series applies save directly to that series' ratings.</p>}
                   {msg && <p style={{ fontSize:12, color:msg.startsWith("✓")?T.green:T.red, margin:0 }}>{msg}</p>}
 
-                  {/* Race history */}
-                  {raceHistory.length > 0 && (
+                  {/* Race history (Cup only — the stored history is Cup races) */}
+                  {activePowerSeries === "cup" && raceHistory.length > 0 && (
                     <div>
                       <h3 style={{ margin:"0 0 12px", fontSize:16, fontWeight:800, color:T.text, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:1, textTransform:"uppercase" }}>Race History</h3>
                       <div style={{ display:"flex", flexDirection:"column", gap:8, maxHeight:360, overflowY:"auto" }}>

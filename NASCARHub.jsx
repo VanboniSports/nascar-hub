@@ -15,7 +15,7 @@ import { runPureStatsPrediction, runEnhancedPureStatsPrediction, runPowerRanking
 import { VBS_LOGO } from "./src/data/logo.js";
 import { T } from "./src/theme.js";
 import { Ic } from "./src/components/icons.jsx";
-import { sb, loadFromSupabase, saveToSupabase } from "./src/lib/supabase.js";
+import { sb, loadFromSupabase, saveToSupabase, savePowerToSupabase } from "./src/lib/supabase.js";
 import { logUsageEvent, tabIdFromPath, raceSlugFromPath, pathForTab, applyTabMeta, trackRacePageView, trackRaceTabView, applyRaceMeta } from "./src/lib/analytics.js";
 import { hubBySlug, findBattleForHub, currentHub, RacesTab, RaceHubPage, RaceHeroCard, loadHubEditorial } from "./src/components/RaceHub.jsx";
 
@@ -234,6 +234,35 @@ export default function NASCARHub() {
   // Cup first render and blanked the whole preview. Same rule applies to the
   // two Phase 3 states above: this derived line stays below all three.
   const activeSeasonPoints = activeSeries === "xfinity" ? seasonPointsXfinity : activeSeries === "truck" ? seasonPointsTruck : seasonPoints;
+
+  // Phase 3: per-series Power Rankings state. Cup keeps its legacy state
+  // (drivers / prevRanks / recentFinishes / ratingHistory) exactly. Lower
+  // series get their own drivers/prevRanks/recentFinishes/ratingHistory,
+  // stored under powerDriversXfinity/Truck, prevRanksXfinity/Truck,
+  // recentFinishesXfinity/Truck, ratingHistoryXfinity/Truck in app_state.
+  // Car numbers collide across series, so lower ratings must never go
+  // into the Cup drivers table. Starting ratings are an honest equal 70
+  // for every roster driver (lower series have no preseason hand-set
+  // ratings like Cup's 95-to-50); the 2026 replay starts from this same
+  // equal base. powerHasData* is true only when a stored record exists;
+  // the site tab uses it to show "not built yet" instead of a fake
+  // ranking for a series with no applied races yet.
+  const powerRoster70 = (roster) => roster.map(d => ({ num: d.num, name: d.name, team: d.team, mfg: d.mfg, overall: 70, superspeedway: 70, intermediate: 70, short: 70, road: 70, rookie: false }));
+  const [powerDriversXfinity, setPowerDriversXfinity] = useState(() => powerRoster70(INITIAL_DRIVERS_XFINITY));
+  const [powerDriversTruck, setPowerDriversTruck] = useState(() => powerRoster70(INITIAL_DRIVERS_TRUCK));
+  const [powerPrevRanksXfinity, setPowerPrevRanksXfinity] = useState({});
+  const [powerPrevRanksTruck, setPowerPrevRanksTruck] = useState({});
+  const [powerRecentFinishesXfinity, setPowerRecentFinishesXfinity] = useState({});
+  const [powerRecentFinishesTruck, setPowerRecentFinishesTruck] = useState({});
+  const [powerRatingHistoryXfinity, setPowerRatingHistoryXfinity] = useState([]);
+  const [powerRatingHistoryTruck, setPowerRatingHistoryTruck] = useState([]);
+  const [powerHasDataXfinity, setPowerHasDataXfinity] = useState(false);
+  const [powerHasDataTruck, setPowerHasDataTruck] = useState(false);
+  // Derived lines stay below all of the useStates above (TDZ rule).
+  const activePowerDrivers = activeSeries === "xfinity" ? powerDriversXfinity : activeSeries === "truck" ? powerDriversTruck : drivers;
+  const activePowerPrevRanks = activeSeries === "xfinity" ? powerPrevRanksXfinity : activeSeries === "truck" ? powerPrevRanksTruck : prevRanks;
+  const activePowerRatingHistory = activeSeries === "xfinity" ? powerRatingHistoryXfinity : activeSeries === "truck" ? powerRatingHistoryTruck : ratingHistory;
+  const activePowerHasData = activeSeries === "xfinity" ? powerHasDataXfinity : activeSeries === "truck" ? powerHasDataTruck : true;
 
   // DFS Optimizer state — persisted via Supabase
   const [dfsSalaries, setDfsSalaries] = useState({});
@@ -565,7 +594,7 @@ export default function NASCARHub() {
     setSbStatus("loading");
     Promise.all([loadFromSupabase(), loadHubEditorial()]).then(([data]) => {
       if (!data) { setSbStatus("error"); return; }
-      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
+      const { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, btRows, dsRows, ddRows, qpRows, bpRows } = data;
       if (drvRows?.length > 0) setDrivers(drvRows.filter(r=>r.name!=="Kyle Busch").map(r=>({num:r.num,name:r.name,team:r.team,mfg:r.mfg,overall:r.overall,superspeedway:r.superspeedway,intermediate:r.intermediate,short:r.short,road:r.road,rookie:r.rookie||false})));
       if (logRows?.length > 0) setRaceHistory(logRows.map(r=>({race:r.race_name,trackType:r.track_type,date:r.race_date,topFinishers:r.top_finishers})));
       if (statRows?.length > 0) { const ss={}; statRows.forEach(r=>{ss[r.num]={races:r.races,totalFin:r.total_fin,totalSt:r.total_st,wins:r.wins,t5:r.t5,t10:r.t10,led:r.led,best:r.best,dnf:r.dnf};}); setSeasonStats(ss); }
@@ -576,6 +605,17 @@ export default function NASCARHub() {
       if (spRows?.[0]) setSeasonPoints(spRows[0].value||{});
       if (spxRows?.[0]) setSeasonPointsXfinity(spxRows[0].value||{});
       if (spTruckRows?.[0]) setSeasonPointsTruck(spTruckRows[0].value||{});
+      // Phase 3 power: only overwrite the equal-70 starting roster when a
+      // stored record actually exists; otherwise the series keeps the
+      // starting roster and hasData stays false (tab shows "not built yet").
+      if (powerDriversXfinityRows?.[0]) { setPowerDriversXfinity(powerDriversXfinityRows[0].value||powerRoster70(INITIAL_DRIVERS_XFINITY)); setPowerHasDataXfinity(true); }
+      if (powerDriversTruckRows?.[0]) { setPowerDriversTruck(powerDriversTruckRows[0].value||powerRoster70(INITIAL_DRIVERS_TRUCK)); setPowerHasDataTruck(true); }
+      if (prXfinityRows?.[0]) setPowerPrevRanksXfinity(prXfinityRows[0].value||{});
+      if (prTruckRows?.[0]) setPowerPrevRanksTruck(prTruckRows[0].value||{});
+      if (rfXfinityRows?.[0]) setPowerRecentFinishesXfinity(rfXfinityRows[0].value||{});
+      if (rfTruckRows?.[0]) setPowerRecentFinishesTruck(rfTruckRows[0].value||{});
+      if (rhXfinityRows?.[0]) setPowerRatingHistoryXfinity(rhXfinityRows[0].value||[]);
+      if (rhTruckRows?.[0]) setPowerRatingHistoryTruck(rhTruckRows[0].value||[]);
       if (btRows?.[0]) setBattleRaces(btRows[0].value||[]);
       if (dsRows?.[0]) setDfsSalaries(dsRows[0].value||{});
       if (ddRows?.[0]) setDfsDisabled(ddRows[0].value||[]);
@@ -648,6 +688,33 @@ export default function NASCARHub() {
     setRaceArchive(newRaceArchive);
     doSave(newDrivers, newRaceHistory, newSeasonStats, newRatingHistory, newPR, newRF, newRaceArchive);
   }, [drivers, prevRanks, recentFinishes, raceHistory, ratingHistory, seasonStats, raceArchive, doSave]);
+
+  // Phase 3: admin race apply for a LOWER series only. Mirrors Cup's
+  // handleRaceApplied for the ratings computation, but deliberately does
+  // NOT touch Cup seasonStats / raceHistory / raceArchive, which are
+  // Cup-only stores; a lower-series apply must never pollute them.
+  // The series argument is passed through to processRace so the
+  // backmarker penalty uses that series' field size (perfScore itself
+  // still uses the Cup field size — a known pre-existing quirk, flagged
+  // separately, not changed here).
+  const handlePowerRaceApplied = useCallback(({ series, raceName, trackType, totalLaps, results }) => {
+    const s = normalizeSeries(series);
+    if (s === "cup") return;
+    const curDrivers = s === "xfinity" ? powerDriversXfinity : powerDriversTruck;
+    const curPR = s === "xfinity" ? powerPrevRanksXfinity : powerPrevRanksTruck;
+    const curRF = s === "xfinity" ? powerRecentFinishesXfinity : powerRecentFinishesTruck;
+    const curRH = s === "xfinity" ? powerRatingHistoryXfinity : powerRatingHistoryTruck;
+    const { drivers: newDrivers, prevRanks: newPR, recentFinishes: newRF, preSnap, postSnap } = processRace(curDrivers, raceName, trackType, totalLaps, results, curPR, curRF, s);
+    const newRH = [...curRH, preSnap, postSnap];
+    if (s === "xfinity") {
+      setPowerDriversXfinity(newDrivers); setPowerPrevRanksXfinity(newPR);
+      setPowerRecentFinishesXfinity(newRF); setPowerRatingHistoryXfinity(newRH); setPowerHasDataXfinity(true);
+    } else {
+      setPowerDriversTruck(newDrivers); setPowerPrevRanksTruck(newPR);
+      setPowerRecentFinishesTruck(newRF); setPowerRatingHistoryTruck(newRH); setPowerHasDataTruck(true);
+    }
+    savePowerToSupabase(s, { drivers: newDrivers, prevRanks: newPR, recentFinishes: newRF, ratingHistory: newRH });
+  }, [powerDriversXfinity, powerDriversTruck, powerPrevRanksXfinity, powerPrevRanksTruck, powerRecentFinishesXfinity, powerRecentFinishesTruck, powerRatingHistoryXfinity, powerRatingHistoryTruck]);
 
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
@@ -787,7 +854,7 @@ export default function NASCARHub() {
           <main className="nascar-main" style={{ flex:"1 1 1000px", minWidth:0, overflow:"auto", padding:"24px 28px", width:"100%" }}>
             <Suspense fallback={<TabLoading />}>
             <div key={activeTab} style={{ animation:"fadeIn 0.2s ease" }}>
-              {activeTab === "power"     && <PowerRankingsTab drivers={activeDrivers} prevRanks={prevRanks} ratingHistory={ratingHistory} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} />}
+              {activeTab === "power"     && <PowerRankingsTab drivers={activeDrivers} prevRanks={prevRanks} ratingHistory={ratingHistory} powerDrivers={activePowerDrivers} powerPrevRanks={activePowerPrevRanks} powerRatingHistory={activePowerRatingHistory} powerHasData={activePowerHasData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} />}
               {activeTab === "predictor" && <PredictorTab drivers={activeDrivers} csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} displayDrivers={activeDrivers} />}
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
@@ -818,6 +885,9 @@ export default function NASCARHub() {
         <GlobalAdminPanel
           drivers={drivers}
           onRaceApplied={handleRaceApplied}
+          powerDriversXfinity={powerDriversXfinity}
+          powerDriversTruck={powerDriversTruck}
+          onPowerRaceApplied={handlePowerRaceApplied}
           raceHistory={raceHistory}
           raceArchive={raceArchive}
           onUndo={handleUndo}
