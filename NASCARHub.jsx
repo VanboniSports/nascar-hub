@@ -411,6 +411,51 @@ export default function NASCARHub() {
     return () => { alive = false; };
   }, [activeSeries]);
 
+  // Race-hub CSV load (Oct 24, 2026): opening a lower-series race page
+  // needs that series' race-data CSV even when the data-series switcher
+  // was never touched, so the page can show official results. Same fetch
+  // / parse / cache path as the lazy data-series effect above; Cup keeps
+  // using the global csvData and never runs this.
+  useEffect(() => {
+    if (activeTab !== "race") return;
+    const hub = raceSlug ? hubBySlug(raceSlug) : currentHub();
+    const series = hub && hub.series;
+    if (!series || series === "cup" || seriesCsvData[series]) return;
+    let alive = true;
+    const driverList = series === "xfinity" ? INITIAL_DRIVERS_XFINITY : INITIAL_DRIVERS_TRUCK;
+    setSeriesCsvLoading(true);
+    fetch(seriesCsvUrl(series))
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
+      })
+      .then(text => {
+        if (!alive) return;
+        const parsed = parseCSVData(text, driverList);
+        if (parsed.length > 0) {
+          setSeriesCsvData(prev => ({ ...prev, [series]: parsed }));
+          try { localStorage.setItem(seriesCsvCacheKey(series), JSON.stringify(parsed)); } catch {}
+        } else {
+          throw new Error("CSV parsed but produced 0 records");
+        }
+        setSeriesCsvLoading(false);
+      })
+      .catch(err => {
+        if (!alive) return;
+        console.warn("Race-hub series CSV auto-fetch failed, trying localStorage cache:", err);
+        try {
+          const csvRaw = localStorage.getItem(seriesCsvCacheKey(series));
+          if (csvRaw) {
+            const cached = JSON.parse(csvRaw);
+            setSeriesCsvData(prev => ({ ...prev, [series]: cached }));
+            setSeriesCsvError(null);
+          }
+        } catch {}
+        setSeriesCsvLoading(false);
+      });
+    return () => { alive = false; };
+  }, [activeTab, raceSlug, seriesCsvData]);
+
   const saveCsvData = useCallback(async (parsed) => {
     setCsvData(parsed);
     try { localStorage.setItem("nascar_csv_data", JSON.stringify(parsed)); } catch {}
@@ -944,7 +989,7 @@ export default function NASCARHub() {
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
-              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} qualPracticeBySeries={{ cup: qualPractice, xfinity: qualPracticeXfinity, truck: qualPracticeTruck }} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
+              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} qualPracticeBySeries={{ cup: qualPractice, xfinity: qualPracticeXfinity, truck: qualPracticeTruck }} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} csvDataBySeries={{ cup: csvData, xfinity: seriesCsvData.xfinity || [], truck: seriesCsvData.truck || [] }} />}
               {activeTab === "sessions"  && <SessionsTab qualPractice={qualPractice} qualPracticeBySeries={{ cup: qualPractice, xfinity: qualPracticeXfinity, truck: qualPracticeTruck }} raceArchive={raceArchive} battleRaces={battleRaces} drivers={drivers} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}

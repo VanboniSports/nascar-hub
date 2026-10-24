@@ -102,7 +102,7 @@ function hubFromSchedule(r, series = "cup") {
       `${r.track} hosts the ${officialName}, a ${r.laps}-lap run on a ${r.length}-mile ${r.type} track. The full preview for this one is still coming together. Check back through the week as practice, qualifying, and the race itself fill in the blanks.`,
       normalizeSeries(series) === "cup"
         ? "Here is how this page works. Every week four pick sources submit a top 10: Pure Stats (track-type history), Enhanced Pure Stats (which folds in manufacturer trends, momentum, and playoff math), the site's own Power Rankings, and my gut. The Battle Tracker scores all four against the official results, and the season-long tally keeps me honest."
-        : "Battle Tracker is Cup-only for 2026, so this hub does not carry battle scoring. Model predictions for this series appear in the Model Predictions section below when available, and on the Race Predictor tab. Official results will appear here once per-series results are wired.",
+        : "Battle Tracker is Cup-only for 2026, so this hub does not carry battle scoring. Model predictions for this series appear in the Model Predictions section below when available, and on the Race Predictor tab. Official results for this series appear here once they are in the site's race data.",
     ],
   };
 }
@@ -224,6 +224,39 @@ export function findArchiveForHub(raceArchive, hub) {
     if (close.length) return close[0].a;
   }
   return null;
+}
+
+// Match a series' race-data CSV rows to a hub, so a lower-series race page
+// can show official results from that series' own data. Parsed CSV rows
+// are arrays: [driver, track, year, finish, start, lapsLed, ..., raceDate
+// at index 9]. Matching is by track + race date, never by week number
+// (weeks collide across series) and never across series: the caller
+// passes only this hub's series' rows. Stage points are not in the CSV,
+// so sp is null and Pts is the base race-finish points from
+// raceFinishPoints; the table renders Stage as an em dash for these rows
+// rather than a zero that would imply known stage points.
+const normTrackName = s => (s || "").toLowerCase().trim().replace(/\s*\([^)]*\)\s*$/, "");
+export function findCsvResultsForHub(csvRows, hub) {
+  if (!hub || !csvRows || !csvRows.length || !hub.date) return null;
+  const track = normTrackName(hub.track);
+  const byDate = csvRows.filter(r => r && r[9] === hub.date && normTrackName(r[1]) === track && r[3] > 0);
+  let rows = byDate;
+  if (!rows.length) {
+    // CSV race dates are occasionally a day off (Trucks Charlotte and
+    // Richmond 2026). Fall back to the same track within 3 days, but
+    // only when that window holds exactly one race date, so a fallback
+    // can never merge two races at the same track.
+    const t = new Date(hub.date + "T12:00:00").getTime();
+    const near = csvRows.filter(r => {
+      if (!r || normTrackName(r[1]) !== track || !(r[3] > 0)) return false;
+      const d = new Date((r[9] || "") + "T12:00:00").getTime();
+      return !isNaN(d) && Math.abs(d - t) <= 3 * 86400000;
+    });
+    const dates = [...new Set(near.map(r => r[9]))];
+    if (dates.length === 1) rows = near;
+  }
+  if (!rows.length) return null;
+  return rows.map(r => ({ fin: r[3], name: r[0], st: r[4], led: r[5], sp: null, pts: raceFinishPoints(r[3]) })).sort((a, b) => a.fin - b.fin);
 }
 // Highest-scoring predictor for a race that has actual results.
 // `models` limits which predictors are eligible (race hubs exclude the
@@ -602,7 +635,7 @@ export function LiveRunningOrder({ hub }) {
 // RACE HUB PAGE — /race/<slug>
 
 
-export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qualPracticeBySeries, onOpenRace, onOpenTab, raceArchive, drivers }) {
+export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qualPracticeBySeries, csvDataBySeries, onOpenRace, onOpenTab, raceArchive, drivers }) {
   if (!hub) {
     // Direct /race/<slug> links for weeks whose slug comes from the Supabase
     // editorial rows resolve on the first paint after boot loads them.
@@ -627,9 +660,11 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
 
   // Series gating for this page. Battle Tracker and the race archive
   // are Cup-only today. Practice/qualifying data is per-series since
-  // Oct 24, 2026 (see the qp block below): for a lower-series hub every
-  // Cup-only source is forced to empty, so the page shows a "not in the
-  // site yet" note instead of Cup data wearing another series' name.
+  // Oct 24, 2026 (see the qp block below), and official results for a
+  // lower-series hub come from that series' own race-data CSV (see the
+  // csvResults block below). For a lower-series hub every Cup-only
+  // source is forced to empty, so the page shows an honest pending note
+  // instead of Cup data wearing another series' name.
   // findBattleForHub and findArchiveForHub gate the same way; this is
   // the second, page-level guard.
   const isCupHub = hub.series === "cup";
@@ -665,6 +700,15 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
       return { ...r, name: d ? d.name : (r.name || `Car #${r.num}`), pts: raceFinishPoints(r.fin) + (r.sp || 0) + (r.fl ? 1 : 0) };
     })
     .sort((a, b) => a.fin - b.fin) : null;
+  // Lower-series official results (Oct 24, 2026): from this series' own
+  // race-data CSV rows, matched by track + date by findCsvResultsForHub.
+  // Cup keeps the battle/archive path exactly as before; lower hubs never
+  // read Cup results, and Cup hubs never read CSV rows here.
+  const csvResults = !isCupHub && csvDataBySeries && csvDataBySeries[hub.series]
+    ? findCsvResultsForHub(csvDataBySeries[hub.series], hub) : null;
+  const lowerActuals = csvResults ? csvResults.map(r => r.name) : null;
+  const raceActuals = isCupHub ? actuals : lowerActuals;
+  const raceFullResults = isCupHub ? fullResults : csvResults;
   const typeColor = TC[hub.trackType] || T.accent;
 
   // Practice/qualifying: per-series record (Oct 24, 2026), matched
@@ -692,9 +736,10 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
   // it shows the final running order in the gap between the feed ending and
   // the Race Results tab appearing (~90 min for post-race inspection).
   // Cup keeps the old rule (Live stays up after the checkered flag until
-  // official results land). For a lower-series hub there are no official
-  // results in the site yet, so keeping Live open forever after race day
-  // would be wrong; Live is offered on race day only.
+  // official results land). For a lower-series hub the Race Results tab
+  // appears once that series' CSV has the race, so keeping Live open
+  // forever after race day would be wrong; Live is offered on race day
+  // only.
   const liveTabOpen = isCupHub
     ? (status === "live" || (status === "completed" && !actuals))
     : status === "live";
@@ -702,17 +747,17 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
     { id: "practice", label: "Practice" },
     { id: "qualifying", label: "Qualifying" },
     ...(liveTabOpen ? [{ id: "live", label: "Live" }] : []),
-    ...(actuals ? [{ id: "race", label: "Race Results" }] : []),
+    ...(raceActuals ? [{ id: "race", label: "Race Results" }] : []),
   ];
   const [resultsTab, setResultsTab] = useState(
-    liveTabOpen ? "live" : actuals ? "race" : qualCount > 0 ? "qualifying" : "practice"
+    liveTabOpen ? "live" : raceActuals ? "race" : qualCount > 0 ? "qualifying" : "practice"
   );
   // When official results land mid-session, hand off from the Live tab.
   const sawActualsRef = useRef(false);
   useEffect(() => {
-    if (actuals && !sawActualsRef.current) setResultsTab("race");
-    sawActualsRef.current = !!actuals;
-  }, [actuals]);
+    if (raceActuals && !sawActualsRef.current) setResultsTab("race");
+    sawActualsRef.current = !!raceActuals;
+  }, [raceActuals]);
 
   // Prev/next stay within the same series, in the same newest-first
   // order as before. For Cup this is exactly the old navigation.
@@ -872,7 +917,7 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
             // neutral "Session times not recorded" instead of a wrong time.
             { label: "Practice", when: !hub.hasSessionData ? "Session times not recorded" : hub.practice ? hub.practice : "No practice scheduled", done: pracCount > 0, canceled: pracCount === 0 && pracCanceled, note: !hub.hasSessionData ? "Not recorded" : hub.practice === null ? "No practice scheduled" : pracCount > 0 ? `${pracCount} drivers logged` : pracCanceled ? "Canceled" : "Scheduled" },
             { label: "Qualifying", when: !hub.hasSessionData ? "Session times not recorded" : (hub.qualifying || "Not confirmed"), done: qualCount > 0, canceled: qualCount === 0 && qualCanceled, note: !hub.hasSessionData ? "Not recorded" : qualCount > 0 ? `${qualCount} drivers logged` : qualCanceled ? "Canceled" : "Scheduled" },
-            { label: "Race", when: !hub.hasSessionData ? `${hub.dateLabel}, session times not recorded` : `${hub.dateLabel}, ${hub.raceTime || "time not confirmed"}`, done: status !== "upcoming", canceled: false, note: status === "live" ? "Green flag today" : status === "completed" ? (actuals ? `Winner: ${actuals[0]}` : "Results pending") : "Scheduled" },
+            { label: "Race", when: !hub.hasSessionData ? `${hub.dateLabel}, session times not recorded` : `${hub.dateLabel}, ${hub.raceTime || "time not confirmed"}`, done: status !== "upcoming", canceled: false, note: status === "live" ? "Green flag today" : status === "completed" ? (raceActuals ? `Winner: ${raceActuals[0]}` : "Results pending") : "Scheduled" },
           ].map((row, i) => (
             <div key={i} style={{ ...card, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: row.canceled ? T.red : row.done ? T.green : T.textDim, flexShrink: 0 }} />
@@ -903,9 +948,9 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
       <MobileSection id="results" title="Official Results">
       <div>
         {sectionTitle("Official Results")}
-        {!isCupHub && (
+        {!isCupHub && status === "completed" && !raceActuals && (
           <div style={{ ...card, marginBottom: 12, fontSize: 12, color: T.textMid, lineHeight: 1.6 }}>
-            Official results for the {seriesLabel(hub.series)} Series are not in the site yet. This page never shows another series' results here. The Race Results tab appears once per-series results are wired, and the Live tab on race day only shows this series' race.
+            Official results for the {seriesLabel(hub.series)} Series are not in the site's race data for this race yet. This page never shows another series' results here. Results appear here once the race data is updated, and the Live tab on race day only shows this series' race.
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
@@ -956,13 +1001,13 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
           )
         )}
         {resultsTab === "live" && <LiveRunningOrder hub={hub} />}
-        {resultsTab === "race" && actuals && (
+        {resultsTab === "race" && raceActuals && (
           <div style={card}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
               <span style={{ fontSize: 22 }}>🏆</span>
               <div>
                 <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, textTransform: "uppercase" }}>Winner</div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: T.gold, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1 }}>{actuals[0]}</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: T.gold, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1 }}>{raceActuals[0]}</div>
               </div>
               {winner && (
                 <div style={{ marginLeft: "auto", fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
@@ -970,7 +1015,7 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
                 </div>
               )}
             </div>
-            {fullResults ? (
+            {raceFullResults ? (
               <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 4 }}>
                 <thead>
                   <tr style={{ borderBottom: `2px solid ${T.border}` }}>
@@ -980,19 +1025,19 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qua
                   </tr>
                 </thead>
                 <tbody>
-                  {fullResults.map((r, i) => (
-                    <tr key={r.num} style={{ borderBottom: i < fullResults.length - 1 ? `1px solid ${T.border}` : "none", background: r.fin === 1 ? `${T.gold}0d` : "none" }}>
+                  {raceFullResults.map((r, i) => (
+                    <tr key={r.num != null ? r.num : r.name} style={{ borderBottom: i < raceFullResults.length - 1 ? `1px solid ${T.border}` : "none", background: r.fin === 1 ? `${T.gold}0d` : "none" }}>
                       <td data-label="Pos" style={{ textAlign: "center", fontSize: 11, fontWeight: 800, color: r.fin === 1 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>P{r.fin}</td>
                       <td data-label="Driver" style={{ fontSize: 13, fontWeight: r.fin === 1 ? 800 : 500, color: T.text, padding: "6px 4px" }}>{r.name}</td>
                       <td data-label="Start" style={{ textAlign: "center", fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.st > 0 ? `P${r.st}` : "—"}</td>
                       <td data-label="Led" style={{ textAlign: "center", fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.led || 0}</td>
-                      <td data-label="Stage" style={{ textAlign: "center", fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.sp || 0}</td>
+                      <td data-label="Stage" style={{ textAlign: "center", fontSize: 12, color: T.textMid, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.sp == null ? "—" : r.sp}</td>
                       <td data-label="Pts" style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: T.accentText, fontFamily: "'IBM Plex Mono',monospace", padding: "6px 4px" }}>{r.pts}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            ) : actuals.slice(0, 10).map((d, i) => (
+            ) : raceActuals.slice(0, 10).map((d, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: i < 9 ? `1px solid ${T.border}` : "none" }}>
                 <span style={{ width: 24, fontSize: 11, fontWeight: 800, color: i === 0 ? T.gold : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>P{i + 1}</span>
                 <span style={{ fontSize: 13, fontWeight: i === 0 ? 800 : 500, color: T.text }}>{d}</span>
