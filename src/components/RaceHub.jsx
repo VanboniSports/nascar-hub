@@ -602,7 +602,7 @@ export function LiveRunningOrder({ hub }) {
 // RACE HUB PAGE — /race/<slug>
 
 
-export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, onOpenRace, onOpenTab, raceArchive, drivers }) {
+export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, qualPracticeBySeries, onOpenRace, onOpenTab, raceArchive, drivers }) {
   if (!hub) {
     // Direct /race/<slug> links for weeks whose slug comes from the Supabase
     // editorial rows resolve on the first paint after boot loads them.
@@ -625,12 +625,13 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, onO
     );
   }
 
-  // Series gating for this page. Battle Tracker, the race archive, and
-  // practice/qualifying data are Cup-only today. For a lower-series hub
-  // every one of those sources is forced to empty, so the page shows a
-  // "not in the site yet" note instead of Cup data wearing another
-  // series' name. findBattleForHub and findArchiveForHub gate the same
-  // way; this is the second, page-level guard.
+  // Series gating for this page. Battle Tracker and the race archive
+  // are Cup-only today. Practice/qualifying data is per-series since
+  // Oct 24, 2026 (see the qp block below): for a lower-series hub every
+  // Cup-only source is forced to empty, so the page shows a "not in the
+  // site yet" note instead of Cup data wearing another series' name.
+  // findBattleForHub and findArchiveForHub gate the same way; this is
+  // the second, page-level guard.
   const isCupHub = hub.series === "cup";
   const effectiveBattleRace = isCupHub ? battleRace : null;
   const status = hubStatus(hub);
@@ -666,21 +667,26 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, onO
     .sort((a, b) => a.fin - b.fin) : null;
   const typeColor = TC[hub.trackType] || T.accent;
 
-  // Practice/qualifying rows are keyed by week number only and are Cup
-  // data. Week numbers collide across series, so a lower-series hub must
-  // not inherit Cup practice/qualifying counts by week.
-  const qpMatch = isCupHub && qualPractice && qualPractice.week === hub.week;
-  const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
-  const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
-  const pracCanceled = qpMatch && !!qualPractice.practiceCanceled;
-  const qualCanceled = qpMatch && !!qualPractice.qualifyingCanceled;
-  const practiceList = (qpMatch && qualPractice.practice)
-    ? Object.entries(qualPractice.practice)
+  // Practice/qualifying: per-series record (Oct 24, 2026), matched
+  // against THAT series' hub week. Week numbers collide across series,
+  // so a Cup week-33 record must never match an O'Reilly week-33 hub,
+  // and a lower-series record must never match a Cup hub. Falls back
+  // to the legacy single prop for Cup callers that do not pass the
+  // per-series map, so Cup behaviour is unchanged without the map.
+  const qp = qualPracticeBySeries ? (qualPracticeBySeries[hub.series] || null)
+    : (isCupHub ? qualPractice : null);
+  const qpMatch = qp && qp.week === hub.week;
+  const pracCount = qpMatch && qp.practice ? Object.keys(qp.practice).length : 0;
+  const qualCount = qpMatch && qp.qualifying ? Object.keys(qp.qualifying).length : 0;
+  const pracCanceled = qpMatch && !!qp.practiceCanceled;
+  const qualCanceled = qpMatch && !!qp.qualifyingCanceled;
+  const practiceList = (qpMatch && qp.practice)
+    ? Object.entries(qp.practice)
         .map(([name, v]) => ({ name, pos: typeof v === "number" ? v : (v.speedRank || 9999), overall: (v && typeof v === "object") ? v.overall : null }))
         .sort((a, b) => a.pos - b.pos)
     : [];
-  const qualList = (qpMatch && qualPractice.qualifying)
-    ? Object.entries(qualPractice.qualifying).map(([name, pos]) => ({ name, pos })).sort((a, b) => a.pos - b.pos)
+  const qualList = (qpMatch && qp.qualifying)
+    ? Object.entries(qp.qualifying).map(([name, pos]) => ({ name, pos })).sort((a, b) => a.pos - b.pos)
     : [];
   // The Live tab stays up after the checkered flag until official results land:
   // it shows the final running order in the gap between the feed ending and
@@ -1021,7 +1027,7 @@ export function RaceHubPage({ hub, battleRace, hubPredictions, qualPractice, onO
 // expand inline, so checking the race never navigates you away from your tab.
 
 
-export function RaceHeroCard({ hub, battleRace, hubPredictions, qualPractice, onOpen, defaultOpen, collapsible }) {
+export function RaceHeroCard({ hub, battleRace, hubPredictions, qualPractice, qualPracticeBySeries, onOpen, defaultOpen, collapsible }) {
   const [open, setOpen] = useState(!!defaultOpen || !collapsible);
   if (!hub) return null;
   const status = hubStatus(hub);
@@ -1037,9 +1043,15 @@ export function RaceHeroCard({ hub, battleRace, hubPredictions, qualPractice, on
   const winner = actuals ? battleWinnerFor(battleRace, HUB_PREDICTORS) : null;
   const darkHorse = battleRace && battleRace.darkHorse;
   const suckPick = battleRace && battleRace.suckPick;
-  const qpMatch = hub.series === "cup" && qualPractice && qualPractice.week === hub.week;
-  const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
-  const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
+  // Practice/qualifying counts from the hub's own series' record
+  // (Oct 24, 2026), matched against that series' hub week — never
+  // another series' record. Falls back to the legacy single prop for
+  // Cup callers that do not pass the per-series map.
+  const qp = qualPracticeBySeries ? (qualPracticeBySeries[hub.series] || null)
+    : (hub.series === "cup" ? qualPractice : null);
+  const qpMatch = qp && qp.week === hub.week;
+  const pracCount = qpMatch && qp.practice ? Object.keys(qp.practice).length : 0;
+  const qualCount = qpMatch && qp.qualifying ? Object.keys(qp.qualifying).length : 0;
   const sectionLabel = { fontSize: 11, fontWeight: 800, color: T.textDim, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1.5, textTransform: "uppercase", margin: "16px 0 8px" };
   return (
     <div style={{

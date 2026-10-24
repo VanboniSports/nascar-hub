@@ -930,7 +930,7 @@ export default function NASCARHub() {
         {/* MOBILE HERO CARD — sits on top (replaces the old next-race banner); hidden on the Race Hub tab itself and on Sessions, where the Sessions tab's own series switcher controls which series is shown and a Cup hero card would leak Cup data under a lower-series selection */}
         {activeTab !== "race" && activeTab !== "sessions" && (
         <div className="nascar-mobile-banner">
-          <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpen={openRacePage} collapsible />
+          <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} qualPracticeBySeries={{ cup: qualPractice, xfinity: qualPracticeXfinity, truck: qualPracticeTruck }} onOpen={openRacePage} collapsible />
         </div>
         )}
 
@@ -944,7 +944,7 @@ export default function NASCARHub() {
               {activeTab === "tracker"   && <BattleTrackerTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "scorecard" && <ScorecardTab battleRaces={battleRaces} incrementTool={incrementTool} />}
               {activeTab === "races"     && <RacesTab battleRaces={battleRaces} onOpenRace={openRacePage} />}
-              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
+              {activeTab === "race"      && <RaceHubPage hub={raceSlug ? hubBySlug(raceSlug) : currentHub()} battleRace={findBattleForHub(battleRaces, raceSlug ? hubBySlug(raceSlug) : currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} qualPracticeBySeries={{ cup: qualPractice, xfinity: qualPracticeXfinity, truck: qualPracticeTruck }} onOpenRace={openRacePage} onOpenTab={handleTabChange} raceArchive={raceArchive} drivers={drivers} />}
               {activeTab === "sessions"  && <SessionsTab qualPractice={qualPractice} qualPracticeBySeries={{ cup: qualPractice, xfinity: qualPracticeXfinity, truck: qualPracticeTruck }} raceArchive={raceArchive} battleRaces={battleRaces} drivers={drivers} />}
               {activeTab === "tracks"    && <TrackStatsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
               {activeTab === "analytics" && <DriverAnalyticsTab csvData={activeCsvData} incrementTool={incrementTool} series={activeSeries} onSeriesChange={setDataSeries} fullTimerNames={seriesFullTimerNames} />}
@@ -959,7 +959,7 @@ export default function NASCARHub() {
           {/* DESKTOP SIDEBAR — hero card sits to the side; hidden on the Race Hub tab itself and on Sessions, where the Sessions tab's own series switcher controls which series is shown and a Cup hero card would leak Cup data under a lower-series selection */}
           {activeTab !== "race" && activeTab !== "sessions" && (
           <div className="nascar-sidebar" style={{ flex: "0 1 320px", minWidth: 280, maxWidth: 320 }}>
-            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} onOpen={openRacePage} defaultOpen />
+            <RaceHeroCard hub={currentHub()} battleRace={findBattleForHub(battleRaces, currentHub())} hubPredictions={hubPredictionsBySeries} qualPractice={qualPractice} qualPracticeBySeries={{ cup: qualPractice, xfinity: qualPracticeXfinity, truck: qualPracticeTruck }} onOpen={openRacePage} defaultOpen />
           </div>
           )}
         </div>
