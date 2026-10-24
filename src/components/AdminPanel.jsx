@@ -488,7 +488,7 @@ export function UsageAdminSection({ toolUsage }) {
 }
 
 
-export function GlobalAdminPanel({ drivers, onRaceApplied, powerDriversXfinity, powerDriversTruck, onPowerRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, seasonPointsXfinity, seasonPointsTruck, onSeasonPointsSaveXfinity, onSeasonPointsSaveTruck, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, blogPosts, onBlogSavePost, onBlogDeletePost, onHubEditorialSave }) {
+export function GlobalAdminPanel({ drivers, onRaceApplied, powerDriversXfinity, powerDriversTruck, onPowerRaceApplied, raceHistory, raceArchive, onUndo, onReset, onReplay, canUndo, battleRaces, onBattleSave, csvData, csvLoading, csvError, onCsvUpload, onCsvRefresh, seasonPoints, onSeasonPointsSave, seasonPointsXfinity, seasonPointsTruck, onSeasonPointsSaveXfinity, onSeasonPointsSaveTruck, toolUsage, dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, qualPracticeXfinity, onQualPracticeSaveXfinity, qualPracticeTruck, onQualPracticeSaveTruck, blogPosts, onBlogSavePost, onBlogDeletePost, onHubEditorialSave }) {
   const [expanded, setExpanded] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [pw, setPw] = useState("");
@@ -1068,6 +1068,10 @@ export function GlobalAdminPanel({ drivers, onRaceApplied, powerDriversXfinity, 
                   onDfsDisabledSave={onDfsDisabledSave}
                   qualPractice={qualPractice}
                   onQualPracticeSave={onQualPracticeSave}
+                  qualPracticeXfinity={qualPracticeXfinity}
+                  onQualPracticeSaveXfinity={onQualPracticeSaveXfinity}
+                  qualPracticeTruck={qualPracticeTruck}
+                  onQualPracticeSaveTruck={onQualPracticeSaveTruck}
                 />
               )}
 
@@ -1275,7 +1279,7 @@ export function HubEditorialAdminSection({ onHubEditorialSave }) {
 // ─────────────────────────────────────────────────────────────
 
 
-export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave }) {
+export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, onDfsDisabledSave, qualPractice, onQualPracticeSave, qualPracticeXfinity, onQualPracticeSaveXfinity, qualPracticeTruck, onQualPracticeSaveTruck }) {
   const [activePlatform, setActivePlatform] = useState("dk");
   const [uploadMsg, setUploadMsg]           = useState("");
   const [disableDriverName, setDisableDriverName] = useState("");
@@ -1288,12 +1292,22 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
   const [qualMsg, setQualMsg]               = useState("");
   const [practiceCanceled, setPracticeCanceled]     = useState(false);
   const [qualifyingCanceled, setQualifyingCanceled] = useState(false);
+  // Per-series practice/qualifying (Oct 24, 2026): this section always
+  // works on the selected series' record only. Cup keeps the legacy
+  // dfsQualifying record exactly; O'Reilly uses dfsQualifyingXfinity
+  // and Trucks dfsQualifyingTruck, so a save for one series can never
+  // wipe another series' data (the combined-save wipe rule applies
+  // per series, not across series). Salaries above stay Cup-only.
+  const [qualSeries, setQualSeries] = useState("cup");
+  const qp = qualSeries === "xfinity" ? qualPracticeXfinity : qualSeries === "truck" ? qualPracticeTruck : qualPractice;
+  const onQpSave = qualSeries === "xfinity" ? onQualPracticeSaveXfinity : qualSeries === "truck" ? onQualPracticeSaveTruck : onQualPracticeSave;
+  const qualSchedule = qualSeries === "xfinity" ? SCHEDULE_XFINITY : qualSeries === "truck" ? SCHEDULE_TRUCK : SCHEDULE;
 
   // Keep the canceled checkboxes in sync with the saved week data
   useEffect(() => {
-    setPracticeCanceled(!!qualPractice?.practiceCanceled);
-    setQualifyingCanceled(!!qualPractice?.qualifyingCanceled);
-  }, [qualPractice]);
+    setPracticeCanceled(!!qp?.practiceCanceled);
+    setQualifyingCanceled(!!qp?.qualifyingCanceled);
+  }, [qp]);
 
   const inputStyle = { width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", fontFamily: "'Barlow',sans-serif" };
   const btnStyle = (c) => ({ padding: "8px 18px", background: c, border: "none", color: "#fff", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" });
@@ -1616,13 +1630,13 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
       practiceIsTiming = false;
     }
     const weekVal = qualWeek === "allstar" ? "allstar" : parseInt(qualWeek);
-    const weekMatches = qualPractice && qualPractice.week === weekVal;
+    const weekMatches = qp && qp.week === weekVal;
     // An empty text box preserves that session's already-saved data for the
     // same week, so flag-only saves (e.g. marking practice canceled) never
     // wipe the other session.
-    const qualResults = Object.keys(qualParsed).length > 0 ? qualParsed : (weekMatches ? (qualPractice.qualifying || {}) : {});
-    const practiceResults = Object.keys(practiceParsed).length > 0 ? practiceParsed : (weekMatches ? (qualPractice.practice || {}) : {});
-    if (!parsedTiming && Object.keys(practiceParsed).length === 0 && weekMatches) practiceIsTiming = !!qualPractice.practiceIsTiming;
+    const qualResults = Object.keys(qualParsed).length > 0 ? qualParsed : (weekMatches ? (qp.qualifying || {}) : {});
+    const practiceResults = Object.keys(practiceParsed).length > 0 ? practiceParsed : (weekMatches ? (qp.practice || {}) : {});
+    if (!parsedTiming && Object.keys(practiceParsed).length === 0 && weekMatches) practiceIsTiming = !!qp.practiceIsTiming;
     if (Object.keys(qualResults).length === 0 && Object.keys(practiceResults).length === 0 && !practiceCanceled && !qualifyingCanceled) {
       setQualMsg("❌ No drivers matched from either text area");
       return;
@@ -1636,7 +1650,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
       qualifyingCanceled,
       updated: new Date().toISOString(),
     };
-    onQualPracticeSave(updated);
+    onQpSave(updated);
     const allUnmatched = [...new Set([...qualUnmatched, ...practiceUnmatched])];
     const qCount = Object.keys(qualResults).length;
     const pCount = Object.keys(practiceResults).length;
@@ -1650,11 +1664,11 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
   };
 
   // Current qualifying status
-  const qualWeekLabel = qualPractice?.week != null
-    ? (qualPractice.week === "allstar" ? "All-Star" : `Week ${qualPractice.week}`)
+  const qualWeekLabel = qp?.week != null
+    ? (qp.week === "allstar" ? "All-Star" : `Week ${qp.week}`)
     : null;
-  const qualCount = qualPractice?.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
-  const practiceCount = qualPractice?.practice ? Object.keys(qualPractice.practice).length : 0;
+  const qualCount = qp?.qualifying ? Object.keys(qp.qualifying).length : 0;
+  const practiceCount = qp?.practice ? Object.keys(qp.practice).length : 0;
 
   const currentSalaries = dfsSalaries?.[activePlatform] || {};
   const salaryCount = Object.keys(currentSalaries).length;
@@ -1773,9 +1787,29 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
           <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 }}>Current Data</div>
           <div style={{ fontSize: 12, color: qualCount > 0 ? T.green : T.textDim, fontFamily: "'IBM Plex Mono',monospace" }}>
             {qualCount > 0
-              ? `✓ ${qualWeekLabel} qualifying: ${qualCount} drivers${practiceCount > 0 ? ` + ${practiceCount} practice` : ""}${qualPractice?.updated ? ` · ${new Date(qualPractice.updated).toLocaleString()}` : ""}`
+              ? `✓ ${qualWeekLabel} qualifying: ${qualCount} drivers${practiceCount > 0 ? ` + ${practiceCount} practice` : ""}${qp?.updated ? ` · ${new Date(qp.updated).toLocaleString()}` : ""}`
               : "No qualifying data saved"
             }
+          </div>
+        </div>
+
+        {/* Series selector (Oct 24, 2026): the week list, status, text
+              areas, and Import & Save below all belong to this series
+              only. Switching series resets the week pick so a Cup week
+              can never be saved under a lower series (week numbers
+              collide across series). */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6 }}>Series</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[["cup", "Cup"], ["xfinity", "O'Reilly"], ["truck", "Trucks"]].map(([id, label]) => (
+              <button key={id} onClick={() => { setQualSeries(id); setQualWeek(""); setQualMsg(""); }}
+                style={{ flex: 1, padding: "8px 14px", borderRadius: 8, cursor: "pointer", background: qualSeries === id ? T.accentSoft : T.surface3, border: `1px solid ${qualSeries === id ? T.accent : T.border}`, color: qualSeries === id ? T.accentText : T.textDim, fontSize: 12, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: T.textDim, marginTop: 6, fontFamily: "'IBM Plex Mono',monospace" }}>
+            Saving here writes only the {qualSeries === "xfinity" ? "O'Reilly" : qualSeries === "truck" ? "Trucks" : "Cup"} record and never touches another series.
           </div>
         </div>
 
@@ -1785,7 +1819,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
           <select value={qualWeek} onChange={e => setQualWeek(e.target.value)}
             style={{ width: "100%", background: T.surface2, border: `1px solid ${T.border}`, color: T.text, borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none" }}>
             <option value="">Choose a race…</option>
-            {SCHEDULE.map(r => (
+            {qualSchedule.map(r => (
               <option key={r.allStar ? "allstar" : r.week} value={r.allStar ? "allstar" : r.week}>
                 {r.allStar ? "★" : `Wk ${r.week}`} · {r.date} · {r.name}{r.allStar ? " (Non-Points)" : ""}
               </option>
@@ -1828,7 +1862,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
             Import & Save
           </button>
           {qualCount > 0 && (
-            <button onClick={() => { if (window.confirm("Clear qualifying & practice data?")) { onQualPracticeSave(null); setQualMsg("✓ Cleared"); } }}
+            <button onClick={() => { if (window.confirm("Clear qualifying & practice data?")) { onQpSave(null); setQualMsg("✓ Cleared"); } }}
               style={{ ...btnStyle("#334155"), padding: "9px 16px" }}>
               Clear Data
             </button>
@@ -1847,7 +1881,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
               View Qualifying Data ({qualCount} drivers)
             </summary>
             <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px", maxHeight: 300, overflowY: "auto" }}>
-              {Object.entries(qualPractice.qualifying).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
+              {Object.entries(qp.qualifying).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
                 <div key={name} style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid, padding: "2px 0", display: "flex", justifyContent: "space-between" }}>
                   <span>{name}</span>
                   <span style={{ color: T.accent, fontWeight: 700 }}>P{pos}</span>
@@ -1861,16 +1895,16 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
         {practiceCount > 0 && (
           <details style={{ background: T.surface3, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
             <summary style={{ cursor: "pointer", fontSize: 11, color: T.textMid, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
-              View Practice Data ({practiceCount} drivers){qualPractice?.practiceIsTiming ? " — Timing ✓" : ""}
+              View Practice Data ({practiceCount} drivers){qp?.practiceIsTiming ? " — Timing ✓" : ""}
             </summary>
             <div style={{ marginTop: 8, maxHeight: 350, overflowY: "auto" }}>
-              {qualPractice.practiceIsTiming ? (
+              {qp.practiceIsTiming ? (
                 // Rich timing data view
                 <div>
                   <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: "2px 8px", padding: "4px 0", borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
                     <span>Driver</span><span>Spd Rank</span><span>LR Rank</span><span>Δ Rank</span><span>Sal Gap</span>
                   </div>
-                  {Object.entries(qualPractice.practice)
+                  {Object.entries(qp.practice)
                     .sort((a, b) => (a[1].speedRank || 99) - (b[1].speedRank || 99))
                     .map(([name, pd]) => (
                     <div key={name} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: "2px 8px", padding: "3px 0", borderBottom: `1px solid ${T.border}10`, fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid }}>
@@ -1887,7 +1921,7 @@ export function DFSAdminSection({ dfsSalaries, onDfsSalariesSave, dfsDisabled, o
               ) : (
                 // Legacy position view
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px" }}>
-                  {Object.entries(qualPractice.practice).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
+                  {Object.entries(qp.practice).sort((a, b) => a[1] - b[1]).map(([name, pos]) => (
                     <div key={name} style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: T.textMid, padding: "2px 0", display: "flex", justifyContent: "space-between" }}>
                       <span>{name}</span>
                       <span style={{ color: T.green, fontWeight: 700 }}>P{pos}</span>

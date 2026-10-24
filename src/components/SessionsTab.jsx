@@ -1,11 +1,13 @@
 // Sessions Tab — Practice, Qualifying, Live, and Race Results in one place.
 // Streamlined view for checking session times without the full race page.
 // Series switcher (Oct 2026): Cup / O'Reilly / Trucks. Default is Cup, so
-// Cup behaviour is unchanged. For lower series, NEVER borrow Cup data:
-// practice/qualifying are Cup week-keyed (week numbers collide across
-// series), and battle/archive lookups already return null for non-Cup
-// hubs. Lower hubs therefore show honest empty states until per-series
-// practice/qualifying logging and results archives exist (separate job).
+// Cup behaviour is unchanged. Per-series practice/qualifying (Oct 24,
+// 2026): each series reads ONLY its own record (Cup dfsQualifying,
+// O'Reilly dfsQualifyingXfinity, Trucks dfsQualifyingTruck), matched
+// against THAT series' hub week, because week numbers collide across
+// series (Cup week 33 vs O'Reilly week 33 are different races). Battle/
+// archive lookups still return null for non-Cup hubs, so lower hubs
+// show honest empty states until their data is imported.
 import React, { useState } from "react";
 import { T } from "../theme.js";
 import { currentHub, hubStatus, LiveRunningOrder, findArchiveForHub, findBattleForHub } from "./RaceHub.jsx";
@@ -13,7 +15,7 @@ import { seriesLabel } from "../data/series.js";
 import { SeriesSwitcher } from "./SeriesSwitcher.jsx";
 import { HubStatusBadge, sectionTitle } from "./ui.jsx";
 
-export default function SessionsTab({ qualPractice, raceArchive, battleRaces, drivers }) {
+export default function SessionsTab({ qualPractice, qualPracticeBySeries, raceArchive, battleRaces, drivers }) {
   const [series, setSeries] = useState("cup");
   const hub = currentHub(series);
 
@@ -28,22 +30,27 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
   const fullResults = archiveEntry && archiveEntry.results ? archiveEntry.results
     : (actuals ? actuals.map((name, i) => ({ pos: i + 1, name })) : null);
 
-  // Cup-only gate: dfsQualifying is a single Cup week-keyed record, and
-  // week numbers collide across series (e.g. Cup week 33 vs O'Reilly
-  // week 33 are different races). Reading it for a lower-series hub
-  // would display Cup practice/qualifying under another series' name.
-  const qpMatch = isCup && qualPractice && hub && qualPractice.week === hub.week;
-  const pracCount = qpMatch && qualPractice.practice ? Object.keys(qualPractice.practice).length : 0;
-  const qualCount = qpMatch && qualPractice.qualifying ? Object.keys(qualPractice.qualifying).length : 0;
-  const pracCanceled = qpMatch && !!qualPractice.practiceCanceled;
-  const qualCanceled = qpMatch && !!qualPractice.qualifyingCanceled;
-  const practiceList = (qpMatch && qualPractice.practice)
-    ? Object.entries(qualPractice.practice)
-        .map(([name, pos]) => ({ name, pos }))
+  // Per-series record: the active series' own record only, never the
+  // Cup record under a lower-series name (and never a lower record
+  // under Cup). Falls back to the legacy single prop for Cup callers
+  // that do not pass the per-series map. Week must match THIS series'
+  // hub week: week numbers collide across series.
+  const qp = qualPracticeBySeries ? (qualPracticeBySeries[series] || null)
+    : (series === "cup" ? qualPractice : null);
+  const qpMatch = qp && hub && qp.week === hub.week;
+  const pracCount = qpMatch && qp.practice ? Object.keys(qp.practice).length : 0;
+  const qualCount = qpMatch && qp.qualifying ? Object.keys(qp.qualifying).length : 0;
+  const pracCanceled = qpMatch && !!qp.practiceCanceled;
+  const qualCanceled = qpMatch && !!qp.qualifyingCanceled;
+  // Practice values may be timing objects (speedRank) rather than plain
+  // positions; rank by speedRank in that case so the list stays ordered.
+  const practiceList = (qpMatch && qp.practice)
+    ? Object.entries(qp.practice)
+        .map(([name, pos]) => ({ name, pos: (pos && typeof pos === "object") ? (pos.speedRank || 99) : pos }))
         .sort((a, b) => a.pos - b.pos)
     : [];
-  const qualList = (qpMatch && qualPractice.qualifying)
-    ? Object.entries(qualPractice.qualifying).map(([name, pos]) => ({ name, pos })).sort((a, b) => a.pos - b.pos)
+  const qualList = (qpMatch && qp.qualifying)
+    ? Object.entries(qp.qualifying).map(([name, pos]) => ({ name, pos })).sort((a, b) => a.pos - b.pos)
     : [];
 
   const resultTabs = [
@@ -99,7 +106,7 @@ export default function SessionsTab({ qualPractice, raceArchive, battleRaces, dr
           {!hub.hasSessionData ? "Session times not recorded"
             : `Practice: ${hub.practice ? hub.practice : "No practice scheduled"} · Qualifying: ${hub.qualifying || "Not confirmed"} · Race: ${hub.dateLabel}, ${hub.raceTime || "time not confirmed"}`}
         </div>
-        {!isCup && (
+        {!isCup && !(qpMatch && (qualCount > 0 || pracCount > 0)) && (
           <div style={{ fontSize: 11, color: T.textDim, fontFamily: "'IBM Plex Mono',monospace", marginTop: 6 }}>
             Practice and qualifying results for this series are not logged yet; session times above come from the schedule.
           </div>

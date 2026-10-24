@@ -92,6 +92,13 @@ export async function loadFromSupabase() {
     const dsRows = byKey["dfsSalaries"] || [];
     const ddRows = byKey["dfsDisabled"] || [];
     const qpRows = byKey["dfsQualifying"] || [];
+    // Per-series practice/qualifying (Oct 24, 2026): same inner shape as
+    // the Cup dfsQualifying object (week, practice, qualifying, canceled
+    // flags). Cup keeps the legacy key exactly; lower series never read
+    // or write the Cup key, and week numbers collide across series, so
+    // each series' record is only ever matched against its own hub week.
+    const qpXfinityRows = byKey["dfsQualifyingXfinity"] || [];
+    const qpTruckRows = byKey["dfsQualifyingTruck"] || [];
     // Blog posts: page load fetches ONLY the lightweight index (id/title/date/
     // excerpt, ~7KB). Full post bodies (which total ~26MB with images) are
     // lazy-loaded when a post is opened. Falls back to per-post rows, then to
@@ -113,7 +120,7 @@ export async function loadFromSupabase() {
         bpRows = Array.isArray(legacyArr) ? [{ value: legacyArr }] : [];
       }
     }
-    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, hubPredXfinityRows, hubPredTruckRows, btRows, dsRows, ddRows, qpRows, bpRows };
+    return { drvRows, logRows, statRows, histRows, prRows, rfRows, raRows, spRows, spxRows, spTruckRows, powerDriversXfinityRows, powerDriversTruckRows, prXfinityRows, prTruckRows, rfXfinityRows, rfTruckRows, rhXfinityRows, rhTruckRows, comboCupRows, comboXfinityRows, comboTruckRows, hubPredXfinityRows, hubPredTruckRows, btRows, dsRows, ddRows, qpRows, qpXfinityRows, qpTruckRows, bpRows };
   } catch(e) { console.error("SB load error:",e); return null; }
 }
 
