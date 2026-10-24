@@ -432,6 +432,19 @@ function liveFeedMatchesHub(data, hub) {
   if (!data || !hub) return false;
   if (data.trackName && hub.track && !trackNamesMatch(data.trackName, hub.track)) return false;
   if (data.lapsTotal && hub.laps && Math.abs(data.lapsTotal - hub.laps) > 10) return false;
+  // DATE guard: laps alone are insufficient. Talladega 2026 proves it: the
+  // O'Reilly race is 94 laps and the Trucks entry is site-listed at 94, so a
+  // Saturday O'Reilly feed passes a Friday Trucks hub's track + laps check.
+  // The feed's updatedAt, converted to its America/New_York calendar date,
+  // must equal hub.date (YYYY-MM-DD). Fail closed if updatedAt is missing or
+  // unparseable, or hub.date is missing, the same as a mismatch.
+  if (!hub.date) return false;
+  const ts = Date.parse(data.updatedAt);
+  if (!Number.isFinite(ts)) return false;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(ts));
+  const get = (t) => parts.find((p) => p.type === t)?.value;
+  const feedDate = `${get("year")}-${get("month")}-${get("day")}`;
+  if (feedDate !== hub.date) return false;
   return true;
 }
 
